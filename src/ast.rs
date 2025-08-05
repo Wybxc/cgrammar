@@ -130,7 +130,7 @@ pub enum Constant {
 /// Integer constants (6.4.4.1)
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct IntegerConstant {
-    pub value: String,
+    pub value: i128,
     pub suffix: Option<IntegerSuffix>,
 }
 
@@ -148,7 +148,7 @@ pub enum IntegerSuffix {
 /// Floating-point constants (6.4.4.2)
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct FloatingConstant {
-    pub value: String,
+    pub value: f64,
     pub suffix: Option<FloatingSuffix>,
 }
 
