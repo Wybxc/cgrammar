@@ -312,7 +312,6 @@ pub fn balanced_token<'a>(
     let parenthesized = balanced_token_sequence
         .clone()
         .or_not()
-        .padded()
         .delimited_by(just('('), just(')'))
         .map(BalancedToken::Parenthesized);
 
@@ -320,7 +319,6 @@ pub fn balanced_token<'a>(
     let bracketed = balanced_token_sequence
         .clone()
         .or_not()
-        .padded()
         .delimited_by(just('['), just(']'))
         .map(BalancedToken::Bracketed);
 
@@ -328,7 +326,6 @@ pub fn balanced_token<'a>(
     let braced = balanced_token_sequence
         .clone()
         .or_not()
-        .padded()
         .delimited_by(just('{'), just('}'))
         .map(BalancedToken::Braced);
 
@@ -355,9 +352,25 @@ pub fn balanced_token<'a>(
 pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSequence> {
     recursive(|balanced_token_sequence| {
         balanced_token(balanced_token_sequence)
-            .padded()
-            .repeated()
+            .separated_by(text::whitespace().or(comment()))
+            .allow_leading()
+            .allow_trailing()
             .collect::<Vec<_>>()
             .map(|tokens| BalancedTokenSequence { tokens })
     })
+}
+
+pub fn comment<'a>() -> impl Parser<'a, &'a str, ()> + Clone {
+    choice((
+        // Single-line comments
+        just("//")
+            .ignore_then(choice((just("\\\n").ignored(), none_of('\n').ignored())).repeated()),
+        // Multi-line comments
+        just("/*")
+            .ignore_then(choice((
+                none_of('*').ignored(),
+                just('*').then(none_of('/')).ignored(),
+            )))
+            .then_ignore(just("*/")),
+    ))
 }
