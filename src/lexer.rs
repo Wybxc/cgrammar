@@ -1,5 +1,5 @@
-use chumsky::prelude::*;
 use crate::ast::*;
+use chumsky::prelude::*;
 
 /// Parse an identifier
 pub fn identifier<'a>() -> impl Parser<'a, &'a str, Identifier> + Clone {
@@ -178,6 +178,7 @@ pub fn floating_suffix<'a>() -> impl Parser<'a, &'a str, FloatingSuffix> + Clone
     ))
 }
 
+/// Parse a decimal floating constant
 pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64> + Clone {
     regex(r"[0-9]+('[0-9]+)*\.[0-9]+('[0-9]+)*([eE][+-]?[0-9]+('[0-9]+)*)?")
         .map(|s: &str| s.replace("'", ""))
@@ -185,20 +186,17 @@ pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64> + Clone 
         .unwrapped()
 }
 
+/// Parse a hexadecimal floating constant
 pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64> + Clone {
-    choice((just("0x"), just("0X")))
-        .ignore_then(regex(r"[0-9a-fA-F]+('[0-9a-fA-F]+)*\.[0-9a-fA-F]+('[0-9a-fA-F]+)*([pP][+-]?[0-9]+('[0-9]+)*)?"))
+    regex(r"0[xX][0-9a-fA-F]+('[0-9a-fA-F]+)*\.[0-9a-fA-F]+('[0-9a-fA-F]+)*([pP][+-]?[0-9]+('[0-9]+)*)?")
         .map(|s: &str| s.replace("'", ""))
         .map(|s| hexf_parse::parse_hexf64(&s, false))
         .unwrapped()
 }
 
-/// Parse a floating constant (simplified - basic decimal format)
+/// Parse a floating constant
 pub fn floating_constant<'a>() -> impl Parser<'a, &'a str, FloatingConstant> + Clone {
-    regex(r"[0-9]+('[0-9]+)*\.[0-9]+('[0-9]+)*([eE][+-]?[0-9]+('[0-9]+)*)?")
-        .map(|s: &str| s.replace("'", ""))
-        .from_str::<f64>()
-        .unwrapped()
+    choice((decimal_floating_constant(), hexadecimal_floating_constant()))
         .then(floating_suffix().or_not())
         .map(|(value, suffix)| FloatingConstant { value, suffix })
 }
