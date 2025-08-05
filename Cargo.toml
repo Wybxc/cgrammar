@@ -1,0 +1,10 @@
+[package]
+name = "cgrammar"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chumsky = "0.10.1"
+
+[dev-dependencies]
+rstest = "0.26.1"
