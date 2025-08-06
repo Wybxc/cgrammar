@@ -10,5 +10,5 @@ fn main() {
     let parser = expression();
     let ast = parser.parse(&input.tokens).unwrap();
 
-    println!("{ast:?}");
+    println!("{}", dbg_pls::pretty(&ast));
 }

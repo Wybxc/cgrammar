@@ -1,7 +1,8 @@
+use dbg_pls::DebugPls;
 use std::fmt;
 
 /// Source code position information
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
@@ -14,7 +15,7 @@ impl Span {
 }
 
 /// AST node with position information
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct Spanned<T> {
     pub node: T,
     pub span: Span,
@@ -31,7 +32,7 @@ impl<T> Spanned<T> {
 // =============================================================================
 
 /// Identifier
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier(pub String);
 
 impl fmt::Display for Identifier {
@@ -45,7 +46,7 @@ impl fmt::Display for Identifier {
 // =============================================================================
 
 /// Keywords (6.4.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Keyword {
     // Storage class
     Auto,
@@ -118,7 +119,7 @@ pub enum Keyword {
 }
 
 /// Constants (6.4.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Constant {
     Integer(IntegerConstant),
     Floating(FloatingConstant),
@@ -128,13 +129,13 @@ pub enum Constant {
 }
 
 /// Integer constants (6.4.4.1)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct IntegerConstant {
     pub value: i128,
     pub suffix: Option<IntegerSuffix>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum IntegerSuffix {
     Unsigned,
     Long,
@@ -146,13 +147,13 @@ pub enum IntegerSuffix {
 }
 
 /// Floating-point constants (6.4.4.2)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct FloatingConstant {
     pub value: f64,
     pub suffix: Option<FloatingSuffix>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum FloatingSuffix {
     F,
     L,
@@ -162,13 +163,13 @@ pub enum FloatingSuffix {
 }
 
 /// Character constants (6.4.4.4)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct CharacterConstant {
     pub encoding_prefix: Option<EncodingPrefix>,
     pub value: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum EncodingPrefix {
     U8,
     U,
@@ -177,7 +178,7 @@ pub enum EncodingPrefix {
 }
 
 /// Predefined constants (6.4.4.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum PredefinedConstant {
     False,
     True,
@@ -185,14 +186,14 @@ pub enum PredefinedConstant {
 }
 
 /// String literals (6.4.5)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct StringLiteral {
     pub encoding_prefix: Option<EncodingPrefix>,
     pub value: String,
 }
 
 /// Punctuators (6.4.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Punctuator {
     // Brackets
     LeftBracket,
@@ -265,7 +266,7 @@ pub enum Punctuator {
 // =============================================================================
 
 /// Expression
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Expression {
     Primary(PrimaryExpression),
     Postfix(PostfixExpression),
@@ -278,7 +279,7 @@ pub enum Expression {
 }
 
 /// Primary expressions (6.5.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum PrimaryExpression {
     Identifier(Identifier),
     Constant(Constant),
@@ -288,13 +289,13 @@ pub enum PrimaryExpression {
 }
 
 /// Generic selection (6.5.1.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct GenericSelection {
     pub controlling_expression: Box<Expression>,
     pub associations: Vec<GenericAssociation>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum GenericAssociation {
     Type {
         type_name: TypeName,
@@ -306,7 +307,7 @@ pub enum GenericAssociation {
 }
 
 /// Postfix expressions (6.5.2)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum PostfixExpression {
     Primary(PrimaryExpression),
     ArrayAccess {
@@ -331,7 +332,7 @@ pub enum PostfixExpression {
 }
 
 /// Compound literals (6.5.2.5)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct CompoundLiteral {
     pub storage_class_specifiers: Vec<StorageClassSpecifier>,
     pub type_name: TypeName,
@@ -339,7 +340,7 @@ pub struct CompoundLiteral {
 }
 
 /// Unary expressions (6.5.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum UnaryExpression {
     Postfix(PostfixExpression),
     PreIncrement(Box<UnaryExpression>),
@@ -353,7 +354,7 @@ pub enum UnaryExpression {
     Alignof(TypeName),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum UnaryOperator {
     Address,
     Dereference,
@@ -364,7 +365,7 @@ pub enum UnaryOperator {
 }
 
 /// Cast expressions (6.5.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum CastExpression {
     Unary(UnaryExpression),
     Cast {
@@ -374,14 +375,14 @@ pub enum CastExpression {
 }
 
 /// Binary expressions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct BinaryExpression {
     pub left: Box<Expression>,
     pub operator: BinaryOperator,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, DebugPls, Clone, Copy, PartialEq)]
 pub enum BinaryOperator {
     // Arithmetic
     Multiply,
@@ -411,7 +412,7 @@ pub enum BinaryOperator {
 }
 
 /// Conditional expressions (6.5.15)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct ConditionalExpression {
     pub condition: Box<Expression>,
     pub then_expr: Box<Expression>,
@@ -419,14 +420,14 @@ pub struct ConditionalExpression {
 }
 
 /// Assignment expressions (6.5.16)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct AssignmentExpression {
     pub left: Box<Expression>,
     pub operator: AssignmentOperator,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum AssignmentOperator {
     Assign,
     MulAssign,
@@ -442,7 +443,7 @@ pub enum AssignmentOperator {
 }
 
 /// Comma expressions (6.5.17)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct CommaExpression {
     pub expressions: Vec<Expression>,
 }
@@ -452,7 +453,7 @@ pub struct CommaExpression {
 // =============================================================================
 
 /// Declarations (6.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Declaration {
     Normal {
         attributes: Vec<AttributeSpecifier>,
@@ -464,12 +465,12 @@ pub enum Declaration {
 }
 
 /// Declaration specifiers (6.7)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum DeclarationSpecifier {
     StorageClass(StorageClassSpecifier),
     TypeSpecifierQualifier(TypeSpecifierQualifier),
@@ -477,14 +478,14 @@ pub enum DeclarationSpecifier {
 }
 
 /// Init declarators (6.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct InitDeclarator {
     pub declarator: Declarator,
     pub initializer: Option<Initializer>,
 }
 
 /// Storage class specifiers (6.7.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum StorageClassSpecifier {
     Auto,
     Constexpr,
@@ -496,7 +497,7 @@ pub enum StorageClassSpecifier {
 }
 
 /// Type specifiers (6.7.2)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum TypeSpecifier {
     Void,
     Char,
@@ -521,7 +522,7 @@ pub enum TypeSpecifier {
 }
 
 /// Struct or union specifiers (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct StructOrUnionSpecifier {
     pub kind: StructOrUnion,
     pub attributes: Vec<AttributeSpecifier>,
@@ -529,14 +530,14 @@ pub struct StructOrUnionSpecifier {
     pub members: Option<Vec<MemberDeclaration>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum StructOrUnion {
     Struct,
     Union,
 }
 
 /// Member declarations (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum MemberDeclaration {
     Normal {
         attributes: Vec<AttributeSpecifier>,
@@ -547,12 +548,12 @@ pub enum MemberDeclaration {
 }
 
 /// Specifier qualifier lists (6.7.2.1)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct SpecifierQualifierList {
     pub items: Vec<TypeSpecifierQualifier>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum TypeSpecifierQualifier {
     TypeSpecifier(TypeSpecifier),
     TypeQualifier(TypeQualifier),
@@ -560,7 +561,7 @@ pub enum TypeSpecifierQualifier {
 }
 
 /// Member declarators (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum MemberDeclarator {
     Declarator(Declarator),
     BitField {
@@ -570,7 +571,7 @@ pub enum MemberDeclarator {
 }
 
 /// Enum specifiers (6.7.2.2)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct EnumSpecifier {
     pub attributes: Vec<AttributeSpecifier>,
     pub identifier: Option<Identifier>,
@@ -578,7 +579,7 @@ pub struct EnumSpecifier {
     pub enumerators: Option<Vec<Enumerator>>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct Enumerator {
     pub name: Identifier,
     pub attributes: Vec<AttributeSpecifier>,
@@ -586,26 +587,26 @@ pub struct Enumerator {
 }
 
 /// Atomic type specifiers (6.7.2.4)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct AtomicTypeSpecifier {
     pub type_name: TypeName,
 }
 
 /// typeof specifiers (6.7.2.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum TypeofSpecifier {
     Typeof(TypeofSpecifierArgument),
     TypeofUnqual(TypeofSpecifierArgument),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum TypeofSpecifierArgument {
     Expression(Box<Expression>),
     TypeName(TypeName),
 }
 
 /// Type qualifiers (6.7.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum TypeQualifier {
     Const,
     Restrict,
@@ -614,27 +615,27 @@ pub enum TypeQualifier {
 }
 
 /// Function specifiers (6.7.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum FunctionSpecifier {
     Inline,
     Noreturn,
 }
 
 /// Alignment specifiers (6.7.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum AlignmentSpecifier {
     Type(TypeName),
     Expression(Box<Expression>),
 }
 
 /// Declarators (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct Declarator {
     pub pointer: Option<Pointer>,
     pub direct_declarator: DirectDeclarator,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum DirectDeclarator {
     Identifier {
         identifier: Identifier,
@@ -654,7 +655,7 @@ pub enum DirectDeclarator {
 }
 
 /// Array declarators (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum ArrayDeclarator {
     Normal {
         type_qualifiers: Vec<TypeQualifier>,
@@ -670,7 +671,7 @@ pub enum ArrayDeclarator {
 }
 
 /// Pointers (6.7.6)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct Pointer {
     pub attributes: Vec<AttributeSpecifier>,
     pub type_qualifiers: Vec<TypeQualifier>,
@@ -678,7 +679,7 @@ pub struct Pointer {
 }
 
 /// Parameter type lists (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum ParameterTypeList {
     Parameters(Vec<ParameterDeclaration>),
     Variadic(Vec<ParameterDeclaration>),
@@ -686,7 +687,7 @@ pub enum ParameterTypeList {
 }
 
 /// Parameter declarations (6.7.6)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct ParameterDeclaration {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
@@ -695,20 +696,20 @@ pub struct ParameterDeclaration {
 }
 
 /// Type names (6.7.7)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct TypeName {
     pub specifiers: SpecifierQualifierList,
     pub abstract_declarator: Option<AbstractDeclarator>,
 }
 
 /// Abstract declarators (6.7.7)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct AbstractDeclarator {
     pub pointer: Option<Pointer>,
     pub direct_abstract_declarator: Option<DirectAbstractDeclarator>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum DirectAbstractDeclarator {
     Parenthesized(Box<AbstractDeclarator>),
     Array {
@@ -724,54 +725,54 @@ pub enum DirectAbstractDeclarator {
 }
 
 /// Initializers (6.7.10)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Initializer {
     Expression(Box<Expression>),
     Braced(BracedInitializer),
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct BracedInitializer {
     pub initializers: Vec<DesignatedInitializer>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct DesignatedInitializer {
     pub designation: Option<Designation>,
     pub initializer: Initializer,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct Designation {
     pub designators: Vec<Designator>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Designator {
     Array(Box<Expression>),
     Member(Identifier),
 }
 
 /// Static assert declarations (6.7.11)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct StaticAssertDeclaration {
     pub condition: Box<Expression>,
     pub message: Option<StringLiteral>,
 }
 
 /// Attribute specifiers (6.7.12.1)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct AttributeSpecifier {
     pub attributes: Vec<Option<Attribute>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct Attribute {
     pub token: AttributeToken,
     pub arguments: Option<BalancedTokenSequence>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum AttributeToken {
     Standard(Identifier),
     Prefixed {
@@ -780,12 +781,12 @@ pub enum AttributeToken {
     },
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct BalancedTokenSequence {
     pub tokens: Vec<BalancedToken>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum BalancedToken {
     Parenthesized(BalancedTokenSequence),
     Bracketed(BalancedTokenSequence),
@@ -802,13 +803,13 @@ pub enum BalancedToken {
 // =============================================================================
 
 /// Statements (6.8)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Statement {
     Labeled(LabeledStatement),
     Unlabeled(UnlabeledStatement),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum UnlabeledStatement {
     Expression(ExpressionStatement),
     Primary {
@@ -821,7 +822,7 @@ pub enum UnlabeledStatement {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum PrimaryBlock {
     Compound(CompoundStatement),
     Selection(SelectionStatement),
@@ -829,7 +830,7 @@ pub enum PrimaryBlock {
 }
 
 /// Labels (6.8.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Label {
     Identifier {
         attributes: Vec<AttributeSpecifier>,
@@ -844,19 +845,19 @@ pub enum Label {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct LabeledStatement {
     pub label: Label,
     pub statement: Box<Statement>,
 }
 
 /// Compound statements (6.8.2)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum BlockItem {
     Declaration(Declaration),
     Statement(UnlabeledStatement),
@@ -864,7 +865,7 @@ pub enum BlockItem {
 }
 
 /// Expression statements (6.8.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum ExpressionStatement {
     Expression(Box<Expression>),
     AttributedExpression {
@@ -875,7 +876,7 @@ pub enum ExpressionStatement {
 }
 
 /// Selection statements (6.8.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum SelectionStatement {
     If {
         condition: Box<Expression>,
@@ -893,7 +894,7 @@ pub enum SelectionStatement {
 }
 
 /// Iteration statements (6.8.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum IterationStatement {
     While {
         condition: Box<Expression>,
@@ -918,7 +919,7 @@ pub enum IterationStatement {
 }
 
 /// Jump statements (6.8.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum JumpStatement {
     Goto(Identifier),
     Continue,
@@ -931,19 +932,19 @@ pub enum JumpStatement {
 // =============================================================================
 
 /// Translation units (6.9)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct TranslationUnit {
     pub external_declarations: Vec<ExternalDeclaration>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum ExternalDeclaration {
     Function(FunctionDefinition),
     Declaration(Declaration),
 }
 
 /// Function definitions (6.9.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct FunctionDefinition {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
@@ -956,17 +957,17 @@ pub struct FunctionDefinition {
 // =============================================================================
 
 /// Preprocessing files (6.10)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct PreprocessingFile {
     pub group: Option<Group>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct Group {
     pub parts: Vec<GroupPart>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum GroupPart {
     IfSection(IfSection),
     ControlLine(ControlLine),
@@ -974,7 +975,7 @@ pub enum GroupPart {
     NonDirective(NonDirective),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct IfSection {
     pub if_group: IfGroup,
     pub elif_groups: Vec<ElifGroup>,
@@ -982,7 +983,7 @@ pub struct IfSection {
     pub endif_line: EndifLine,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum IfGroup {
     If {
         condition: Box<Expression>,
@@ -998,7 +999,7 @@ pub enum IfGroup {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum ElifGroup {
     Elif {
         condition: Box<Expression>,
@@ -1014,15 +1015,15 @@ pub enum ElifGroup {
     },
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct ElseGroup {
     pub group: Option<Group>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct EndifLine;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum ControlLine {
     Include(Vec<String>), // pp-tokens
     Embed(Vec<String>),   // pp-tokens
@@ -1040,12 +1041,12 @@ pub enum ControlLine {
     Empty,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct TextLine {
     pub tokens: Vec<String>, // pp-tokens
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct NonDirective {
     pub tokens: Vec<String>, // pp-tokens
 }
@@ -1055,7 +1056,7 @@ pub struct NonDirective {
 // =============================================================================
 
 /// Preprocessor expressions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum PreprocessorExpression {
     Defined(Identifier),
     DefinedParen(Identifier),
@@ -1073,13 +1074,13 @@ pub enum PreprocessorExpression {
     VaOpt(Vec<String>),         // pp-tokens
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum HeaderName {
     SystemHeader(String), // < h-char-sequence >
     LocalHeader(String),  // " q-char-sequence "
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum HeaderNameTokens {
     StringLiteral(StringLiteral),
     Tokens(Vec<String>), // < h-pp-tokens >

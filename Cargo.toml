@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 chumsky = { version = "0.10.1", features = ["pratt", "regex"] }
+dbg-pls = { version = "0.4.3", features = ["derive", "pretty"] }
 hexf-parse = "0.2.1"
 
 [dev-dependencies]
