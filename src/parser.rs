@@ -89,6 +89,20 @@ pub fn unary_expression<'a>(
     recursive(|unary_expression| {
         let postfix = postfix_expression(expression);
 
+        let pre_increment_operator = select! {
+            BalancedToken::Punctuator(Punctuator::Increment) => ()
+        };
+        let pre_increment = pre_increment_operator
+            .ignore_then(unary_expression.clone())
+            .map(Box::new);
+
+        let pre_decrement_operator = select! {
+            BalancedToken::Punctuator(Punctuator::Decrement) => ()
+        };
+        let pre_decrement = pre_decrement_operator
+            .ignore_then(unary_expression.clone())
+            .map(Box::new);
+
         let unary_operator = select! {
             BalancedToken::Punctuator(Punctuator::Ampersand) => UnaryOperator::Address,
             BalancedToken::Punctuator(Punctuator::Star) => UnaryOperator::Dereference,
@@ -101,6 +115,8 @@ pub fn unary_expression<'a>(
 
         choice((
             postfix.map(UnaryExpression::Postfix),
+            pre_increment.map(UnaryExpression::PreIncrement),
+            pre_decrement.map(UnaryExpression::PreDecrement),
             unary.map(|(operator, operand)| UnaryExpression::Unary {
                 operator,
                 operand: Box::new(operand),
