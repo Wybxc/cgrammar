@@ -268,7 +268,6 @@ pub enum Punctuator {
 /// Expression
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Expression {
-    Primary(PrimaryExpression),
     Postfix(PostfixExpression),
     Unary(UnaryExpression),
     Cast(CastExpression),

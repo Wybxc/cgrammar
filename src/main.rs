@@ -8,7 +8,13 @@ fn main() {
     let input = lexer.parse(src.as_str()).unwrap();
 
     let parser = expression();
-    let ast = parser.parse(&input.tokens).unwrap();
-
-    println!("{}", dbg_pls::pretty(&ast));
+    let ast = parser.parse(&input.tokens);
+    if ast.has_errors() {
+        for error in ast.errors() {
+            println!("{error:?}");
+        }
+        std::process::exit(1);
+    } else {
+        println!("{}", dbg_pls::pretty(&ast.unwrap()));
+    }
 }
