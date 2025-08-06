@@ -311,21 +311,18 @@ pub fn balanced_token<'a>(
     // Parenthesized: ( balanced-token-sequence? )
     let parenthesized = balanced_token_sequence
         .clone()
-        .or_not()
         .delimited_by(just('('), just(')'))
         .map(BalancedToken::Parenthesized);
 
     // Bracketed: [ balanced-token-sequence? ]
     let bracketed = balanced_token_sequence
         .clone()
-        .or_not()
         .delimited_by(just('['), just(']'))
         .map(BalancedToken::Bracketed);
 
     // Braced: { balanced-token-sequence? }
     let braced = balanced_token_sequence
         .clone()
-        .or_not()
         .delimited_by(just('{'), just('}'))
         .map(BalancedToken::Braced);
 

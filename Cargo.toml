@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = { version = "0.10.1", features = ["regex"] }
+chumsky = { version = "0.10.1", features = ["pratt", "regex"] }
 hexf-parse = "0.2.1"
 
 [dev-dependencies]

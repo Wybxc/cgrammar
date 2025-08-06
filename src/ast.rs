@@ -381,7 +381,7 @@ pub struct BinaryExpression {
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOperator {
     // Arithmetic
     Multiply,
@@ -787,9 +787,9 @@ pub struct BalancedTokenSequence {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BalancedToken {
-    Parenthesized(Option<BalancedTokenSequence>),
-    Bracketed(Option<BalancedTokenSequence>),
-    Braced(Option<BalancedTokenSequence>),
+    Parenthesized(BalancedTokenSequence),
+    Bracketed(BalancedTokenSequence),
+    Braced(BalancedTokenSequence),
     Identifier(Identifier),
     StringLiteral(StringLiteral),
     Constant(Constant),
