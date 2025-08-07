@@ -37,6 +37,7 @@ pub fn primary_expression<'a>(
 /// (6.5.2) postfix expression
 pub fn postfix_expression<'a>(
     expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [BalancedToken], PostfixExpression, Extra<'a>> + Clone {
     let primary = primary_expression(expression.clone());
 
@@ -49,8 +50,15 @@ pub fn postfix_expression<'a>(
     let array = expression.nested_in(select_ref! {
         BalancedToken::Bracketed(BalancedTokenSequence { tokens }) => tokens.as_slice()
     });
+    let function = assignment_expression
+        .separated_by(select! {
+            BalancedToken::Punctuator(Punctuator::Comma) => ()
+        })
+        .collect::<Vec<Expression>>()
+        .nested_in(select_ref! {
+            BalancedToken::Parenthesized(BalancedTokenSequence { tokens }) => tokens.as_slice()
+        });
 
-    // TODO: function call
     // TODO: member access
     // TODO: member access through pointer
     // TODO: compound literal
@@ -72,6 +80,12 @@ pub fn postfix_expression<'a>(
                         index: Box::new(idx),
                     })
                 }),
+                function.map(|args| -> PostfixFn {
+                    Box::new(move |expr| PostfixExpression::FunctionCall {
+                        function: Box::new(expr),
+                        arguments: args,
+                    })
+                }),
             ))
             .repeated(),
             |acc, f| f(acc),
@@ -83,9 +97,10 @@ pub fn postfix_expression<'a>(
 /// (6.5.3) unary expression
 pub fn unary_expression<'a>(
     expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [BalancedToken], UnaryExpression, Extra<'a>> + Clone {
     recursive(|unary_expression| {
-        let postfix = postfix_expression(expression);
+        let postfix = postfix_expression(expression, assignment_expression);
 
         let increment_operator = select! {
             BalancedToken::Punctuator(Punctuator::Increment) => ()
@@ -157,6 +172,7 @@ pub fn cast_expression<'a>(
 /// (6.5.14) logical OR expression
 pub fn binary_expression<'a>(
     expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone {
     use chumsky::pratt::*;
 
@@ -182,9 +198,9 @@ pub fn binary_expression<'a>(
         };
     }
 
-    let unary = unary_expression(expression.clone());
+    let unary = unary_expression(expression.clone(), assignment_expression.clone());
     let cast = cast_expression(unary.clone());
-    let postfix = postfix_expression(expression.clone());
+    let postfix = postfix_expression(expression.clone(), assignment_expression.clone());
 
     // Suppose precedence is X, use 1000 - 10*X as the associativity level
     choice((
@@ -290,28 +306,28 @@ pub fn assignment_expression<'a>(
 /// (6.5.17) expression
 pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone {
     recursive(|expression| {
-        let binary = binary_expression(expression.clone());
+        let mut assignment = Recursive::declare();
+
+        let binary = binary_expression(expression.clone(), assignment.clone());
         let conditional = conditional_expression(binary, expression.clone());
-        let assignment =
-            assignment_expression(conditional.clone(), unary_expression(expression.clone()));
+
+        assignment.define(assignment_expression(
+            conditional.clone(),
+            unary_expression(expression.clone(), assignment.clone()),
+        ));
 
         let comma = select! {
             BalancedToken::Punctuator(Punctuator::Comma) => ()
         };
         assignment
-            .clone()
-            .then(
-                comma
-                    .ignore_then(assignment)
-                    .repeated()
-                    .collect::<Vec<Expression>>(),
-            )
-            .map(|(first, mut rest)| {
-                if rest.is_empty() {
-                    first
+            .separated_by(comma)
+            .at_least(1)
+            .collect::<Vec<Expression>>()
+            .map(|expressions| {
+                if expressions.len() == 1 {
+                    expressions.into_iter().next().unwrap()
                 } else {
-                    rest.insert(0, first);
-                    Expression::Comma(CommaExpression { expressions: rest })
+                    Expression::Comma(CommaExpression { expressions })
                 }
             })
             .labelled("expression")

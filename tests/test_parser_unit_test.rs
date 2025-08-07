@@ -129,7 +129,7 @@ where
     F: Fn(PostfixExpression) -> bool,
 {
     let parser = expression();
-    let postfix_parser = postfix_expression(parser);
+    let postfix_parser = postfix_expression(parser.clone(), parser);
     let result = postfix_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -144,7 +144,7 @@ fn test_postfix_expression_primary(
     #[case] validator: fn(PostfixExpression) -> bool,
 ) {
     let parser = expression();
-    let postfix_parser = postfix_expression(parser);
+    let postfix_parser = postfix_expression(parser.clone(), parser);
     let result = postfix_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -191,7 +191,7 @@ where
     F: Fn(UnaryExpression) -> bool,
 {
     let parser = expression();
-    let unary_parser = unary_expression(parser);
+    let unary_parser = unary_expression(parser.clone(), parser);
     let result = unary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -206,7 +206,7 @@ fn test_unary_expression_postfix(
     #[case] validator: fn(UnaryExpression) -> bool,
 ) {
     let parser = expression();
-    let unary_parser = unary_expression(parser);
+    let unary_parser = unary_expression(parser.clone(), parser);
     let result = unary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -225,7 +225,7 @@ where
     F: Fn(CastExpression) -> bool,
 {
     let parser = expression();
-    let unary_parser = unary_expression(parser);
+    let unary_parser = unary_expression(parser.clone(), parser.clone());
     let cast_parser = cast_expression(unary_parser);
     let result = cast_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
@@ -281,7 +281,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser);
+    let binary_parser = binary_expression(parser.clone(), parser);
     let result = binary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -308,7 +308,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser);
+    let binary_parser = binary_expression(parser.clone(), parser);
     let result = binary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -367,7 +367,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser);
+    let binary_parser = binary_expression(parser.clone(), parser);
     let result = binary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -402,7 +402,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser);
+    let binary_parser = binary_expression(parser.clone(), parser);
     let result = binary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -429,7 +429,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser);
+    let binary_parser = binary_expression(parser.clone(), parser);
     let result = binary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -480,7 +480,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser);
+    let binary_parser = binary_expression(parser.clone(), parser);
     let result = binary_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
 }
@@ -505,7 +505,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser.clone());
+    let binary_parser = binary_expression(parser.clone(), parser.clone());
     let conditional_parser = conditional_expression(binary_parser, parser);
     let result = conditional_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
@@ -524,7 +524,7 @@ where
     F: Fn(Expression) -> bool,
 {
     let parser = expression();
-    let binary_parser = binary_expression(parser.clone());
+    let binary_parser = binary_expression(parser.clone(), parser.clone());
     let conditional_parser = conditional_expression(binary_parser, parser);
     let result = conditional_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
@@ -628,9 +628,9 @@ where
     F: Fn(Expression) -> bool,
 {
     let expression_parser = expression();
-    let binary_parser = binary_expression(expression_parser.clone());
+    let binary_parser = binary_expression(expression_parser.clone(), expression_parser.clone());
     let conditional_parser = conditional_expression(binary_parser, expression_parser.clone());
-    let unary_parser = unary_expression(expression_parser);
+    let unary_parser = unary_expression(expression_parser.clone(), expression_parser.clone());
     let assignment_parser = assignment_expression(conditional_parser, unary_parser);
     let result = assignment_parser.parse(input.as_slice()).unwrap();
     assert!(validator(result));
@@ -857,7 +857,7 @@ fn test_cast_expression_basic() {
     let tokens = vec![make_identifier("value")];
 
     let expression_parser = expression();
-    let unary_parser = unary_expression(expression_parser);
+    let unary_parser = unary_expression(expression_parser.clone(), expression_parser);
     let cast_parser = cast_expression(unary_parser);
 
     let result = cast_parser.parse(tokens.as_slice());
