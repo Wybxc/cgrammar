@@ -147,7 +147,7 @@ pub fn cast_expression<'a>(
 pub fn postfix_expression<'a>(
     expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [BalancedToken], PostfixExpression, Extra<'a>> + Clone {
-    let primary = primary_expression(expression);
+    let primary = primary_expression(expression.clone());
 
     let increment = select! {
         BalancedToken::Punctuator(Punctuator::Increment) => ()
@@ -155,14 +155,27 @@ pub fn postfix_expression<'a>(
     let decrement = select! {
         BalancedToken::Punctuator(Punctuator::Decrement) => ()
     };
+    let array = expression.nested_in(select_ref! {
+        BalancedToken::Bracketed(BalancedTokenSequence { tokens }) => tokens.as_slice()
+    });
 
-    type PostfixFn = fn(PostfixExpression) -> PostfixExpression;
+    type PostfixFn = Box<dyn FnOnce(PostfixExpression) -> PostfixExpression>;
     primary
         .map(PostfixExpression::Primary)
         .foldl(
             choice((
-                increment.to::<PostfixFn>(|expr| PostfixExpression::PostIncrement(Box::new(expr))),
-                decrement.to::<PostfixFn>(|expr| PostfixExpression::PostDecrement(Box::new(expr))),
+                increment.map(|_| -> PostfixFn {
+                    Box::new(|expr| PostfixExpression::PostIncrement(Box::new(expr)))
+                }),
+                decrement.map(|_| -> PostfixFn {
+                    Box::new(|expr| PostfixExpression::PostDecrement(Box::new(expr)))
+                }),
+                array.map(|idx| -> PostfixFn {
+                    Box::new(move |expr| PostfixExpression::ArrayAccess {
+                        array: Box::new(expr),
+                        index: Box::new(idx),
+                    })
+                }),
             ))
             .repeated(),
             |acc, f| f(acc),
