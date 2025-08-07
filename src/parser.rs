@@ -1,26 +1,22 @@
 use crate::ast::*;
 use chumsky::prelude::*;
 
-type Extra<'a> = chumsky::extra::Err<Rich<'a, BalancedToken>>;
+pub type Token = BalancedToken;
+pub type TokenStream = BalancedTokenSequence;
+type Extra<'a> = chumsky::extra::Err<Rich<'a, Token>>;
+
+// =============================================================================
+// Expressions
+// =============================================================================
 
 /// (6.5.1) primary expression
 pub fn primary_expression<'a>(
-    expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone,
-) -> impl Parser<'a, &'a [BalancedToken], PrimaryExpression, Extra<'a>> + Clone {
-    let identifier = select! {
-        BalancedToken::Identifier(value) => value
-    };
-    let constant = select! {
-        BalancedToken::Constant(value) => value
-    };
-    let string_literal = select! {
-        BalancedToken::StringLiteral(value) => value
-    };
-
+    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone,
+) -> impl Parser<'a, &'a [Token], PrimaryExpression, Extra<'a>> + Clone {
     choice((
-        identifier.map(PrimaryExpression::Identifier),
-        constant.map(PrimaryExpression::Constant),
-        string_literal.map(PrimaryExpression::StringLiteral),
+        identifier().map(PrimaryExpression::Identifier),
+        constant().map(PrimaryExpression::Constant),
+        string_literal().map(PrimaryExpression::StringLiteral),
         expression
             .parenthesized()
             .map(Box::new)
@@ -33,9 +29,9 @@ pub fn primary_expression<'a>(
 
 /// (6.5.2) postfix expression
 pub fn postfix_expression<'a>(
-    expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [BalancedToken], PostfixExpression, Extra<'a>> + Clone {
+    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [Token], PostfixExpression, Extra<'a>> + Clone {
     let primary = primary_expression(expression.clone());
 
     let increment = punctuator(Punctuator::Increment);
@@ -45,11 +41,8 @@ pub fn postfix_expression<'a>(
         .separated_by(punctuator(Punctuator::Comma))
         .collect::<Vec<Expression>>()
         .parenthesized();
-    let identifier = select! {
-        BalancedToken::Identifier(value) => value
-    };
-    let member_access = punctuator(Punctuator::Dot).ignore_then(identifier);
-    let member_access_ptr = punctuator(Punctuator::Arrow).ignore_then(identifier);
+    let member_access = punctuator(Punctuator::Dot).ignore_then(identifier());
+    let member_access_ptr = punctuator(Punctuator::Arrow).ignore_then(identifier());
 
     // TODO: compound literal
 
@@ -98,9 +91,9 @@ pub fn postfix_expression<'a>(
 
 /// (6.5.3) unary expression
 pub fn unary_expression<'a>(
-    expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [BalancedToken], UnaryExpression, Extra<'a>> + Clone {
+    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone {
     recursive(|unary_expression| {
         let postfix = postfix_expression(expression, assignment_expression);
 
@@ -113,12 +106,12 @@ pub fn unary_expression<'a>(
             .map(Box::new);
 
         let unary_operator = select! {
-            BalancedToken::Punctuator(Punctuator::Ampersand) => UnaryOperator::Address,
-            BalancedToken::Punctuator(Punctuator::Star) => UnaryOperator::Dereference,
-            BalancedToken::Punctuator(Punctuator::Plus) => UnaryOperator::Plus,
-            BalancedToken::Punctuator(Punctuator::Minus) => UnaryOperator::Minus,
-            BalancedToken::Punctuator(Punctuator::Bang) => UnaryOperator::LogicalNot,
-            BalancedToken::Punctuator(Punctuator::Tilde) => UnaryOperator::BitwiseNot,
+            Token::Punctuator(Punctuator::Ampersand) => UnaryOperator::Address,
+            Token::Punctuator(Punctuator::Star) => UnaryOperator::Dereference,
+            Token::Punctuator(Punctuator::Plus) => UnaryOperator::Plus,
+            Token::Punctuator(Punctuator::Minus) => UnaryOperator::Minus,
+            Token::Punctuator(Punctuator::Bang) => UnaryOperator::LogicalNot,
+            Token::Punctuator(Punctuator::Tilde) => UnaryOperator::BitwiseNot,
         };
         let unary = unary_operator.then(cast_expression(unary_expression.clone()));
 
@@ -146,8 +139,8 @@ pub fn unary_expression<'a>(
 
 /// (6.5.4) cast expression
 pub fn cast_expression<'a>(
-    unary_expression: impl Parser<'a, &'a [BalancedToken], UnaryExpression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [BalancedToken], CastExpression, Extra<'a>> + Clone {
+    unary_expression: impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [Token], CastExpression, Extra<'a>> + Clone {
     // TODO: cast
     recursive(|_cast_expression| unary_expression.map(CastExpression::Unary))
 }
@@ -172,9 +165,9 @@ pub fn cast_expression<'a>(
 ///
 /// (6.5.14) logical OR expression
 pub fn binary_expression<'a>(
-    expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone {
+    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
     use chumsky::pratt::*;
 
     macro_rules! op {
@@ -233,9 +226,9 @@ pub fn binary_expression<'a>(
 
 /// (6.5.15) conditional expression
 pub fn conditional_expression<'a>(
-    binary_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-    expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone {
+    binary_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
     recursive(|conditional_expression| {
         choice((
             binary_expression
@@ -260,22 +253,22 @@ pub fn conditional_expression<'a>(
 
 /// (6.5.16) assignment expression
 pub fn assignment_expression<'a>(
-    conditional_expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
-    unary_expression: impl Parser<'a, &'a [BalancedToken], UnaryExpression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone {
+    conditional_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    unary_expression: impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
     recursive(|assignment_expression| {
         let assigment_opeartor = select! {
-            BalancedToken::Punctuator(Punctuator::Assign) => AssignmentOperator::Assign,
-            BalancedToken::Punctuator(Punctuator::AddAssign) => AssignmentOperator::AddAssign,
-            BalancedToken::Punctuator(Punctuator::SubAssign) => AssignmentOperator::SubAssign,
-            BalancedToken::Punctuator(Punctuator::MulAssign) => AssignmentOperator::MulAssign,
-            BalancedToken::Punctuator(Punctuator::DivAssign) => AssignmentOperator::DivAssign,
-            BalancedToken::Punctuator(Punctuator::ModAssign) => AssignmentOperator::ModAssign,
-            BalancedToken::Punctuator(Punctuator::AndAssign) => AssignmentOperator::AndAssign,
-            BalancedToken::Punctuator(Punctuator::OrAssign) => AssignmentOperator::OrAssign,
-            BalancedToken::Punctuator(Punctuator::XorAssign) => AssignmentOperator::XorAssign,
-            BalancedToken::Punctuator(Punctuator::LeftShiftAssign) => AssignmentOperator::LeftShiftAssign,
-            BalancedToken::Punctuator(Punctuator::RightShiftAssign) => AssignmentOperator::RightShiftAssign,
+            Token::Punctuator(Punctuator::Assign) => AssignmentOperator::Assign,
+            Token::Punctuator(Punctuator::AddAssign) => AssignmentOperator::AddAssign,
+            Token::Punctuator(Punctuator::SubAssign) => AssignmentOperator::SubAssign,
+            Token::Punctuator(Punctuator::MulAssign) => AssignmentOperator::MulAssign,
+            Token::Punctuator(Punctuator::DivAssign) => AssignmentOperator::DivAssign,
+            Token::Punctuator(Punctuator::ModAssign) => AssignmentOperator::ModAssign,
+            Token::Punctuator(Punctuator::AndAssign) => AssignmentOperator::AndAssign,
+            Token::Punctuator(Punctuator::OrAssign) => AssignmentOperator::OrAssign,
+            Token::Punctuator(Punctuator::XorAssign) => AssignmentOperator::XorAssign,
+            Token::Punctuator(Punctuator::LeftShiftAssign) => AssignmentOperator::LeftShiftAssign,
+            Token::Punctuator(Punctuator::RightShiftAssign) => AssignmentOperator::RightShiftAssign,
         };
         choice((
             unary_expression
@@ -296,7 +289,7 @@ pub fn assignment_expression<'a>(
 }
 
 /// (6.5.17) expression
-pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone {
+pub fn expression<'a>() -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
     recursive(|expression| {
         let mut assignment = Recursive::declare();
 
@@ -324,56 +317,149 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extr
     })
 }
 
-fn keyword<'a>(kwd: &str) -> impl Parser<'a, &'a [BalancedToken], (), Extra<'a>> + Clone {
+// =============================================================================
+// Attributes
+// =============================================================================
+
+/// (6.7.12.1) attribute specifier sequence
+pub fn attribute_specifier_sequence<'a>()
+-> impl Parser<'a, &'a [Token], Vec<AttributeSpecifier>, Extra<'a>> + Clone {
+    attribute_specifier()
+        .repeated()
+        .collect::<Vec<AttributeSpecifier>>()
+        .labelled("attribute specifier sequence")
+        .as_context()
+}
+
+/// (6.7.12.1) attribute specifier
+pub fn attribute_specifier<'a>()
+-> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
+    attribute_list()
+        .bracketed()
+        .bracketed()
+        .map(|attributes| AttributeSpecifier { attributes })
+        .labelled("attribute specifier")
+        .as_context()
+}
+
+/// (6.7.12.1) attribute list
+pub fn attribute_list<'a>() -> impl Parser<'a, &'a [Token], Vec<Attribute>, Extra<'a>> + Clone {
+    attribute()
+        .separated_by(punctuator(Punctuator::Comma))
+        .allow_trailing()
+        .collect::<Vec<Attribute>>()
+        .labelled("attribute list")
+        .as_context()
+}
+
+/// (6.7.12.1) attribute
+pub fn attribute<'a>() -> impl Parser<'a, &'a [Token], Attribute, Extra<'a>> + Clone {
+    attribute_token()
+        .then(attribute_argument_clause().or_not())
+        .map(|(token, arguments)| Attribute {
+            token,
+            arguments: arguments.unwrap_or_default(),
+        })
+        .labelled("attribute")
+        .as_context()
+}
+
+/// (6.7.12.1) attribute token
+pub fn attribute_token<'a>() -> impl Parser<'a, &'a [Token], AttributeToken, Extra<'a>> + Clone {
+    let standard = identifier();
+    let prefixed = identifier()
+        .then_ignore(punctuator(Punctuator::Scope))
+        .then(identifier());
+
+    choice((
+        prefixed.map(|(prefix, identifier)| AttributeToken::Prefixed { prefix, identifier }),
+        standard.map(AttributeToken::Standard),
+    ))
+    .labelled("attribute token")
+    .as_context()
+}
+
+/// (6.7.12.1) attribute argument clause
+pub fn attribute_argument_clause<'a>()
+-> impl Parser<'a, &'a [Token], TokenStream, Extra<'a>> + Clone {
     select! {
-        BalancedToken::Identifier(Identifier(name)) if name == kwd => ()
+        Token::Parenthesized(tokens) => tokens
     }
 }
 
-fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, &'a [BalancedToken], (), Extra<'a>> + Clone {
+// =============================================================================
+// Parser utilities
+// =============================================================================
+
+fn identifier<'a>() -> impl Parser<'a, &'a [Token], Identifier, Extra<'a>> + Clone {
     select! {
-        BalancedToken::Punctuator(p) if p == punc => ()
+        Token::Identifier(value) => value
+    }
+}
+
+fn constant<'a>() -> impl Parser<'a, &'a [Token], Constant, Extra<'a>> + Clone {
+    select! {
+        Token::Constant(value) => value
+    }
+}
+
+fn string_literal<'a>() -> impl Parser<'a, &'a [Token], StringLiteral, Extra<'a>> + Clone {
+    select! {
+        Token::StringLiteral(value) => value
+    }
+}
+
+fn keyword<'a>(kwd: &str) -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
+    select! {
+        Token::Identifier(Identifier(name)) if name == kwd => ()
+    }
+}
+
+fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
+    select! {
+        Token::Punctuator(p) if p == punc => ()
     }
 }
 
 trait ParserExt<O, E> {
-    fn parenthesized<'a>(self) -> impl Parser<'a, &'a [BalancedToken], O, E> + Clone
+    fn parenthesized<'a>(self) -> impl Parser<'a, &'a [Token], O, E> + Clone
     where
         Self: Sized,
-        Self: Parser<'a, &'a [BalancedToken], O, E> + Clone,
-        E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+        Self: Parser<'a, &'a [Token], O, E> + Clone,
+        E: chumsky::extra::ParserExtra<'a, &'a [Token]>,
     {
         self.nested_in(select_ref! {
-            BalancedToken::Parenthesized(BalancedTokenSequence { tokens }) => tokens.as_slice()
+            Token::Parenthesized(tokens) => tokens.as_ref()
         })
     }
 
-    fn bracketed<'a>(self) -> impl Parser<'a, &'a [BalancedToken], O, E> + Clone
+    fn bracketed<'a>(self) -> impl Parser<'a, &'a [Token], O, E> + Clone
     where
         Self: Sized,
-        Self: Parser<'a, &'a [BalancedToken], O, E> + Clone,
-        E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+        Self: Parser<'a, &'a [Token], O, E> + Clone,
+        E: chumsky::extra::ParserExtra<'a, &'a [Token]>,
     {
         self.nested_in(select_ref! {
-            BalancedToken::Bracketed(BalancedTokenSequence { tokens }) => tokens.as_slice()
+            Token::Bracketed(tokens) => tokens.as_ref()
         })
     }
 
-    fn braced<'a>(self) -> impl Parser<'a, &'a [BalancedToken], O, E> + Clone
+    #[allow(dead_code)] // TODO
+    fn braced<'a>(self) -> impl Parser<'a, &'a [Token], O, E> + Clone
     where
         Self: Sized,
-        Self: Parser<'a, &'a [BalancedToken], O, E> + Clone,
-        E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+        Self: Parser<'a, &'a [Token], O, E> + Clone,
+        E: chumsky::extra::ParserExtra<'a, &'a [Token]>,
     {
         self.nested_in(select_ref! {
-            BalancedToken::Braced(BalancedTokenSequence { tokens }) => tokens.as_slice()
+            Token::Braced(tokens) => tokens.as_ref()
         })
     }
 }
 
 impl<'a, T, O, E> ParserExt<O, E> for T
 where
-    T: Parser<'a, &'a [BalancedToken], O, E>,
-    E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+    T: Parser<'a, &'a [Token], O, E>,
+    E: chumsky::extra::ParserExtra<'a, &'a [Token]>,
 {
 }

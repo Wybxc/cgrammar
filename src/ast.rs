@@ -762,13 +762,13 @@ pub struct StaticAssertDeclaration {
 /// Attribute specifiers (6.7.12.1)
 #[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct AttributeSpecifier {
-    pub attributes: Vec<Option<Attribute>>,
+    pub attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct Attribute {
     pub token: AttributeToken,
-    pub arguments: Option<BalancedTokenSequence>,
+    pub arguments: BalancedTokenSequence,
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -783,6 +783,12 @@ pub enum AttributeToken {
 #[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct BalancedTokenSequence {
     pub tokens: Vec<BalancedToken>,
+}
+
+impl AsRef<[BalancedToken]> for BalancedTokenSequence {
+    fn as_ref(&self) -> &[BalancedToken] {
+        &self.tokens
+    }
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
