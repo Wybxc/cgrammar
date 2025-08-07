@@ -50,6 +50,11 @@ pub fn postfix_expression<'a>(
         BalancedToken::Bracketed(BalancedTokenSequence { tokens }) => tokens.as_slice()
     });
 
+    // TODO: function call
+    // TODO: member access
+    // TODO: member access through pointer
+    // TODO: compound literal
+
     type PostfixFn = Box<dyn FnOnce(PostfixExpression) -> PostfixExpression>;
     primary
         .map(PostfixExpression::Primary)
@@ -106,6 +111,9 @@ pub fn unary_expression<'a>(
         };
         let unary = unary_operator.then(cast_expression(unary_expression));
 
+        // TODO: sizeof
+        // TODO: _Alignof
+
         choice((
             pre_increment.map(UnaryExpression::PreIncrement),
             pre_decrement.map(UnaryExpression::PreDecrement),
@@ -124,6 +132,7 @@ pub fn unary_expression<'a>(
 pub fn cast_expression<'a>(
     unary_expression: impl Parser<'a, &'a [BalancedToken], UnaryExpression, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [BalancedToken], CastExpression, Extra<'a>> + Clone {
+    // TODO: cast
     recursive(|_cast_expression| unary_expression.map(CastExpression::Unary))
 }
 
