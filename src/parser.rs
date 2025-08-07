@@ -32,7 +32,7 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extr
     recursive(|expression| {
         let unary = unary_expression(expression.clone());
         let cast = cast_expression(unary.clone());
-        let postfix = postfix_expression(expression);
+        let postfix = postfix_expression(expression.clone());
 
         choice((
             unary.map(Expression::Unary),
@@ -59,6 +59,28 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extr
             infix(left(1000 - 110), op!(LogicalAnd), binary!(LogicalAnd)),
             infix(left(1000 - 120), op!(LogicalOr), binary!(LogicalOr)),
         ))
+        .foldl(
+            {
+                let question = select! {
+                    BalancedToken::Punctuator(Punctuator::Question) => ()
+                };
+                let colon = select! {
+                    BalancedToken::Punctuator(Punctuator::Colon) => ()
+                };
+                question
+                    .ignore_then(expression.clone())
+                    .then_ignore(colon)
+                    .then(expression)
+                    .repeated()
+            },
+            |condition, (then_expr, else_expr)| {
+                Expression::Conditional(ConditionalExpression {
+                    condition: Box::new(condition),
+                    then_expr: Box::new(then_expr),
+                    else_expr: Box::new(else_expr),
+                })
+            },
+        )
         .labelled("expression")
         .as_context()
     })
@@ -182,4 +204,29 @@ pub fn postfix_expression<'a>(
         )
         .labelled("postfix expression")
         .as_context()
+}
+
+pub fn conditional_expression<'a>(
+    expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [BalancedToken], ConditionalExpression, Extra<'a>> + Clone {
+    let question = select! {
+        BalancedToken::Punctuator(Punctuator::Question) => ()
+    };
+    let colon = select! {
+        BalancedToken::Punctuator(Punctuator::Colon) => ()
+    };
+
+    expression
+        .clone()
+        .then_ignore(question)
+        .then(expression.clone())
+        .then_ignore(colon)
+        .then(expression)
+        .map(
+            |((condition, then_expr), else_expr)| ConditionalExpression {
+                condition: Box::new(condition),
+                then_expr: Box::new(then_expr),
+                else_expr: Box::new(else_expr),
+            },
+        )
 }
