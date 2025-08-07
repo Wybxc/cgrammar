@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::ast::*;
 use chumsky::prelude::*;
 
@@ -30,7 +32,7 @@ pub fn primary_expression<'a>(
 /// (6.5.2) postfix expression
 pub fn postfix_expression<'a>(
     expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [Token], PostfixExpression, Extra<'a>> + Clone {
     let primary = primary_expression(expression.clone());
 
@@ -38,6 +40,7 @@ pub fn postfix_expression<'a>(
     let decrement = punctuator(Punctuator::Decrement);
     let array = expression.bracketed();
     let function = assignment_expression
+        .map(Brand::into_inner)
         .separated_by(punctuator(Punctuator::Comma))
         .collect::<Vec<Expression>>()
         .parenthesized();
@@ -51,12 +54,8 @@ pub fn postfix_expression<'a>(
         .map(PostfixExpression::Primary)
         .foldl(
             choice((
-                increment.map(|_| -> PostfixFn {
-                    Box::new(|expr| PostfixExpression::PostIncrement(Box::new(expr)))
-                }),
-                decrement.map(|_| -> PostfixFn {
-                    Box::new(|expr| PostfixExpression::PostDecrement(Box::new(expr)))
-                }),
+                increment.map(|_| -> PostfixFn { Box::new(|expr| PostfixExpression::PostIncrement(Box::new(expr))) }),
+                decrement.map(|_| -> PostfixFn { Box::new(|expr| PostfixExpression::PostDecrement(Box::new(expr))) }),
                 array.map(|idx| -> PostfixFn {
                     Box::new(move |expr| PostfixExpression::ArrayAccess {
                         array: Box::new(expr),
@@ -92,7 +91,7 @@ pub fn postfix_expression<'a>(
 /// (6.5.3) unary expression
 pub fn unary_expression<'a>(
     expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    assignment_expression: impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone {
     recursive(|unary_expression| {
         let postfix = postfix_expression(expression, assignment_expression);
@@ -115,9 +114,7 @@ pub fn unary_expression<'a>(
         };
         let unary = unary_operator.then(cast_expression(unary_expression.clone()));
 
-        let sizeof = keyword("sizeof")
-            .ignore_then(unary_expression.clone())
-            .map(Box::new);
+        let sizeof = keyword("sizeof").ignore_then(unary_expression.clone()).map(Box::new);
 
         // TODO: sizeof type
         // TODO: _Alignof
@@ -166,8 +163,8 @@ pub fn cast_expression<'a>(
 /// (6.5.14) logical OR expression
 pub fn binary_expression<'a>(
     expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
+    assignment_expression: impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone + 'a,
+) -> impl Parser<'a, &'a [Token], Brand<Expression, BinaryExpression>, Extra<'a>> + Clone {
     use chumsky::pratt::*;
 
     macro_rules! op {
@@ -220,15 +217,16 @@ pub fn binary_expression<'a>(
         infix(left(1000 - 110), op!(LogicalAnd), binary!(LogicalAnd)),
         infix(left(1000 - 120), op!(LogicalOr), binary!(LogicalOr)),
     ))
+    .map(Brand::new)
     .labelled("binary expression")
     .as_context()
 }
 
 /// (6.5.15) conditional expression
 pub fn conditional_expression<'a>(
-    binary_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    binary_expression: impl Parser<'a, &'a [Token], Brand<Expression, BinaryExpression>, Extra<'a>> + Clone + 'a,
     expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
+) -> impl Parser<'a, &'a [Token], Brand<Expression, ConditionalExpression>, Extra<'a>> + Clone {
     recursive(|conditional_expression| {
         choice((
             binary_expression
@@ -236,16 +234,17 @@ pub fn conditional_expression<'a>(
                 .then_ignore(punctuator(Punctuator::Question))
                 .then(expression)
                 .then_ignore(punctuator(Punctuator::Colon))
-                .then(conditional_expression)
+                .then(conditional_expression.map(Brand::into_inner))
                 .map(|((condition, then_expr), else_expr)| {
                     Expression::Conditional(ConditionalExpression {
-                        condition: Box::new(condition),
+                        condition: Box::new(condition.into_inner()),
                         then_expr: Box::new(then_expr),
                         else_expr: Box::new(else_expr),
                     })
                 }),
-            binary_expression,
+            binary_expression.map(Brand::into_inner),
         ))
+        .map(Brand::new)
         .labelled("conditional expression")
         .as_context()
     })
@@ -253,9 +252,9 @@ pub fn conditional_expression<'a>(
 
 /// (6.5.16) assignment expression
 pub fn assignment_expression<'a>(
-    conditional_expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
+    conditional_expression: impl Parser<'a, &'a [Token], Brand<Expression, ConditionalExpression>, Extra<'a>> + Clone + 'a,
     unary_expression: impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
+) -> impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone {
     recursive(|assignment_expression| {
         let assigment_opeartor = select! {
             Token::Punctuator(Punctuator::Assign) => AssignmentOperator::Assign,
@@ -273,7 +272,7 @@ pub fn assignment_expression<'a>(
         choice((
             unary_expression
                 .then(assigment_opeartor)
-                .then(assignment_expression)
+                .then(assignment_expression.map(Brand::into_inner))
                 .map(|((left, operator), right)| {
                     Expression::Assignment(AssignmentExpression {
                         operator,
@@ -281,8 +280,9 @@ pub fn assignment_expression<'a>(
                         right: Box::new(right),
                     })
                 }),
-            conditional_expression,
+            conditional_expression.map(Brand::into_inner),
         ))
+        .map(Brand::new)
         .labelled("assignment expression")
         .as_context()
     })
@@ -302,6 +302,7 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> +
         ));
 
         assignment
+            .map(Brand::into_inner)
             .separated_by(punctuator(Punctuator::Comma))
             .at_least(1)
             .collect::<Vec<Expression>>()
@@ -322,8 +323,7 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> +
 // =============================================================================
 
 /// (6.7.12.1) attribute specifier sequence
-pub fn attribute_specifier_sequence<'a>()
--> impl Parser<'a, &'a [Token], Vec<AttributeSpecifier>, Extra<'a>> + Clone {
+pub fn attribute_specifier_sequence<'a>() -> impl Parser<'a, &'a [Token], Vec<AttributeSpecifier>, Extra<'a>> + Clone {
     attribute_specifier()
         .repeated()
         .collect::<Vec<AttributeSpecifier>>()
@@ -332,8 +332,7 @@ pub fn attribute_specifier_sequence<'a>()
 }
 
 /// (6.7.12.1) attribute specifier
-pub fn attribute_specifier<'a>()
--> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
+pub fn attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
     attribute_list()
         .bracketed()
         .bracketed()
@@ -380,8 +379,7 @@ pub fn attribute_token<'a>() -> impl Parser<'a, &'a [Token], AttributeToken, Ext
 }
 
 /// (6.7.12.1) attribute argument clause
-pub fn attribute_argument_clause<'a>()
--> impl Parser<'a, &'a [Token], TokenStream, Extra<'a>> + Clone {
+pub fn attribute_argument_clause<'a>() -> impl Parser<'a, &'a [Token], TokenStream, Extra<'a>> + Clone {
     select! {
         Token::Parenthesized(tokens) => tokens
     }
@@ -462,4 +460,17 @@ where
     T: Parser<'a, &'a [Token], O, E>,
     E: chumsky::extra::ParserExtra<'a, &'a [Token]>,
 {
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Brand<T, B>(T, PhantomData<B>);
+
+impl<T, B> Brand<T, B> {
+    fn new(value: T) -> Self {
+        Brand(value, PhantomData)
+    }
+
+    fn into_inner(self) -> T {
+        self.0
+    }
 }

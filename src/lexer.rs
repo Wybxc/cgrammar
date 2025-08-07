@@ -67,27 +67,17 @@ pub fn binary_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
 pub fn integer_suffix<'a>() -> impl Parser<'a, &'a str, IntegerSuffix> + Clone {
     choice((
         // Unsigned + Long variations
-        just("ull")
-            .or(just("ULL"))
-            .map(|_| IntegerSuffix::UnsignedLongLong),
-        just("ul")
-            .or(just("UL"))
-            .map(|_| IntegerSuffix::UnsignedLong),
-        just("llu")
-            .or(just("LLU"))
-            .map(|_| IntegerSuffix::UnsignedLongLong),
-        just("lu")
-            .or(just("LU"))
-            .map(|_| IntegerSuffix::UnsignedLong),
+        just("ull").or(just("ULL")).map(|_| IntegerSuffix::UnsignedLongLong),
+        just("ul").or(just("UL")).map(|_| IntegerSuffix::UnsignedLong),
+        just("llu").or(just("LLU")).map(|_| IntegerSuffix::UnsignedLongLong),
+        just("lu").or(just("LU")).map(|_| IntegerSuffix::UnsignedLong),
         // Long variations
         just("ll").or(just("LL")).map(|_| IntegerSuffix::LongLong),
         just("l").or(just("L")).map(|_| IntegerSuffix::Long),
         // Unsigned
         just("u").or(just("U")).map(|_| IntegerSuffix::Unsigned),
         // Bit-precise suffixes
-        just("uwb")
-            .or(just("UWB"))
-            .map(|_| IntegerSuffix::UnsignedBitPrecise),
+        just("uwb").or(just("UWB")).map(|_| IntegerSuffix::UnsignedBitPrecise),
         just("wb").or(just("WB")).map(|_| IntegerSuffix::BitPrecise),
     ))
 }
@@ -205,10 +195,7 @@ pub fn character_constant<'a>() -> impl Parser<'a, &'a str, CharacterConstant> +
 
     prefix
         .then(content.delimited_by(just('\''), just('\'')))
-        .map(|(encoding_prefix, value)| CharacterConstant {
-            encoding_prefix,
-            value,
-        })
+        .map(|(encoding_prefix, value)| CharacterConstant { encoding_prefix, value })
 }
 
 /// (6.4.4.5) predefined constant
@@ -224,17 +211,11 @@ pub fn predefined_constant<'a>() -> impl Parser<'a, &'a str, PredefinedConstant>
 pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiteral> + Clone {
     let prefix = encoding_prefix().or_not();
 
-    let content = escape_sequence()
-        .or(none_of("\"\\"))
-        .repeated()
-        .collect::<String>();
+    let content = escape_sequence().or(none_of("\"\\")).repeated().collect::<String>();
 
     prefix
         .then(content.delimited_by(just('"'), just('"')))
-        .map(|(encoding_prefix, value)| StringLiteral {
-            encoding_prefix,
-            value,
-        })
+        .map(|(encoding_prefix, value)| StringLiteral { encoding_prefix, value })
 }
 
 /// (6.4.6) punctuator (excluding parentheses and brackets)
@@ -300,19 +281,13 @@ pub fn balanced_token<'a>(
     balanced_token_sequence: impl Parser<'a, &'a str, BalancedTokenSequence> + Clone,
 ) -> impl Parser<'a, &'a str, BalancedToken> + Clone {
     // Parenthesized: ( balanced-token-sequence? )
-    let parenthesized = balanced_token_sequence
-        .clone()
-        .delimited_by(just('('), just(')'));
+    let parenthesized = balanced_token_sequence.clone().delimited_by(just('('), just(')'));
 
     // Bracketed: [ balanced-token-sequence? ]
-    let bracketed = balanced_token_sequence
-        .clone()
-        .delimited_by(just('['), just(']'));
+    let bracketed = balanced_token_sequence.clone().delimited_by(just('['), just(']'));
 
     // Braced: { balanced-token-sequence? }
-    let braced = balanced_token_sequence
-        .clone()
-        .delimited_by(just('{'), just('}'));
+    let braced = balanced_token_sequence.clone().delimited_by(just('{'), just('}'));
 
     // Other tokens (non-brackets)
     let identifier = identifier();
@@ -349,22 +324,15 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
 pub fn comment<'a>() -> impl Parser<'a, &'a str, ()> + Clone {
     choice((
         // Single-line comments
-        just("//")
-            .ignore_then(choice((just("\\\n").ignored(), none_of('\n').ignored())).repeated()),
+        just("//").ignore_then(choice((just("\\\n").ignored(), none_of('\n').ignored())).repeated()),
         // Multi-line comments
         just("/*")
-            .ignore_then(choice((
-                none_of('*').ignored(),
-                just('*').then(none_of('/')).ignored(),
-            )))
+            .ignore_then(choice((none_of('*').ignored(), just('*').then(none_of('/')).ignored())))
             .then_ignore(just("*/")),
     ))
 }
 
 /// any other token as unknown
 pub fn unknown<'a>() -> impl Parser<'a, &'a str, String> + Clone {
-    none_of(" \t\n\r()[]{}")
-        .repeated()
-        .at_least(1)
-        .collect::<String>()
+    none_of(" \t\n\r()[]{}").repeated().at_least(1).collect::<String>()
 }

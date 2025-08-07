@@ -677,10 +677,7 @@ pub struct Attribute {
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum AttributeToken {
     Standard(Identifier),
-    Prefixed {
-        prefix: Identifier,
-        identifier: Identifier,
-    },
+    Prefixed { prefix: Identifier, identifier: Identifier },
 }
 
 #[derive(Debug, DebugPls, Default, Clone, PartialEq)]
