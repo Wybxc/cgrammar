@@ -16,16 +16,13 @@ pub fn primary_expression<'a>(
     let string_literal = select! {
         BalancedToken::StringLiteral(value) => value
     };
-    let parens = select_ref! {
-        BalancedToken::Parenthesized(BalancedTokenSequence { tokens } ) => tokens.as_slice()
-    };
 
     choice((
         identifier.map(PrimaryExpression::Identifier),
         constant.map(PrimaryExpression::Constant),
         string_literal.map(PrimaryExpression::StringLiteral),
         expression
-            .nested_in(parens)
+            .parenthesized()
             .map(Box::new)
             .map(PrimaryExpression::Parenthesized),
         // TODO: Generic selection
@@ -41,34 +38,18 @@ pub fn postfix_expression<'a>(
 ) -> impl Parser<'a, &'a [BalancedToken], PostfixExpression, Extra<'a>> + Clone {
     let primary = primary_expression(expression.clone());
 
-    let increment = select! {
-        BalancedToken::Punctuator(Punctuator::Increment) => ()
-    };
-    let decrement = select! {
-        BalancedToken::Punctuator(Punctuator::Decrement) => ()
-    };
-    let array = expression.nested_in(select_ref! {
-        BalancedToken::Bracketed(BalancedTokenSequence { tokens }) => tokens.as_slice()
-    });
+    let increment = punctuator(Punctuator::Increment);
+    let decrement = punctuator(Punctuator::Decrement);
+    let array = expression.bracketed();
     let function = assignment_expression
-        .separated_by(select! {
-            BalancedToken::Punctuator(Punctuator::Comma) => ()
-        })
+        .separated_by(punctuator(Punctuator::Comma))
         .collect::<Vec<Expression>>()
-        .nested_in(select_ref! {
-            BalancedToken::Parenthesized(BalancedTokenSequence { tokens }) => tokens.as_slice()
-        });
+        .parenthesized();
     let identifier = select! {
         BalancedToken::Identifier(value) => value
     };
-    let member_access = select! {
-        BalancedToken::Punctuator(Punctuator::Dot) => ()
-    }
-    .ignore_then(identifier);
-    let member_access_ptr = select! {
-        BalancedToken::Punctuator(Punctuator::Arrow) => ()
-    }
-    .ignore_then(identifier);
+    let member_access = punctuator(Punctuator::Dot).ignore_then(identifier);
+    let member_access_ptr = punctuator(Punctuator::Arrow).ignore_then(identifier);
 
     // TODO: compound literal
 
@@ -123,17 +104,11 @@ pub fn unary_expression<'a>(
     recursive(|unary_expression| {
         let postfix = postfix_expression(expression, assignment_expression);
 
-        let increment_operator = select! {
-            BalancedToken::Punctuator(Punctuator::Increment) => ()
-        };
-        let pre_increment = increment_operator
+        let pre_increment = punctuator(Punctuator::Increment)
             .ignore_then(unary_expression.clone())
             .map(Box::new);
 
-        let decrement_operator = select! {
-            BalancedToken::Punctuator(Punctuator::Decrement) => ()
-        };
-        let pre_decrement = decrement_operator
+        let pre_decrement = punctuator(Punctuator::Decrement)
             .ignore_then(unary_expression.clone())
             .map(Box::new);
 
@@ -145,9 +120,13 @@ pub fn unary_expression<'a>(
             BalancedToken::Punctuator(Punctuator::Bang) => UnaryOperator::LogicalNot,
             BalancedToken::Punctuator(Punctuator::Tilde) => UnaryOperator::BitwiseNot,
         };
-        let unary = unary_operator.then(cast_expression(unary_expression));
+        let unary = unary_operator.then(cast_expression(unary_expression.clone()));
 
-        // TODO: sizeof
+        let sizeof = keyword("sizeof")
+            .ignore_then(unary_expression.clone())
+            .map(Box::new);
+
+        // TODO: sizeof type
         // TODO: _Alignof
 
         choice((
@@ -157,6 +136,7 @@ pub fn unary_expression<'a>(
                 operator,
                 operand: Box::new(operand),
             }),
+            sizeof.map(UnaryExpression::Sizeof), // sizeof must be before postfix
             postfix.map(UnaryExpression::Postfix),
         ))
         .labelled("unary expression")
@@ -200,9 +180,7 @@ pub fn binary_expression<'a>(
     macro_rules! op {
         ($punct:expr) => {{
             use Punctuator::*;
-            select! {
-                BalancedToken::Punctuator(p) if p == $punct => ()
-            }
+            punctuator($punct)
         }};
     }
 
@@ -259,19 +237,12 @@ pub fn conditional_expression<'a>(
     expression: impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone + 'a,
 ) -> impl Parser<'a, &'a [BalancedToken], Expression, Extra<'a>> + Clone {
     recursive(|conditional_expression| {
-        let question = select! {
-            BalancedToken::Punctuator(Punctuator::Question) => ()
-        };
-        let colon = select! {
-            BalancedToken::Punctuator(Punctuator::Colon) => ()
-        };
-
         choice((
             binary_expression
                 .clone()
-                .then_ignore(question)
+                .then_ignore(punctuator(Punctuator::Question))
                 .then(expression)
-                .then_ignore(colon)
+                .then_ignore(punctuator(Punctuator::Colon))
                 .then(conditional_expression)
                 .map(|((condition, then_expr), else_expr)| {
                     Expression::Conditional(ConditionalExpression {
@@ -337,11 +308,8 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extr
             unary_expression(expression.clone(), assignment.clone()),
         ));
 
-        let comma = select! {
-            BalancedToken::Punctuator(Punctuator::Comma) => ()
-        };
         assignment
-            .separated_by(comma)
+            .separated_by(punctuator(Punctuator::Comma))
             .at_least(1)
             .collect::<Vec<Expression>>()
             .map(|expressions| {
@@ -354,4 +322,58 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extr
             .labelled("expression")
             .as_context()
     })
+}
+
+fn keyword<'a>(kwd: &str) -> impl Parser<'a, &'a [BalancedToken], (), Extra<'a>> + Clone {
+    select! {
+        BalancedToken::Identifier(Identifier(name)) if name == kwd => ()
+    }
+}
+
+fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, &'a [BalancedToken], (), Extra<'a>> + Clone {
+    select! {
+        BalancedToken::Punctuator(p) if p == punc => ()
+    }
+}
+
+trait ParserExt<O, E> {
+    fn parenthesized<'a>(self) -> impl Parser<'a, &'a [BalancedToken], O, E> + Clone
+    where
+        Self: Sized,
+        Self: Parser<'a, &'a [BalancedToken], O, E> + Clone,
+        E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+    {
+        self.nested_in(select_ref! {
+            BalancedToken::Parenthesized(BalancedTokenSequence { tokens }) => tokens.as_slice()
+        })
+    }
+
+    fn bracketed<'a>(self) -> impl Parser<'a, &'a [BalancedToken], O, E> + Clone
+    where
+        Self: Sized,
+        Self: Parser<'a, &'a [BalancedToken], O, E> + Clone,
+        E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+    {
+        self.nested_in(select_ref! {
+            BalancedToken::Bracketed(BalancedTokenSequence { tokens }) => tokens.as_slice()
+        })
+    }
+
+    fn braced<'a>(self) -> impl Parser<'a, &'a [BalancedToken], O, E> + Clone
+    where
+        Self: Sized,
+        Self: Parser<'a, &'a [BalancedToken], O, E> + Clone,
+        E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+    {
+        self.nested_in(select_ref! {
+            BalancedToken::Braced(BalancedTokenSequence { tokens }) => tokens.as_slice()
+        })
+    }
+}
+
+impl<'a, T, O, E> ParserExt<O, E> for T
+where
+    T: Parser<'a, &'a [BalancedToken], O, E>,
+    E: chumsky::extra::ParserExtra<'a, &'a [BalancedToken]>,
+{
 }
