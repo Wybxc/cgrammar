@@ -1,7 +1,7 @@
-use std::marker::PhantomData;
-
 use crate::ast::*;
+use crate::utils::*;
 use chumsky::prelude::*;
+use macro_rules_attribute::apply;
 
 pub type Token = BalancedToken;
 pub type TokenStream = BalancedTokenSequence;
@@ -12,14 +12,12 @@ type Extra<'a> = chumsky::extra::Err<Rich<'a, Token>>;
 // =============================================================================
 
 /// (6.5.1) primary expression
-pub fn primary_expression<'a>(
-    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone,
-) -> impl Parser<'a, &'a [Token], PrimaryExpression, Extra<'a>> + Clone {
+pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpression, Extra<'a>> + Clone {
     choice((
         identifier().map(PrimaryExpression::Identifier),
         constant().map(PrimaryExpression::Constant),
         string_literal().map(PrimaryExpression::StringLiteral),
-        expression
+        expression()
             .parenthesized()
             .map(Box::new)
             .map(PrimaryExpression::Parenthesized),
@@ -30,16 +28,12 @@ pub fn primary_expression<'a>(
 }
 
 /// (6.5.2) postfix expression
-pub fn postfix_expression<'a>(
-    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], PostfixExpression, Extra<'a>> + Clone {
-    let primary = primary_expression(expression.clone());
-
+#[apply(cached)]
+pub fn postfix_expression<'a>() -> impl Parser<'a, &'a [Token], PostfixExpression, Extra<'a>> + Clone {
     let increment = punctuator(Punctuator::Increment);
     let decrement = punctuator(Punctuator::Decrement);
-    let array = expression.bracketed();
-    let function = assignment_expression
+    let array = expression().bracketed();
+    let function = assignment_expression()
         .map(Brand::into_inner)
         .separated_by(punctuator(Punctuator::Comma))
         .collect::<Vec<Expression>>()
@@ -50,7 +44,7 @@ pub fn postfix_expression<'a>(
     // TODO: compound literal
 
     type PostfixFn = Box<dyn FnOnce(PostfixExpression) -> PostfixExpression>;
-    primary
+    primary_expression()
         .map(PostfixExpression::Primary)
         .foldl(
             choice((
@@ -89,57 +83,52 @@ pub fn postfix_expression<'a>(
 }
 
 /// (6.5.3) unary expression
-pub fn unary_expression<'a>(
-    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone {
-    recursive(|unary_expression| {
-        let postfix = postfix_expression(expression, assignment_expression);
+#[apply(cached)]
+pub fn unary_expression<'a>() -> impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone {
+    let pre_increment = punctuator(Punctuator::Increment)
+        .ignore_then(unary_expression())
+        .map(Box::new);
 
-        let pre_increment = punctuator(Punctuator::Increment)
-            .ignore_then(unary_expression.clone())
-            .map(Box::new);
+    let pre_decrement = punctuator(Punctuator::Decrement)
+        .ignore_then(unary_expression())
+        .map(Box::new);
 
-        let pre_decrement = punctuator(Punctuator::Decrement)
-            .ignore_then(unary_expression.clone())
-            .map(Box::new);
+    let unary_operator = select! {
+        Token::Punctuator(Punctuator::Ampersand) => UnaryOperator::Address,
+        Token::Punctuator(Punctuator::Star) => UnaryOperator::Dereference,
+        Token::Punctuator(Punctuator::Plus) => UnaryOperator::Plus,
+        Token::Punctuator(Punctuator::Minus) => UnaryOperator::Minus,
+        Token::Punctuator(Punctuator::Bang) => UnaryOperator::LogicalNot,
+        Token::Punctuator(Punctuator::Tilde) => UnaryOperator::BitwiseNot,
+    };
+    let unary = unary_operator.then(cast_expression());
 
-        let unary_operator = select! {
-            Token::Punctuator(Punctuator::Ampersand) => UnaryOperator::Address,
-            Token::Punctuator(Punctuator::Star) => UnaryOperator::Dereference,
-            Token::Punctuator(Punctuator::Plus) => UnaryOperator::Plus,
-            Token::Punctuator(Punctuator::Minus) => UnaryOperator::Minus,
-            Token::Punctuator(Punctuator::Bang) => UnaryOperator::LogicalNot,
-            Token::Punctuator(Punctuator::Tilde) => UnaryOperator::BitwiseNot,
-        };
-        let unary = unary_operator.then(cast_expression(unary_expression.clone()));
+    let sizeof = keyword("sizeof").ignore_then(unary_expression()).map(Box::new);
 
-        let sizeof = keyword("sizeof").ignore_then(unary_expression.clone()).map(Box::new);
+    let postfix = postfix_expression();
 
-        // TODO: sizeof type
-        // TODO: _Alignof
+    // TODO: sizeof type
+    // TODO: _Alignof
 
-        choice((
-            pre_increment.map(UnaryExpression::PreIncrement),
-            pre_decrement.map(UnaryExpression::PreDecrement),
-            unary.map(|(operator, operand)| UnaryExpression::Unary {
-                operator,
-                operand: Box::new(operand),
-            }),
-            sizeof.map(UnaryExpression::Sizeof), // sizeof must be before postfix
-            postfix.map(UnaryExpression::Postfix),
-        ))
-        .labelled("unary expression")
-        .as_context()
-    })
+    choice((
+        pre_increment.map(UnaryExpression::PreIncrement),
+        pre_decrement.map(UnaryExpression::PreDecrement),
+        unary.map(|(operator, operand)| UnaryExpression::Unary {
+            operator,
+            operand: Box::new(operand),
+        }),
+        sizeof.map(UnaryExpression::Sizeof), // sizeof must be before postfix
+        postfix.map(UnaryExpression::Postfix),
+    ))
+    .labelled("unary expression")
+    .as_context()
 }
 
 /// (6.5.4) cast expression
-pub fn cast_expression<'a>(
-    unary_expression: impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], CastExpression, Extra<'a>> + Clone {
+#[apply(cached)]
+pub fn cast_expression<'a>() -> impl Parser<'a, &'a [Token], CastExpression, Extra<'a>> + Clone {
     // TODO: cast
-    recursive(|_cast_expression| unary_expression.map(CastExpression::Unary))
+    unary_expression().map(CastExpression::Unary)
 }
 
 /// (6.5.5) multiplicative expression
@@ -161,10 +150,7 @@ pub fn cast_expression<'a>(
 /// (6.5.13) logical AND expression
 ///
 /// (6.5.14) logical OR expression
-pub fn binary_expression<'a>(
-    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-    assignment_expression: impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], Brand<Expression, BinaryExpression>, Extra<'a>> + Clone {
+pub fn binary_expression<'a>() -> impl Parser<'a, &'a [Token], Brand<Expression, BinaryExpression>, Extra<'a>> + Clone {
     use chumsky::pratt::*;
 
     macro_rules! op {
@@ -187,15 +173,11 @@ pub fn binary_expression<'a>(
         };
     }
 
-    let unary = unary_expression(expression.clone(), assignment_expression.clone());
-    let cast = cast_expression(unary.clone());
-    let postfix = postfix_expression(expression.clone(), assignment_expression.clone());
-
     // Suppose precedence is X, use 1000 - 10*X as the associativity level
     choice((
-        unary.map(Expression::Unary),
-        cast.map(Expression::Cast),
-        postfix.map(Expression::Postfix),
+        unary_expression().map(Expression::Unary),
+        cast_expression().map(Expression::Cast),
+        postfix_expression().map(Expression::Postfix),
     ))
     .pratt((
         infix(left(1000 - 30), op!(Star), binary!(Multiply)),
@@ -223,99 +205,88 @@ pub fn binary_expression<'a>(
 }
 
 /// (6.5.15) conditional expression
-pub fn conditional_expression<'a>(
-    binary_expression: impl Parser<'a, &'a [Token], Brand<Expression, BinaryExpression>, Extra<'a>> + Clone + 'a,
-    expression: impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], Brand<Expression, ConditionalExpression>, Extra<'a>> + Clone {
-    recursive(|conditional_expression| {
-        choice((
-            binary_expression
-                .clone()
-                .then_ignore(punctuator(Punctuator::Question))
-                .then(expression)
-                .then_ignore(punctuator(Punctuator::Colon))
-                .then(conditional_expression.map(Brand::into_inner))
-                .map(|((condition, then_expr), else_expr)| {
-                    Expression::Conditional(ConditionalExpression {
-                        condition: Box::new(condition.into_inner()),
-                        then_expr: Box::new(then_expr),
-                        else_expr: Box::new(else_expr),
-                    })
-                }),
-            binary_expression.map(Brand::into_inner),
-        ))
-        .map(Brand::new)
-        .labelled("conditional expression")
-        .as_context()
-    })
+#[apply(cached)]
+pub fn conditional_expression<'a>()
+-> impl Parser<'a, &'a [Token], Brand<Expression, ConditionalExpression>, Extra<'a>> + Clone {
+    choice((
+        binary_expression()
+            .then_ignore(punctuator(Punctuator::Question))
+            .then(expression())
+            .then_ignore(punctuator(Punctuator::Colon))
+            .then(conditional_expression().map(Brand::into_inner))
+            .map(|((condition, then_expr), else_expr)| {
+                Expression::Conditional(ConditionalExpression {
+                    condition: Box::new(condition.into_inner()),
+                    then_expr: Box::new(then_expr),
+                    else_expr: Box::new(else_expr),
+                })
+            }),
+        binary_expression().map(Brand::into_inner),
+    ))
+    .map(Brand::new)
+    .labelled("conditional expression")
+    .as_context()
 }
 
 /// (6.5.16) assignment expression
-pub fn assignment_expression<'a>(
-    conditional_expression: impl Parser<'a, &'a [Token], Brand<Expression, ConditionalExpression>, Extra<'a>> + Clone + 'a,
-    unary_expression: impl Parser<'a, &'a [Token], UnaryExpression, Extra<'a>> + Clone + 'a,
-) -> impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone {
-    recursive(|assignment_expression| {
-        let assigment_opeartor = select! {
-            Token::Punctuator(Punctuator::Assign) => AssignmentOperator::Assign,
-            Token::Punctuator(Punctuator::AddAssign) => AssignmentOperator::AddAssign,
-            Token::Punctuator(Punctuator::SubAssign) => AssignmentOperator::SubAssign,
-            Token::Punctuator(Punctuator::MulAssign) => AssignmentOperator::MulAssign,
-            Token::Punctuator(Punctuator::DivAssign) => AssignmentOperator::DivAssign,
-            Token::Punctuator(Punctuator::ModAssign) => AssignmentOperator::ModAssign,
-            Token::Punctuator(Punctuator::AndAssign) => AssignmentOperator::AndAssign,
-            Token::Punctuator(Punctuator::OrAssign) => AssignmentOperator::OrAssign,
-            Token::Punctuator(Punctuator::XorAssign) => AssignmentOperator::XorAssign,
-            Token::Punctuator(Punctuator::LeftShiftAssign) => AssignmentOperator::LeftShiftAssign,
-            Token::Punctuator(Punctuator::RightShiftAssign) => AssignmentOperator::RightShiftAssign,
-        };
-        choice((
-            unary_expression
-                .then(assigment_opeartor)
-                .then(assignment_expression.map(Brand::into_inner))
-                .map(|((left, operator), right)| {
-                    Expression::Assignment(AssignmentExpression {
-                        operator,
-                        left: Box::new(Expression::Unary(left)),
-                        right: Box::new(right),
-                    })
-                }),
-            conditional_expression.map(Brand::into_inner),
-        ))
-        .map(Brand::new)
-        .labelled("assignment expression")
-        .as_context()
-    })
+#[apply(cached)]
+pub fn assignment_expression<'a>()
+-> impl Parser<'a, &'a [Token], Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone {
+    let assigment_opeartor = select! {
+        Token::Punctuator(Punctuator::Assign) => AssignmentOperator::Assign,
+        Token::Punctuator(Punctuator::AddAssign) => AssignmentOperator::AddAssign,
+        Token::Punctuator(Punctuator::SubAssign) => AssignmentOperator::SubAssign,
+        Token::Punctuator(Punctuator::MulAssign) => AssignmentOperator::MulAssign,
+        Token::Punctuator(Punctuator::DivAssign) => AssignmentOperator::DivAssign,
+        Token::Punctuator(Punctuator::ModAssign) => AssignmentOperator::ModAssign,
+        Token::Punctuator(Punctuator::AndAssign) => AssignmentOperator::AndAssign,
+        Token::Punctuator(Punctuator::OrAssign) => AssignmentOperator::OrAssign,
+        Token::Punctuator(Punctuator::XorAssign) => AssignmentOperator::XorAssign,
+        Token::Punctuator(Punctuator::LeftShiftAssign) => AssignmentOperator::LeftShiftAssign,
+        Token::Punctuator(Punctuator::RightShiftAssign) => AssignmentOperator::RightShiftAssign,
+    };
+    choice((
+        unary_expression()
+            .map(Expression::Unary)
+            .then(assigment_opeartor)
+            .then(assignment_expression().map(Brand::into_inner))
+            .map(|((left, operator), right)| {
+                Expression::Assignment(AssignmentExpression {
+                    operator,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                })
+            }),
+        conditional_expression().map(Brand::into_inner),
+    ))
+    .map(Brand::new)
+    .labelled("assignment expression")
+    .as_context()
 }
 
 /// (6.5.17) expression
+#[apply(cached)]
 pub fn expression<'a>() -> impl Parser<'a, &'a [Token], Expression, Extra<'a>> + Clone {
-    recursive(|expression| {
-        let mut assignment = Recursive::declare();
+    assignment_expression()
+        .map(Brand::into_inner)
+        .separated_by(punctuator(Punctuator::Comma))
+        .at_least(1)
+        .collect::<Vec<Expression>>()
+        .map(|expressions| {
+            if expressions.len() == 1 {
+                expressions.into_iter().next().unwrap()
+            } else {
+                Expression::Comma(CommaExpression { expressions })
+            }
+        })
+        .labelled("expression")
+        .as_context()
+}
 
-        let binary = binary_expression(expression.clone(), assignment.clone());
-        let conditional = conditional_expression(binary, expression.clone());
-
-        assignment.define(assignment_expression(
-            conditional.clone(),
-            unary_expression(expression.clone(), assignment.clone()),
-        ));
-
-        assignment
-            .map(Brand::into_inner)
-            .separated_by(punctuator(Punctuator::Comma))
-            .at_least(1)
-            .collect::<Vec<Expression>>()
-            .map(|expressions| {
-                if expressions.len() == 1 {
-                    expressions.into_iter().next().unwrap()
-                } else {
-                    Expression::Comma(CommaExpression { expressions })
-                }
-            })
-            .labelled("expression")
-            .as_context()
-    })
+/// (6.6) constant expression
+pub fn constant_expression<'a>()
+-> impl Parser<'a, &'a [Token], Brand<Expression, ConditionalExpression>, Extra<'a>> + Clone {
+    conditional_expression().labelled("constant expression").as_context()
 }
 
 // =============================================================================
@@ -460,17 +431,4 @@ where
     T: Parser<'a, &'a [Token], O, E>,
     E: chumsky::extra::ParserExtra<'a, &'a [Token]>,
 {
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Brand<T, B>(T, PhantomData<B>);
-
-impl<T, B> Brand<T, B> {
-    fn new(value: T) -> Self {
-        Brand(value, PhantomData)
-    }
-
-    fn into_inner(self) -> T {
-        self.0
-    }
 }
