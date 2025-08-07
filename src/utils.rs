@@ -3,7 +3,7 @@ use std::{
     cell::{OnceCell, RefCell},
     collections::HashMap,
     marker::PhantomData,
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 use chumsky::{
@@ -32,7 +32,21 @@ pub trait Cacher {
 
 pub struct Cached<P>(OnceCell<P>);
 
-pub fn cached_recursive<'src, C>(cacher: C) -> Rc<Ext<Cached<C::Parser<'src>>>>
+pub enum Shared<T> {
+    Strong(Rc<T>),
+    Weak(Weak<T>),
+}
+
+impl<T> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Shared::Strong(p) => Shared::Strong(p.clone()),
+            Shared::Weak(weak) => Shared::Weak(weak.clone()),
+        }
+    }
+}
+
+pub fn cached_recursive<'src, C>(cacher: C) -> Ext<Shared<Cached<C::Parser<'src>>>>
 where
     C: Cacher + 'static,
 {
@@ -40,57 +54,64 @@ where
         static CACHE: RefCell<HashMap<TypeId, Rc<dyn Any>>> = RefCell::new(HashMap::new());
     }
 
-    macro_rules! parser {
-        ($l:lifetime) => { Rc<Ext<Cached<C::Parser<$l>>>>};
+    macro_rules! P {
+        ($l:lifetime) => { Cached<C::Parser<$l>> };
     }
-
-    // TODO: miri said that there is memory leak
 
     let key = cacher.type_id();
 
     if let Some(parser) = CACHE.with(|cache| {
         let cache = cache.borrow();
-        cache
-            .get(&key)
-            .and_then(|b| b.clone().downcast::<Ext<Cached<C::Parser<'static>>>>().ok())
+        cache.get(&key).and_then(|b| b.clone().downcast::<P!['static]>().ok())
     }) {
         // SAFETY: The parser created by `cacher` is guaranteed to be valid for any lifetime,
         // so we can safely transmute it to the desired lifetime.
-        let parser = unsafe { std::mem::transmute::<parser!['static], parser!['src]>(parser) };
-        return parser;
+        let parser = unsafe { std::mem::transmute::<Rc<P!['static]>, Rc<P!['src]>>(parser) };
+        let parser = Rc::downgrade(&parser);
+        return Ext(Shared::Weak(parser));
     }
 
-    let parser: Rc<Ext<Cached<C::Parser<'src>>>> = Rc::new(Ext(Cached(OnceCell::new())));
+    let parser: Rc<P!['src]> = Rc::new(Cached(OnceCell::new()));
     CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
         let parser = parser.clone();
         // SAFETY: The parser created by `cacher` is guaranteed to be valid for any lifetime,
         // so we can safely transmute it to the desired lifetime.
-        let parser = unsafe { std::mem::transmute::<parser!['src], parser!['static]>(parser) };
-        cache.insert(key, parser.clone() as Rc<dyn Any>);
+        let parser = unsafe { std::mem::transmute::<Rc<P!['src]>, Rc<P!['static]>>(parser) };
+        cache.insert(key, parser as Rc<dyn Any>);
     });
     parser
-        .0
         .0
         .set(C::make_parser())
         .ok()
         .expect("Parser is already initalized");
-    parser
+    Ext(Shared::Strong(parser))
 }
 
-impl<'src, P, I, O, E> ExtParser<'src, I, O, E> for Cached<P>
+impl<T> Shared<T> {
+    fn upgrade(&self) -> Option<Rc<T>> {
+        match self {
+            Shared::Strong(p) => Some(p.clone()),
+            Shared::Weak(weak) => weak.upgrade(),
+        }
+    }
+}
+
+impl<'src, P, I, O, E> ExtParser<'src, I, O, E> for Shared<Cached<P>>
 where
     P: Parser<'src, I, O, E>,
     I: Input<'src>,
     E: extra::ParserExtra<'src, I>,
 {
     fn parse(&self, inp: &mut InputRef<'src, '_, I, E>) -> Result<O, E::Error> {
-        let parser = self.0.get().expect("Parser not initialized");
+        let parser = self.upgrade().expect("Parser dropped");
+        let parser = parser.0.get().expect("Parser not initialized");
         inp.parse(parser)
     }
 
     fn check(&self, inp: &mut InputRef<'src, '_, I, E>) -> Result<(), E::Error> {
-        let parser = self.0.get().expect("Parser not initialized");
+        let parser = self.upgrade().expect("Parser dropped");
+        let parser = parser.0.get().expect("Parser not initialized");
         inp.check(parser)
     }
 }
