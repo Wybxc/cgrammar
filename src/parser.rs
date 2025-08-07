@@ -58,9 +58,18 @@ pub fn postfix_expression<'a>(
         .nested_in(select_ref! {
             BalancedToken::Parenthesized(BalancedTokenSequence { tokens }) => tokens.as_slice()
         });
+    let identifier = select! {
+        BalancedToken::Identifier(value) => value
+    };
+    let member_access = select! {
+        BalancedToken::Punctuator(Punctuator::Dot) => ()
+    }
+    .ignore_then(identifier);
+    let member_access_ptr = select! {
+        BalancedToken::Punctuator(Punctuator::Arrow) => ()
+    }
+    .ignore_then(identifier);
 
-    // TODO: member access
-    // TODO: member access through pointer
     // TODO: compound literal
 
     type PostfixFn = Box<dyn FnOnce(PostfixExpression) -> PostfixExpression>;
@@ -84,6 +93,18 @@ pub fn postfix_expression<'a>(
                     Box::new(move |expr| PostfixExpression::FunctionCall {
                         function: Box::new(expr),
                         arguments: args,
+                    })
+                }),
+                member_access.map(|member| -> PostfixFn {
+                    Box::new(move |expr| PostfixExpression::MemberAccess {
+                        object: Box::new(expr),
+                        member,
+                    })
+                }),
+                member_access_ptr.map(|member| -> PostfixFn {
+                    Box::new(move |expr| PostfixExpression::MemberAccessPtr {
+                        object: Box::new(expr),
+                        member,
                     })
                 }),
             ))
