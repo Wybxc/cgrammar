@@ -81,6 +81,27 @@ pub fn expression<'a>() -> impl Parser<'a, &'a [BalancedToken], Expression, Extr
                 })
             },
         )
+        .pratt(infix(
+            right(1000 - 140),
+            select! {
+                BalancedToken::Punctuator(Punctuator::Assign) => AssignmentOperator::Assign,
+                BalancedToken::Punctuator(Punctuator::AddAssign) => AssignmentOperator::AddAssign,
+                BalancedToken::Punctuator(Punctuator::SubAssign) => AssignmentOperator::SubAssign,
+                BalancedToken::Punctuator(Punctuator::MulAssign) => AssignmentOperator::MulAssign,
+                BalancedToken::Punctuator(Punctuator::DivAssign) => AssignmentOperator::DivAssign,
+                BalancedToken::Punctuator(Punctuator::ModAssign) => AssignmentOperator::ModAssign,
+                BalancedToken::Punctuator(Punctuator::AndAssign) => AssignmentOperator::AndAssign,
+                BalancedToken::Punctuator(Punctuator::OrAssign) => AssignmentOperator::OrAssign,
+                BalancedToken::Punctuator(Punctuator::XorAssign) => AssignmentOperator::XorAssign,
+                BalancedToken::Punctuator(Punctuator::LeftShiftAssign) => AssignmentOperator::LeftShiftAssign,
+                BalancedToken::Punctuator(Punctuator::RightShiftAssign) => AssignmentOperator::RightShiftAssign,
+            },
+            |left, operator, right, _| Expression::Assignment(AssignmentExpression {
+                operator,
+                left: Box::new(left),
+                right: Box::new(right),
+            }),
+        ))
         .labelled("expression")
         .as_context()
     })

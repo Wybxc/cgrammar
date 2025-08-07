@@ -426,7 +426,7 @@ pub struct AssignmentExpression {
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, DebugPls, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, Copy, PartialEq)]
 pub enum AssignmentOperator {
     Assign,
     MulAssign,
