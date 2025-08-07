@@ -461,7 +461,7 @@ where
 #[case(",", Punctuator::Comma)]
 #[case("#", Punctuator::Hash)]
 fn test_simple_punctuator_valid(#[case] input: &str, #[case] expected: Punctuator) {
-    let parser = simple_punctuator();
+    let parser = punctuator();
     let result = parser.parse(input).unwrap();
     assert_eq!(result, expected);
 }
@@ -477,7 +477,7 @@ fn test_simple_punctuator_valid(#[case] input: &str, #[case] expected: Punctuato
 #[case("`", "`")]
 #[case("€", "€")]
 fn test_unknown_token_valid(#[case] input: &str, #[case] expected: &str) {
-    let parser = unknown_token();
+    let parser = unknown();
     let result = parser.parse(input).unwrap();
     assert_eq!(result, expected);
 }
