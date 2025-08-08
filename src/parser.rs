@@ -120,8 +120,13 @@ pub fn unary_expression<'a>() -> impl Parser<'a, &'a [Token], UnaryExpression, E
 /// (6.5.4) cast expression
 #[apply(cached)]
 pub fn cast_expression<'a>() -> impl Parser<'a, &'a [Token], CastExpression, Extra<'a>> + Clone {
-    // TODO: cast
-    unary_expression().map(CastExpression::Unary)
+    choice((
+        type_name()
+            .parenthesized()
+            .then(cast_expression().map(Box::new))
+            .map(|(type_name, expression)| CastExpression::Cast { type_name, expression }),
+        unary_expression().map(CastExpression::Unary),
+    ))
 }
 
 /// (6.5.5) multiplicative expression
@@ -168,8 +173,8 @@ pub fn binary_expression<'a>() -> impl Parser<'a, &'a [Token], Brand<Expression,
 
     // Suppose precedence is X, use 1000 - 10*X as the associativity level
     choice((
-        unary_expression().map(Expression::Unary),
         cast_expression().map(Expression::Cast),
+        unary_expression().map(Expression::Unary),
         postfix_expression().map(Expression::Postfix),
     ))
     .pratt((
