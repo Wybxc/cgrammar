@@ -64,8 +64,14 @@ pub struct Context {
 
 impl Default for Context {
     fn default() -> Self {
+        let mut builtin = Namespace::default();
+        builtin.add_typedef_name(Identifier::from("__builtin_va_list"));
+        builtin.add_typedef_name(Identifier::from("__uint128_t"));
+
         let mut namespaces = GenericVector::new();
+        namespaces.push_back(builtin);
         namespaces.push_back(Namespace::default());
+
         Self { namespaces }
     }
 }
