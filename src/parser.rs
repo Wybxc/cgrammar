@@ -1104,7 +1104,6 @@ trait ParserExt<O, E> {
         })
     }
 
-    #[allow(dead_code)] // TODO
     fn braced<'a>(self) -> impl Parser<'a, &'a [Token], O, E> + Clone
     where
         Self: Sized,
