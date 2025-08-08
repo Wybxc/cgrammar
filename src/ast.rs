@@ -697,13 +697,11 @@ pub enum AttributeToken {
 }
 
 #[derive(Debug, DebugPls, Default, Clone, PartialEq)]
-pub struct BalancedTokenSequence {
-    pub tokens: Vec<BalancedToken>,
-}
+pub struct BalancedTokenSequence(pub Vec<BalancedToken>);
 
 impl AsRef<[BalancedToken]> for BalancedTokenSequence {
     fn as_ref(&self) -> &[BalancedToken] {
-        &self.tokens
+        &self.0
     }
 }
 

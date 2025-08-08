@@ -8,7 +8,7 @@ fn main() {
     let input = lexer.parse(src.as_str()).unwrap();
 
     let parser = declaration();
-    let ast = parser.parse(&input.tokens);
+    let ast = parser.parse(&input.0);
     if ast.has_errors() {
         for error in ast.errors() {
             println!("{error:?}");

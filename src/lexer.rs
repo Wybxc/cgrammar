@@ -316,7 +316,7 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
             .allow_leading()
             .allow_trailing()
             .collect::<Vec<_>>()
-            .map(|tokens| BalancedTokenSequence { tokens })
+            .map(BalancedTokenSequence)
     })
 }
 
