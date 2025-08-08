@@ -1285,12 +1285,7 @@ pub fn old_fashioned_attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], A
 
 pub fn asm_attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
     keyword("__asm")
-        .ignore_then(
-            string_literal()
-                .repeated()
-                .collect::<Vec<StringLiteral>>()
-                .parenthesized(),
-        )
+        .ignore_then(string_literal().parenthesized())
         .map(AttributeSpecifier::Asm)
         .labelled("asm attribute specifier")
         .as_context()
@@ -1397,7 +1392,7 @@ fn constant<'a>() -> impl Parser<'a, &'a [Token], Constant, Extra<'a>> + Clone {
     }
 }
 
-fn string_literal<'a>() -> impl Parser<'a, &'a [Token], StringLiteral, Extra<'a>> + Clone {
+fn string_literal<'a>() -> impl Parser<'a, &'a [Token], StringLiterals, Extra<'a>> + Clone {
     select! {
         Token::StringLiteral(value) => value
     }

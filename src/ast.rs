@@ -95,6 +95,9 @@ pub enum PredefinedConstant {
 
 /// String literals (6.4.5)
 #[derive(Debug, DebugPls, Default, Clone, PartialEq)]
+pub struct StringLiterals(pub Vec<StringLiteral>);
+
+#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct StringLiteral {
     pub encoding_prefix: Option<EncodingPrefix>,
     pub value: String,
@@ -191,7 +194,7 @@ pub enum PrimaryExpression {
     Identifier(Identifier),
     Constant(Constant),
     EnumerationConstant(Identifier),
-    StringLiteral(StringLiteral),
+    StringLiteral(StringLiterals),
     Parenthesized(Box<Expression>),
     Generic(GenericSelection),
 }
@@ -718,14 +721,14 @@ pub enum Designator {
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct StaticAssertDeclaration {
     pub condition: ConstantExpression,
-    pub message: Option<StringLiteral>,
+    pub message: Option<StringLiterals>,
 }
 
 /// Attribute specifiers (6.7.12.1)
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum AttributeSpecifier {
     Attributes(Vec<Attribute>),
-    Asm(Vec<StringLiteral>),
+    Asm(StringLiterals),
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -755,7 +758,7 @@ pub enum BalancedToken {
     Bracketed(BalancedTokenSequence),
     Braced(BalancedTokenSequence),
     Identifier(Identifier),
-    StringLiteral(StringLiteral),
+    StringLiteral(StringLiterals),
     Constant(Constant),
     Punctuator(Punctuator),
     Unknown, // For any other tokens not explicitly defined

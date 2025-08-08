@@ -214,7 +214,7 @@ pub fn predefined_constant<'a>() -> impl Parser<'a, &'a str, PredefinedConstant,
 }
 
 /// (6.4.5) string-literal
-pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiteral, Extra<'a>> + Clone {
+pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiterals, Extra<'a>> + Clone {
     let prefix = encoding_prefix().or_not();
 
     let content = escape_sequence().or(none_of("\"\\")).repeated().collect::<String>();
@@ -222,6 +222,10 @@ pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiteral, Extra<'a>
     prefix
         .then(content.delimited_by(just('"'), just('"')))
         .map(|(encoding_prefix, value)| StringLiteral { encoding_prefix, value })
+        .separated_by(text::whitespace())
+        .at_least(1)
+        .collect::<Vec<StringLiteral>>()
+        .map(StringLiterals)
 }
 
 /// (6.4.6) punctuator (excluding parentheses and brackets)
