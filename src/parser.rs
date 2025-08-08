@@ -1,11 +1,13 @@
 use crate::ast::*;
+use crate::context::State;
 use crate::utils::*;
+
 use chumsky::prelude::*;
 use macro_rules_attribute::apply;
 
 pub type Token = BalancedToken;
 pub type TokenStream = BalancedTokenSequence;
-type Extra<'a> = chumsky::extra::Err<Rich<'a, Token>>;
+type Extra<'a> = chumsky::extra::Full<Rich<'a, Token>, State, ()>;
 
 // =============================================================================
 // Expressions
@@ -301,12 +303,22 @@ pub fn declaration<'a>() -> impl Parser<'a, &'a [Token], Declaration, Extra<'a>>
             Declaration::Normal { attributes, specifiers, declarators }
         });
 
+    let typedef = attribute_specifier_sequence()
+        .then(declaration_specifiers_with_typedef())
+        .then(typedef_declarator_list().or_not().map(Option::unwrap_or_default))
+        .then_ignore(punctuator(Punctuator::Semicolon))
+        .map(|((mut attributes, (specifiers, attributes_after)), declarators)| {
+            attributes.extend(attributes_after);
+            Declaration::Typedef { attributes, specifiers, declarators }
+        });
+
     let static_assert = static_assert_declaration();
 
     let attribute = attribute_specifier_sequence().then_ignore(punctuator(Punctuator::Semicolon));
 
     choice((
         normal,
+        typedef,
         static_assert.map(Declaration::StaticAssert),
         attribute.map(Declaration::Attribute),
     ))
@@ -314,8 +326,7 @@ pub fn declaration<'a>() -> impl Parser<'a, &'a [Token], Declaration, Extra<'a>>
     .as_context()
 }
 
-/// (6.7) declaration specifiers
-#[apply(cached)]
+/// (6.7) declaration specifiers (without typedef)
 pub fn declaration_specifiers<'a>()
 -> impl Parser<'a, &'a [Token], (DeclarationSpecifiers, Vec<AttributeSpecifier>), Extra<'a>> + Clone {
     declaration_specifier()
@@ -328,7 +339,21 @@ pub fn declaration_specifiers<'a>()
         .as_context()
 }
 
-/// (6.7) declaration specifier
+/// (6.7) declaration specifiers (with typedef)
+pub fn declaration_specifiers_with_typedef<'a>()
+-> impl Parser<'a, &'a [Token], (DeclarationSpecifiers, Vec<AttributeSpecifier>), Extra<'a>> + Clone {
+    declaration_specifier()
+        .or(keyword("typedef").to(DeclarationSpecifier::StorageClass(StorageClassSpecifier::Typedef)))
+        .repeated()
+        .at_least(1)
+        .collect::<Vec<DeclarationSpecifier>>()
+        .then(attribute_specifier_sequence())
+        .map(|(specifiers, attrs)| (DeclarationSpecifiers { specifiers }, attrs))
+        .labelled("declaration specifiers")
+        .as_context()
+}
+
+/// (6.7) declaration specifier (without typedef)
 #[apply(cached)]
 pub fn declaration_specifier<'a>() -> impl Parser<'a, &'a [Token], DeclarationSpecifier, Extra<'a>> + Clone {
     choice((
@@ -359,7 +384,29 @@ pub fn init_declarator<'a>() -> impl Parser<'a, &'a [Token], InitDeclarator, Ext
         .as_context()
 }
 
-/// (6.7.1) storage class specifier
+pub fn typedef_declarator_list<'a>() -> impl Parser<'a, &'a [Token], Vec<Declarator>, Extra<'a>> + Clone {
+    typedef_declarator()
+        .separated_by(punctuator(Punctuator::Comma))
+        .at_least(1)
+        .collect::<Vec<Declarator>>()
+        .labelled("init declarator list")
+        .as_context()
+}
+
+pub fn typedef_declarator<'a>() -> impl Parser<'a, &'a [Token], Declarator, Extra<'a>> + Clone {
+    declarator()
+        .map_with(move |declarator, extra| {
+            extra
+                .state()
+                .ctx_mut()
+                .add_typedef_name(declarator.identifier().clone());
+            declarator
+        })
+        .labelled("init declarator")
+        .as_context()
+}
+
+/// (6.7.1) storage class specifier (without typedef)
 #[apply(cached)]
 pub fn storage_class_specifier<'a>() -> impl Parser<'a, &'a [Token], StorageClassSpecifier, Extra<'a>> + Clone {
     choice((
@@ -369,13 +416,13 @@ pub fn storage_class_specifier<'a>() -> impl Parser<'a, &'a [Token], StorageClas
         keyword("register").to(StorageClassSpecifier::Register),
         keyword("static").to(StorageClassSpecifier::Static),
         keyword("thread_local").to(StorageClassSpecifier::ThreadLocal),
-        keyword("typedef").to(StorageClassSpecifier::Typedef),
+        // keyword("typedef").to(StorageClassSpecifier::Typedef),
     ))
     .labelled("storage class specifier")
     .as_context()
 }
 
-/// (6.7.2) type specifier - simplified to break recursion
+/// (6.7.2) type specifier
 pub fn type_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeSpecifier, Extra<'a>> + Clone {
     choice((
         keyword("void").to(TypeSpecifier::Void),
@@ -397,7 +444,7 @@ pub fn type_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeSpecifier, Extra
             .map(TypeSpecifier::BitInt),
         struct_or_union_specifier().map(TypeSpecifier::Struct),
         enum_specifier().map(TypeSpecifier::Enum),
-        identifier().map(TypeSpecifier::TypedefName), // Must be last to avoid conflicts
+        typedef_name().map(TypeSpecifier::TypedefName), // Must be last to avoid conflicts
     ))
     .labelled("type specifier")
     .as_context()
@@ -814,6 +861,20 @@ pub fn direct_abstract_declarator<'a>() -> impl Parser<'a, &'a [Token], DirectAb
     .as_context()
 }
 
+/// (6.7.8) typedef name
+pub fn typedef_name<'a>() -> impl Parser<'a, &'a [Token], Identifier, Extra<'a>> + Clone {
+    identifier()
+        .try_map_with(|name, extra| {
+            if extra.state().ctx().is_typedef_name(&name) {
+                Ok(name)
+            } else {
+                Err(Rich::custom(extra.span(), format!("`{name}` is not a typedef name")))
+            }
+        })
+        .labelled("typedef name")
+        .as_context()
+}
+
 /// (6.7.10) braced initializer
 #[apply(cached)]
 pub fn braced_initializer<'a>() -> impl Parser<'a, &'a [Token], BracedInitializer, Extra<'a>> + Clone {
@@ -960,6 +1021,30 @@ pub fn attribute_argument_clause<'a>() -> impl Parser<'a, &'a [Token], TokenStre
     select! {
         Token::Parenthesized(tokens) => tokens
     }
+}
+
+// =============================================================================
+// Translation Units
+// =============================================================================
+
+/// (6.9) translation unit
+pub fn translation_unit<'a>() -> impl Parser<'a, &'a [Token], TranslationUnit, Extra<'a>> + Clone {
+    external_declaration()
+        .repeated()
+        .collect::<Vec<ExternalDeclaration>>()
+        .map(|external_declarations| TranslationUnit { external_declarations })
+        .labelled("translation unit")
+        .as_context()
+}
+
+/// (6.9) external declaration
+pub fn external_declaration<'a>() -> impl Parser<'a, &'a [Token], ExternalDeclaration, Extra<'a>> + Clone {
+    choice((
+        // function_definition().map(ExternalDeclaration::Function),
+        declaration().map(ExternalDeclaration::Declaration),
+    ))
+    .labelled("external declaration")
+    .as_context()
 }
 
 // =============================================================================

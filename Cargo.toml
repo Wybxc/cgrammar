@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = { version = "0.10.1", features = ["extension", "pratt", "regex"] }
+chumsky = { version = "0.10.0", features = ["extension", "pratt", "regex"] }
 dbg-pls = { version = "0.4.3", features = ["derive", "pretty"] }
 hexf-parse = "0.2.1"
+imbl = "6.0.0"
 macro_rules_attribute = "0.2.2"
+rustc-hash = "2.1.1"
+slab = "0.4.11"
 
 [dev-dependencies]
 rstest = "0.26.1"

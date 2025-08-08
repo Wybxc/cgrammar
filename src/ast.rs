@@ -17,6 +17,12 @@ impl fmt::Display for Identifier {
     }
 }
 
+impl From<&str> for Identifier {
+    fn from(s: &str) -> Self {
+        Identifier(s.to_string())
+    }
+}
+
 // =============================================================================
 // Lexical Elements (6.4)
 // =============================================================================
@@ -366,6 +372,11 @@ pub enum Declaration {
         specifiers: DeclarationSpecifiers,
         declarators: Vec<InitDeclarator>,
     },
+    Typedef {
+        attributes: Vec<AttributeSpecifier>,
+        specifiers: DeclarationSpecifiers,
+        declarators: Vec<Declarator>,
+    },
     StaticAssert(StaticAssertDeclaration),
     Attribute(Vec<AttributeSpecifier>),
 }
@@ -545,6 +556,15 @@ pub enum Declarator {
     },
 }
 
+impl Declarator {
+    pub fn identifier(&self) -> &Identifier {
+        match self {
+            Declarator::Direct(direct) => direct.identifier(),
+            Declarator::Pointer { declarator, .. } => declarator.identifier(),
+        }
+    }
+}
+
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum DirectDeclarator {
     Identifier {
@@ -562,6 +582,17 @@ pub enum DirectDeclarator {
         attributes: Vec<AttributeSpecifier>,
         parameters: ParameterTypeList,
     },
+}
+
+impl DirectDeclarator {
+    pub fn identifier(&self) -> &Identifier {
+        match self {
+            DirectDeclarator::Identifier { identifier, .. } => identifier,
+            DirectDeclarator::Parenthesized(declarator) => declarator.identifier(),
+            DirectDeclarator::Array { declarator, .. } => declarator.identifier(),
+            DirectDeclarator::Function { declarator, .. } => declarator.identifier(),
+        }
+    }
 }
 
 /// Array declarators (6.7.6)
@@ -714,7 +745,7 @@ pub enum BalancedToken {
     StringLiteral(StringLiteral),
     Constant(Constant),
     Punctuator(Punctuator),
-    Unknown(String), // For any other tokens not explicitly defined
+    Unknown, // For any other tokens not explicitly defined
 }
 
 // =============================================================================

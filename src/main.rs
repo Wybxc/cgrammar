@@ -7,7 +7,7 @@ fn main() {
     let lexer = balanced_token_sequence();
     let input = lexer.parse(src.as_str()).unwrap();
 
-    let parser = declaration();
+    let parser = translation_unit();
     let ast = parser.parse(&input.0);
     if ast.has_errors() {
         for error in ast.errors() {

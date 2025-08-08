@@ -1,0 +1,107 @@
+use std::cell::RefCell;
+
+use chumsky::{
+    input::{Checkpoint, Cursor, Input},
+    inspector::Inspector,
+};
+use imbl::{GenericHashSet, GenericVector, shared_ptr::RcK};
+use rustc_hash::FxBuildHasher;
+use slab::Slab;
+
+use crate::Identifier;
+
+#[derive(Default)]
+pub struct State {
+    current: RefCell<Context>,
+    checkpoints: RefCell<Slab<Context>>,
+}
+
+impl State {
+    pub fn new() -> Self {
+        Self {
+            current: RefCell::new(Context::default()),
+            checkpoints: RefCell::new(Slab::new()),
+        }
+    }
+
+    pub fn ctx(&self) -> Context {
+        self.current.borrow().clone()
+    }
+
+    pub fn ctx_mut(&mut self) -> &mut Context {
+        self.current.get_mut()
+    }
+
+    pub fn set_ctx(&self, ctx: Context) {
+        *self.current.borrow_mut() = ctx;
+    }
+}
+
+impl<'src, I> Inspector<'src, I> for State
+where
+    I: Input<'src>,
+{
+    type Checkpoint = usize;
+
+    fn on_token(&mut self, _token: &I::Token) {}
+
+    fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, I>) -> Self::Checkpoint {
+        let mut checkpoints = self.checkpoints.borrow_mut();
+        checkpoints.insert(self.current.borrow().clone())
+    }
+
+    fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, I, Self::Checkpoint>) {
+        let checkpoints = self.checkpoints.borrow();
+        let context = checkpoints.get(*marker.inspector()).expect("Invalid checkpoint");
+        *self.current.borrow_mut() = context.clone();
+    }
+}
+
+#[derive(Clone)]
+pub struct Context {
+    namespaces: GenericVector<Namespace, RcK>,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        let mut namespaces = GenericVector::new();
+        namespaces.push_back(Namespace::default());
+        Self { namespaces }
+    }
+}
+
+impl Context {
+    pub fn is_typedef_name(&self, name: &Identifier) -> bool {
+        self.namespaces.iter().rev().any(|ns| ns.is_typedef_name(name))
+    }
+
+    pub fn add_typedef_name(&mut self, name: Identifier) {
+        self.namespaces
+            .back_mut()
+            .expect("No namespace to add typedef name")
+            .add_typedef_name(name);
+    }
+
+    pub fn push(&mut self) {
+        self.namespaces.push_back(Namespace::default());
+    }
+
+    pub fn pop(&mut self) {
+        self.namespaces.pop_back();
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Namespace {
+    typedef_names: GenericHashSet<Identifier, FxBuildHasher, RcK>,
+}
+
+impl Namespace {
+    pub fn is_typedef_name(&self, name: &Identifier) -> bool {
+        self.typedef_names.contains(name)
+    }
+
+    pub fn add_typedef_name(&mut self, name: Identifier) {
+        self.typedef_names.insert(name);
+    }
+}

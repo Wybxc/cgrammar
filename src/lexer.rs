@@ -304,7 +304,7 @@ pub fn balanced_token<'a>(
         string_literal.map(BalancedToken::StringLiteral),
         constant.map(BalancedToken::Constant),
         punctuator.map(BalancedToken::Punctuator),
-        unknown_token.map(BalancedToken::Unknown),
+        unknown_token.to(BalancedToken::Unknown),
     ))
 }
 
@@ -333,6 +333,6 @@ pub fn comment<'a>() -> impl Parser<'a, &'a str, ()> + Clone {
 }
 
 /// any other token as unknown
-pub fn unknown<'a>() -> impl Parser<'a, &'a str, String> + Clone {
-    none_of(" \t\n\r()[]{}").repeated().at_least(1).collect::<String>()
+pub fn unknown<'a>() -> impl Parser<'a, &'a str, ()> + Clone {
+    none_of(" \t\n\r()[]{}").repeated().at_least(1).collect()
 }

@@ -1,7 +1,6 @@
 use std::{
     any::{Any, TypeId},
     cell::{OnceCell, RefCell},
-    collections::HashMap,
     marker::PhantomData,
     rc::{Rc, Weak},
 };
@@ -11,6 +10,7 @@ use chumsky::{
     input::InputRef,
     prelude::*,
 };
+use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Brand<T, B>(T, PhantomData<B>);
@@ -51,7 +51,7 @@ where
     C: Cacher + 'static,
 {
     thread_local! {
-        static CACHE: RefCell<HashMap<TypeId, Rc<dyn Any>>> = RefCell::new(HashMap::new());
+        static CACHE: RefCell<FxHashMap<TypeId, Rc<dyn Any>>> = RefCell::new(FxHashMap::default());
     }
 
     macro_rules! P {
