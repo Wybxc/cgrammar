@@ -23,9 +23,51 @@ pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpressio
             .parenthesized()
             .map(Box::new)
             .map(PrimaryExpression::Parenthesized),
-        // TODO: Generic selection
+        generic_selection().map(PrimaryExpression::Generic),
     ))
     .labelled("primiary expression")
+    .as_context()
+}
+
+/// (6.5.1.1) generic selection
+pub fn generic_selection<'a>() -> impl Parser<'a, &'a [Token], GenericSelection, Extra<'a>> + Clone {
+    keyword("_Generic")
+        .ignore_then(
+            assignment_expression()
+                .map(Brand::into_inner)
+                .map(Box::new)
+                .then_ignore(punctuator(Punctuator::Comma))
+                .then(generic_association_list())
+                .parenthesized(),
+        )
+        .map(|(controlling_expression, associations)| GenericSelection { controlling_expression, associations })
+        .labelled("generic selection")
+        .as_context()
+}
+
+/// (6.5.1.1) generic association list
+pub fn generic_association_list<'a>() -> impl Parser<'a, &'a [Token], Vec<GenericAssociation>, Extra<'a>> + Clone {
+    generic_association()
+        .separated_by(punctuator(Punctuator::Comma))
+        .at_least(1)
+        .collect::<Vec<GenericAssociation>>()
+        .labelled("generic association list")
+        .as_context()
+}
+
+/// (6.5.1.1) generic association
+pub fn generic_association<'a>() -> impl Parser<'a, &'a [Token], GenericAssociation, Extra<'a>> + Clone {
+    choice((
+        keyword("default")
+            .ignore_then(punctuator(Punctuator::Colon))
+            .ignore_then(assignment_expression().map(Brand::into_inner).map(Box::new))
+            .map(|expression| GenericAssociation::Default { expression }),
+        type_name()
+            .then_ignore(punctuator(Punctuator::Colon))
+            .then(assignment_expression().map(Brand::into_inner).map(Box::new))
+            .map(|(type_name, expression)| GenericAssociation::Type { type_name, expression }),
+    ))
+    .labelled("generic association")
     .as_context()
 }
 
@@ -43,38 +85,57 @@ pub fn postfix_expression<'a>() -> impl Parser<'a, &'a [Token], PostfixExpressio
     let member_access = punctuator(Punctuator::Dot).ignore_then(identifier());
     let member_access_ptr = punctuator(Punctuator::Arrow).ignore_then(identifier());
 
-    // TODO: compound literal
-
     type PostfixFn = Box<dyn FnOnce(PostfixExpression) -> PostfixExpression>;
-    primary_expression()
-        .map(PostfixExpression::Primary)
-        .foldl(
-            choice((
-                increment.map(|_| -> PostfixFn { Box::new(|expr| PostfixExpression::PostIncrement(Box::new(expr))) }),
-                decrement.map(|_| -> PostfixFn { Box::new(|expr| PostfixExpression::PostDecrement(Box::new(expr))) }),
-                array.map(|idx| -> PostfixFn {
-                    Box::new(move |expr| PostfixExpression::ArrayAccess {
-                        array: Box::new(expr),
-                        index: Box::new(idx),
-                    })
-                }),
-                function.map(|args| -> PostfixFn {
-                    Box::new(move |expr| PostfixExpression::FunctionCall {
-                        function: Box::new(expr),
-                        arguments: args,
-                    })
-                }),
-                member_access.map(|member| -> PostfixFn {
-                    Box::new(move |expr| PostfixExpression::MemberAccess { object: Box::new(expr), member })
-                }),
-                member_access_ptr.map(|member| -> PostfixFn {
-                    Box::new(move |expr| PostfixExpression::MemberAccessPtr { object: Box::new(expr), member })
-                }),
-            ))
-            .repeated(),
-            |acc, f| f(acc),
-        )
+    let postfix = primary_expression().map(PostfixExpression::Primary).foldl(
+        choice((
+            increment.map(|_| -> PostfixFn { Box::new(|expr| PostfixExpression::PostIncrement(Box::new(expr))) }),
+            decrement.map(|_| -> PostfixFn { Box::new(|expr| PostfixExpression::PostDecrement(Box::new(expr))) }),
+            array.map(|idx| -> PostfixFn {
+                Box::new(move |expr| PostfixExpression::ArrayAccess {
+                    array: Box::new(expr),
+                    index: Box::new(idx),
+                })
+            }),
+            function.map(|arguments| -> PostfixFn {
+                Box::new(move |expr| PostfixExpression::FunctionCall { function: Box::new(expr), arguments })
+            }),
+            member_access.map(|member| -> PostfixFn {
+                Box::new(move |expr| PostfixExpression::MemberAccess { object: Box::new(expr), member })
+            }),
+            member_access_ptr.map(|member| -> PostfixFn {
+                Box::new(move |expr| PostfixExpression::MemberAccessPtr { object: Box::new(expr), member })
+            }),
+        ))
+        .repeated(),
+        |acc, f| f(acc),
+    );
+
+    choice((compound_literal().map(PostfixExpression::CompoundLiteral), postfix))
         .labelled("postfix expression")
+        .as_context()
+}
+
+/// (6.5.2.5) compound literal
+pub fn compound_literal<'a>() -> impl Parser<'a, &'a [Token], CompoundLiteral, Extra<'a>> + Clone {
+    storage_class_specifiers()
+        .then(type_name())
+        .parenthesized()
+        .then(braced_initializer())
+        .map(|((storage_class_specifiers, type_name), initializer)| CompoundLiteral {
+            storage_class_specifiers,
+            type_name,
+            initializer,
+        })
+        .labelled("compound literal")
+        .as_context()
+}
+
+/// (6.5.2.5) storage class specifiers
+pub fn storage_class_specifiers<'a>() -> impl Parser<'a, &'a [Token], Vec<StorageClassSpecifier>, Extra<'a>> + Clone {
+    storage_class_specifier()
+        .repeated()
+        .collect::<Vec<StorageClassSpecifier>>()
+        .labelled("storage class specifiers")
         .as_context()
 }
 
@@ -99,18 +160,19 @@ pub fn unary_expression<'a>() -> impl Parser<'a, &'a [Token], UnaryExpression, E
     };
     let unary = unary_operator.then(cast_expression());
 
-    let sizeof = keyword("sizeof").ignore_then(unary_expression()).map(Box::new);
+    let sizeof_expr = keyword("sizeof").ignore_then(unary_expression()).map(Box::new);
+    let sizeof_type = keyword("sizeof").ignore_then(type_name().parenthesized());
+    let alignof_type = keyword("alignof").ignore_then(type_name().parenthesized());
 
     let postfix = postfix_expression();
-
-    // TODO: sizeof type
-    // TODO: _Alignof
 
     choice((
         pre_increment.map(UnaryExpression::PreIncrement),
         pre_decrement.map(UnaryExpression::PreDecrement),
         unary.map(|(operator, operand)| UnaryExpression::Unary { operator, operand: Box::new(operand) }),
-        sizeof.map(UnaryExpression::Sizeof), // sizeof must be before postfix
+        sizeof_type.map(UnaryExpression::SizeofType), // sizeof type must be before sizeof expr
+        sizeof_expr.map(UnaryExpression::Sizeof),
+        alignof_type.map(UnaryExpression::Alignof),
         postfix.map(UnaryExpression::Postfix),
     ))
     .labelled("unary expression")
