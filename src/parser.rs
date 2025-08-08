@@ -16,6 +16,7 @@ type Extra<'a> = chumsky::extra::Full<Rich<'a, Token>, State, ()>;
 /// (6.5.1) primary expression
 pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpression, Extra<'a>> + Clone {
     choice((
+        generic_selection().map(PrimaryExpression::Generic),
         identifier().map(PrimaryExpression::Identifier),
         constant().map(PrimaryExpression::Constant),
         string_literal().map(PrimaryExpression::StringLiteral),
@@ -23,7 +24,6 @@ pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpressio
             .parenthesized()
             .map(Box::new)
             .map(PrimaryExpression::Parenthesized),
-        generic_selection().map(PrimaryExpression::Generic),
     ))
     .labelled("primiary expression")
     .as_context()
@@ -390,9 +390,9 @@ pub fn declaration<'a>() -> impl Parser<'a, &'a [Token], Declaration, Extra<'a>>
     ));
 
     choice((
+        static_assert.map(Declaration::StaticAssert),
         normal,
         typedef,
-        static_assert.map(Declaration::StaticAssert),
         attribute.map(Declaration::Attribute),
     ))
     .labelled("declaration")
