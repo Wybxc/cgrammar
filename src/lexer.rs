@@ -97,7 +97,7 @@ pub fn floating_constant<'a>() -> impl Parser<'a, &'a str, FloatingConstant, Ext
 
 /// (6.4.4.2) decimal floating constant
 pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64, Extra<'a>> + Clone {
-    regex(r"[0-9]+('[0-9]+)*\.[0-9]+('[0-9]+)*([eE][+-]?[0-9]+('[0-9]+)*)?")
+    regex(r"[0-9]+('[0-9]+)*(\.[0-9]+('[0-9]+)*([eE][+-]?[0-9]+('[0-9]+)*)?|[eE][+-]?[0-9]+('[0-9]+)*)")
         .map(|s: &str| s.replace("'", ""))
         .from_str::<f64>()
         .unwrapped()
@@ -105,7 +105,7 @@ pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64, Extra<'a
 
 /// (6.4.4.2) hexadecimal floating constant
 pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64, Extra<'a>> + Clone {
-    regex(r"0[xX][0-9a-fA-F]+('[0-9a-fA-F]+)*\.[0-9a-fA-F]+('[0-9a-fA-F]+)*([pP][+-]?[0-9]+('[0-9]+)*)?")
+    regex(r"0[xX][0-9a-fA-F]+('[0-9a-fA-F]+)*(\.[0-9a-fA-F]+('[0-9a-fA-F]+)*([pP][+-]?[0-9]+('[0-9]+)*)?|[pP][+-]?[0-9]+('[0-9]+)*)")
         .map(|s: &str| s.replace("'", ""))
         .map(|s| hexf_parse::parse_hexf64(&s, false))
         .unwrapped()
