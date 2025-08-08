@@ -960,6 +960,188 @@ pub fn static_assert_declaration<'a>() -> impl Parser<'a, &'a [Token], StaticAss
 }
 
 // =============================================================================
+// Statements
+// =============================================================================
+
+/// (6.8) statement
+#[apply(cached)]
+pub fn statement<'a>() -> impl Parser<'a, &'a [Token], Statement, Extra<'a>> + Clone {
+    choice((
+        labelled_statement().map(Statement::Labeled),
+        unlabeled_statement().map(Statement::Unlabeled),
+    ))
+    .labelled("statement")
+    .as_context()
+}
+
+/// (6.8) unlabeled statement
+#[apply(cached)]
+pub fn unlabeled_statement<'a>() -> impl Parser<'a, &'a [Token], UnlabeledStatement, Extra<'a>> + Clone {
+    let primary_block = attribute_specifier_sequence()
+        .then(choice((
+            compound_statement().map(PrimaryBlock::Compound),
+            selection_statement().map(PrimaryBlock::Selection),
+            iteration_statement().map(PrimaryBlock::Iteration),
+        )))
+        .map(|(attributes, block)| UnlabeledStatement::Primary { attributes, block });
+
+    let jump = attribute_specifier_sequence()
+        .then(jump_statement())
+        .map(|(attributes, statement)| UnlabeledStatement::Jump { attributes, statement });
+
+    let expr = expression_statement().map(UnlabeledStatement::Expression);
+
+    choice((primary_block, jump, expr))
+        .labelled("unlabeled statement")
+        .as_context()
+}
+
+/// (6.8.1) label
+#[apply(cached)]
+pub fn label<'a>() -> impl Parser<'a, &'a [Token], Label, Extra<'a>> + Clone {
+    let case_label = attribute_specifier_sequence()
+        .then(keyword("case").ignore_then(constant_expression()))
+        .then_ignore(punctuator(Punctuator::Colon))
+        .map(|(attributes, expression)| Label::Case { attributes, expression });
+
+    let default_label = attribute_specifier_sequence()
+        .then(keyword("default"))
+        .then_ignore(punctuator(Punctuator::Colon))
+        .map(|(attributes, _)| Label::Default { attributes });
+
+    let ident_label = attribute_specifier_sequence()
+        .then(identifier())
+        .then_ignore(punctuator(Punctuator::Colon))
+        .map(|(attributes, identifier)| Label::Identifier { attributes, identifier });
+
+    choice((case_label, default_label, ident_label))
+        .labelled("label")
+        .as_context()
+}
+
+/// (6.8.1) labeled statement
+pub fn labelled_statement<'a>() -> impl Parser<'a, &'a [Token], LabeledStatement, Extra<'a>> + Clone {
+    label()
+        .then(statement().map(Box::new))
+        .map(|(label, statement)| LabeledStatement { label, statement })
+        .labelled("labeled statement")
+        .as_context()
+}
+
+/// (6.8.2) compound statement
+#[apply(cached)]
+pub fn compound_statement<'a>() -> impl Parser<'a, &'a [Token], CompoundStatement, Extra<'a>> + Clone {
+    block_item()
+        .repeated()
+        .collect::<Vec<BlockItem>>()
+        .braced()
+        .map(|items| CompoundStatement { items })
+        .labelled("compound statement")
+        .as_context()
+}
+
+/// (6.8.2) block item
+pub fn block_item<'a>() -> impl Parser<'a, &'a [Token], BlockItem, Extra<'a>> + Clone {
+    choice((
+        declaration().map(BlockItem::Declaration),
+        label().map(BlockItem::Label),
+        unlabeled_statement().map(BlockItem::Statement),
+    ))
+    .labelled("block item")
+    .as_context()
+}
+
+/// (6.8.3) expression statement
+pub fn expression_statement<'a>() -> impl Parser<'a, &'a [Token], ExpressionStatement, Extra<'a>> + Clone {
+    attribute_specifier_sequence()
+        .then(expression().map(Box::new).or_not())
+        .then_ignore(punctuator(Punctuator::Semicolon))
+        .map(|(attributes, expression)| ExpressionStatement { attributes, expression })
+        .labelled("expression statement")
+        .as_context()
+}
+
+/// (6.8.4) selection statement
+pub fn selection_statement<'a>() -> impl Parser<'a, &'a [Token], SelectionStatement, Extra<'a>> + Clone {
+    let if_stmt = keyword("if")
+        .ignore_then(expression().map(Box::new).parenthesized())
+        .then(statement().map(Box::new))
+        .then(keyword("else").ignore_then(statement().map(Box::new)).or_not())
+        .map(|((condition, then_stmt), else_stmt)| SelectionStatement::If { condition, then_stmt, else_stmt });
+
+    let switch_stmt = keyword("switch")
+        .ignore_then(expression().map(Box::new).parenthesized())
+        .then(statement().map(Box::new))
+        .map(|(expression, statement)| SelectionStatement::Switch { expression, statement });
+
+    choice((if_stmt, switch_stmt))
+        .labelled("selection statement")
+        .as_context()
+}
+
+/// (6.8.5) iteration statement
+pub fn iteration_statement<'a>() -> impl Parser<'a, &'a [Token], IterationStatement, Extra<'a>> + Clone {
+    let while_stmt = keyword("while")
+        .ignore_then(expression().map(Box::new).parenthesized())
+        .then(statement().map(Box::new))
+        .map(|(condition, body)| IterationStatement::While { condition, body });
+
+    let do_while_stmt = keyword("do")
+        .ignore_then(statement().map(Box::new))
+        .then_ignore(keyword("while"))
+        .then(expression().map(Box::new).parenthesized())
+        .then_ignore(punctuator(Punctuator::Semicolon))
+        .map(|(body, condition)| IterationStatement::DoWhile { body, condition });
+
+    let for_stmt = keyword("for")
+        .ignore_then(
+            choice((
+                expression()
+                    .map(Box::new)
+                    .map(ForInit::Expression)
+                    .or_not()
+                    .then_ignore(punctuator(Punctuator::Semicolon)),
+                declaration().map(ForInit::Declaration).map(Some),
+            ))
+            .then(expression().map(Box::new).or_not())
+            .then_ignore(punctuator(Punctuator::Semicolon))
+            .then(expression().map(Box::new).or_not())
+            .parenthesized(),
+        )
+        .then(statement().map(Box::new))
+        .map(|(((init, condition), update), body)| IterationStatement::For { init, condition, update, body });
+
+    choice((while_stmt, do_while_stmt, for_stmt))
+        .labelled("iteration statement")
+        .as_context()
+}
+
+/// (6.8.6) jump statement
+pub fn jump_statement<'a>() -> impl Parser<'a, &'a [Token], JumpStatement, Extra<'a>> + Clone {
+    let goto_stmt = keyword("goto")
+        .ignore_then(identifier())
+        .then_ignore(punctuator(Punctuator::Semicolon))
+        .map(JumpStatement::Goto);
+
+    let continue_stmt = keyword("continue")
+        .then_ignore(punctuator(Punctuator::Semicolon))
+        .to(JumpStatement::Continue);
+
+    let break_stmt = keyword("break")
+        .then_ignore(punctuator(Punctuator::Semicolon))
+        .to(JumpStatement::Break);
+
+    let return_stmt = keyword("return")
+        .ignore_then(expression().or_not())
+        .then_ignore(punctuator(Punctuator::Semicolon))
+        .map(|expr| JumpStatement::Return(expr.map(Box::new)));
+
+    choice((goto_stmt, continue_stmt, break_stmt, return_stmt))
+        .labelled("jump statement")
+        .as_context()
+}
+
+// =============================================================================
 // Attributes
 // =============================================================================
 

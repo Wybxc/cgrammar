@@ -788,7 +788,7 @@ pub enum Label {
     },
     Case {
         attributes: Vec<AttributeSpecifier>,
-        expression: Box<Expression>,
+        expression: ConstantExpression,
     },
     Default {
         attributes: Vec<AttributeSpecifier>,
@@ -816,13 +816,9 @@ pub enum BlockItem {
 
 /// Expression statements (6.8.3)
 #[derive(Debug, DebugPls, Clone, PartialEq)]
-pub enum ExpressionStatement {
-    Expression(Box<Expression>),
-    AttributedExpression {
-        attributes: Vec<AttributeSpecifier>,
-        expression: Box<Expression>,
-    },
-    Empty,
+pub struct ExpressionStatement {
+    pub attributes: Vec<AttributeSpecifier>,
+    pub expression: Option<Box<Expression>>,
 }
 
 /// Selection statements (6.8.4)
@@ -831,11 +827,7 @@ pub enum SelectionStatement {
     If {
         condition: Box<Expression>,
         then_stmt: Box<Statement>,
-    },
-    IfElse {
-        condition: Box<Expression>,
-        then_stmt: Box<Statement>,
-        else_stmt: Box<Statement>,
+        else_stmt: Option<Box<Statement>>,
     },
     Switch {
         expression: Box<Expression>,
@@ -855,17 +847,17 @@ pub enum IterationStatement {
         condition: Box<Expression>,
     },
     For {
-        init: Option<Box<Expression>>,
+        init: Option<ForInit>,
         condition: Option<Box<Expression>>,
         update: Option<Box<Expression>>,
         body: Box<Statement>,
     },
-    ForDecl {
-        init: Declaration,
-        condition: Option<Box<Expression>>,
-        update: Option<Box<Expression>>,
-        body: Box<Statement>,
-    },
+}
+
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub enum ForInit {
+    Expression(Box<Expression>),
+    Declaration(Declaration),
 }
 
 /// Jump statements (6.8.6)
