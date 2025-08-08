@@ -531,6 +531,7 @@ pub enum TypeQualifier {
     Volatile,
     Atomic,
     Nonnull,
+    Nullable,
 }
 
 /// Function specifiers (6.7.4)

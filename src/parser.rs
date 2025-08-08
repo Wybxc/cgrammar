@@ -705,6 +705,7 @@ pub fn type_qualifier<'a>() -> impl Parser<'a, &'a [Token], TypeQualifier, Extra
         keyword("volatile").to(TypeQualifier::Volatile),
         keyword("_Atomic").to(TypeQualifier::Atomic),
         keyword("_Nonnull").to(TypeQualifier::Nonnull),
+        keyword("_Nullable").to(TypeQualifier::Nullable),
     ))
     .labelled("type qualifier")
     .as_context()
