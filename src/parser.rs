@@ -1227,11 +1227,27 @@ pub fn translation_unit<'a>() -> impl Parser<'a, &'a [Token], TranslationUnit, E
 /// (6.9) external declaration
 pub fn external_declaration<'a>() -> impl Parser<'a, &'a [Token], ExternalDeclaration, Extra<'a>> + Clone {
     choice((
-        // function_definition().map(ExternalDeclaration::Function),
+        function_definition().map(ExternalDeclaration::Function),
         declaration().map(ExternalDeclaration::Declaration),
     ))
     .labelled("external declaration")
     .as_context()
+}
+
+/// (6.9.1) function definition
+pub fn function_definition<'a>() -> impl Parser<'a, &'a [Token], FunctionDefinition, Extra<'a>> + Clone {
+    attribute_specifier_sequence()
+        .then(declaration_specifiers())
+        .then(declarator())
+        .then(compound_statement())
+        .map(
+            |(((mut attributes, (specifiers, attributes_after)), declarator), body)| {
+                attributes.extend(attributes_after);
+                FunctionDefinition { attributes, specifiers, declarator, body }
+            },
+        )
+        .labelled("function definition")
+        .as_context()
 }
 
 // =============================================================================
