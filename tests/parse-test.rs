@@ -1,12 +1,10 @@
 use cgrammar::*;
 use chumsky::prelude::*;
 use rstest::rstest;
-use std::path::PathBuf;
+use std::{io::Write, path::{Path, PathBuf}};
 
 #[rstest]
 fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
-    use std::io::Write;
-
     let input = std::fs::read_to_string(&path).unwrap();
     let mut prepocessor = std::process::Command::new("cc")
         .args(["-E", "-x", "c", "--std=c2x", "-"])
@@ -21,10 +19,23 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
     let lexer = balanced_token_sequence();
     let input = lexer.parse(&input).unwrap();
 
-    println!("Testing parser on: {}", path.display());
     let parser = translation_unit();
     let result = parser.parse(&input.0);
     if result.has_errors() {
+        const FAILED_TESTS: &str = "tests/failed-tests.txt";
+        let path = pathdiff::diff_paths(path, Path::new(".").canonicalize().unwrap()).unwrap();
+        if !std::fs::read_to_string(FAILED_TESTS)
+            .unwrap_or_default()
+            .contains(path.to_string_lossy().as_ref())
+        {
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(FAILED_TESTS)
+                .unwrap();
+            writeln!(file, "{}", path.to_string_lossy()).unwrap();
+        }
+
         for error in result.errors() {
             println!("{error:?}");
         }

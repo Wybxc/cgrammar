@@ -13,4 +13,5 @@ rustc-hash = "2.1.1"
 slab = "0.4.11"
 
 [dev-dependencies]
+pathdiff = "0.2.3"
 rstest = "0.26.1"
