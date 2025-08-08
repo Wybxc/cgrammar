@@ -20,7 +20,6 @@ pub fn constant<'a>() -> impl Parser<'a, &'a str, Constant, Extra<'a>> + Clone {
         floating_constant().map(Constant::Floating),
         character_constant().map(Constant::Character),
         integer_constant().map(Constant::Integer),
-        identifier().map(Constant::Enumeration),
     ))
 }
 
@@ -307,9 +306,9 @@ pub fn balanced_token<'a>(
         parenthesized.map(BalancedToken::Parenthesized),
         bracketed.map(BalancedToken::Bracketed),
         braced.map(BalancedToken::Braced),
-        identifier.map(BalancedToken::Identifier),
         string_literal.map(BalancedToken::StringLiteral),
         constant.map(BalancedToken::Constant),
+        identifier.map(BalancedToken::Identifier),
         punctuator.map(BalancedToken::Punctuator),
         unknown_token.to(BalancedToken::Unknown),
     ))

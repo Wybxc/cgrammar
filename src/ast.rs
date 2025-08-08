@@ -32,7 +32,6 @@ impl From<&str> for Identifier {
 pub enum Constant {
     Integer(IntegerConstant),
     Floating(FloatingConstant),
-    Enumeration(Identifier),
     Character(CharacterConstant),
     Predefined(PredefinedConstant),
 }
