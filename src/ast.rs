@@ -391,7 +391,10 @@ pub struct DeclarationSpecifiers {
 pub enum DeclarationSpecifier {
     StorageClass(StorageClassSpecifier),
     TypeSpecifierQualifier(TypeSpecifierQualifier),
-    Function(FunctionSpecifier),
+    Function {
+        specifier: FunctionSpecifier,
+        attributes: Vec<AttributeSpecifier>,
+    },
 }
 
 /// Init declarators (6.7)

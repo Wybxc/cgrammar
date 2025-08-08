@@ -432,7 +432,9 @@ pub fn declaration_specifier<'a>() -> impl Parser<'a, &'a [Token], DeclarationSp
     choice((
         storage_class_specifier().map(DeclarationSpecifier::StorageClass),
         type_specifier_qualifier().map(DeclarationSpecifier::TypeSpecifierQualifier),
-        function_specifier().map(DeclarationSpecifier::Function),
+        function_specifier()
+            .then(attribute_specifier_sequence())
+            .map(|(specifier, attributes)| DeclarationSpecifier::Function { specifier, attributes }),
     ))
     .labelled("declaration specifier")
     .as_context()
