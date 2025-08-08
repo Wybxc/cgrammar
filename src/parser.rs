@@ -381,7 +381,13 @@ pub fn declaration<'a>() -> impl Parser<'a, &'a [Token], Declaration, Extra<'a>>
 
     let static_assert = static_assert_declaration();
 
-    let attribute = attribute_specifier_sequence().then_ignore(punctuator(Punctuator::Semicolon));
+    let attribute = choice((
+        old_fashioned_attribute_specifier()
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<AttributeSpecifier>>(),
+        attribute_specifier_sequence().then_ignore(punctuator(Punctuator::Semicolon)),
+    ));
 
     choice((
         normal,
@@ -1231,11 +1237,23 @@ pub fn attribute_specifier_sequence<'a>() -> impl Parser<'a, &'a [Token], Vec<At
 
 /// (6.7.12.1) attribute specifier
 pub fn attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
-    let old_fashioned = keyword("__attribute__").ignore_then(attribute_list().parenthesized().parenthesized());
+    choice((
+        old_fashioned_attribute_specifier(),
+        attribute_list()
+            .bracketed()
+            .bracketed()
+            .map(|attributes| AttributeSpecifier { attributes }),
+    ))
+    .labelled("attribute specifier")
+    .as_context()
+}
 
-    choice((old_fashioned, attribute_list().bracketed().bracketed()))
+#[apply(cached)]
+pub fn old_fashioned_attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
+    keyword("__attribute__")
+        .ignore_then(attribute_list().parenthesized().parenthesized())
         .map(|attributes| AttributeSpecifier { attributes })
-        .labelled("attribute specifier")
+        .labelled("old fashioned attribute specifier")
         .as_context()
 }
 
