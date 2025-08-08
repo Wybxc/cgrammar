@@ -698,6 +698,7 @@ pub fn type_qualifier<'a>() -> impl Parser<'a, &'a [Token], TypeQualifier, Extra
         keyword("restrict").to(TypeQualifier::Restrict),
         keyword("volatile").to(TypeQualifier::Volatile),
         keyword("_Atomic").to(TypeQualifier::Atomic),
+        keyword("_Nonnull").to(TypeQualifier::Nonnull),
     ))
     .labelled("type qualifier")
     .as_context()
@@ -810,12 +811,19 @@ pub fn array_declarator<'a>() -> impl Parser<'a, &'a [Token], ArrayDeclarator, E
 /// (6.7.6) pointer
 #[apply(cached)]
 pub fn pointer<'a>() -> impl Parser<'a, &'a [Token], Pointer, Extra<'a>> + Clone {
-    punctuator(Punctuator::Star)
-        .ignore_then(attribute_specifier_sequence())
-        .then(type_qualifier_list().or_not().map(Option::unwrap_or_default))
-        .map(|(attributes, type_qualifiers)| Pointer { attributes, type_qualifiers })
-        .labelled("pointer")
-        .as_context()
+    choice((
+        punctuator(Punctuator::Star).to(PointerOrBlock::Pointer),
+        punctuator(Punctuator::Caret).to(PointerOrBlock::Block),
+    ))
+    .then(attribute_specifier_sequence())
+    .then(type_qualifier_list().or_not().map(Option::unwrap_or_default))
+    .map(|((pointer_or_block, attributes), type_qualifiers)| Pointer {
+        pointer_or_block,
+        attributes,
+        type_qualifiers,
+    })
+    .labelled("pointer")
+    .as_context()
 }
 
 /// (6.7.6) type qualifier list

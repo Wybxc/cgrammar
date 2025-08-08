@@ -530,6 +530,7 @@ pub enum TypeQualifier {
     Restrict,
     Volatile,
     Atomic,
+    Nonnull,
 }
 
 /// Function specifiers (6.7.4)
@@ -612,10 +613,17 @@ pub enum ArrayDeclarator {
 }
 
 /// Pointers (6.7.6)
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct Pointer {
+    pub pointer_or_block: PointerOrBlock,
     pub attributes: Vec<AttributeSpecifier>,
     pub type_qualifiers: Vec<TypeQualifier>,
+}
+
+#[derive(Debug, DebugPls, Clone, Copy, PartialEq)]
+pub enum PointerOrBlock {
+    Pointer,
+    Block,
 }
 
 /// Parameter type lists (6.7.6)
