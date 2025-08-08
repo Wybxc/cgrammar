@@ -190,6 +190,7 @@ pub enum Expression {
 pub enum PrimaryExpression {
     Identifier(Identifier),
     Constant(Constant),
+    EnumerationConstant(Identifier),
     StringLiteral(StringLiteral),
     Parenthesized(Box<Expression>),
     Generic(GenericSelection),

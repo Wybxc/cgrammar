@@ -17,8 +17,9 @@ type Extra<'a> = chumsky::extra::Full<Rich<'a, Token>, State, ()>;
 pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpression, Extra<'a>> + Clone {
     choice((
         generic_selection().map(PrimaryExpression::Generic),
-        identifier().map(PrimaryExpression::Identifier),
         constant().map(PrimaryExpression::Constant),
+        enumeration_constant().map(PrimaryExpression::EnumerationConstant),
+        identifier().map(PrimaryExpression::Identifier),
         string_literal().map(PrimaryExpression::StringLiteral),
         expression()
             .parenthesized()
@@ -27,6 +28,23 @@ pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpressio
     ))
     .labelled("primiary expression")
     .as_context()
+}
+
+pub fn enumeration_constant<'a>() -> impl Parser<'a, &'a [Token], Identifier, Extra<'a>> + Clone {
+    identifier()
+        .try_map_with(|name, extra| {
+            if extra.state().ctx().is_enum_constant(&name) {
+                Ok(name)
+            } else {
+                Err(expected_found(
+                    ["enumeration constant"],
+                    Some(Token::Identifier(name)),
+                    extra.span(),
+                ))
+            }
+        })
+        .labelled("enumeration constant")
+        .as_context()
 }
 
 /// (6.5.1.1) generic selection
@@ -649,6 +667,10 @@ pub fn enum_specifier<'a>() -> impl Parser<'a, &'a [Token], EnumSpecifier, Extra
 /// (6.7.2.2) enumerator list
 pub fn enumerator_list<'a>() -> impl Parser<'a, &'a [Token], Vec<Enumerator>, Extra<'a>> + Clone {
     enumerator()
+        .map_with(|enumerator, extra| {
+            extra.state().ctx_mut().add_enum_constant(enumerator.name.clone());
+            enumerator
+        })
         .separated_by(punctuator(Punctuator::Comma))
         .allow_trailing()
         .collect::<Vec<Enumerator>>()

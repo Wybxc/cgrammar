@@ -81,11 +81,20 @@ impl Context {
         self.namespaces.iter().rev().any(|ns| ns.is_typedef_name(name))
     }
 
+    pub fn is_enum_constant(&self, name: &Identifier) -> bool {
+        self.namespaces.iter().rev().any(|ns| ns.is_enum_constant(name))
+    }
+
+    fn namespace_mut(&mut self) -> &mut Namespace {
+        self.namespaces.back_mut().expect("No namespace to mutate")
+    }
+
     pub fn add_typedef_name(&mut self, name: Identifier) {
-        self.namespaces
-            .back_mut()
-            .expect("No namespace to add typedef name")
-            .add_typedef_name(name);
+        self.namespace_mut().add_typedef_name(name);
+    }
+
+    pub fn add_enum_constant(&mut self, name: Identifier) {
+        self.namespace_mut().add_enum_constant(name);
     }
 
     pub fn push(&mut self) {
@@ -100,6 +109,7 @@ impl Context {
 #[derive(Default, Clone)]
 pub struct Namespace {
     typedef_names: GenericHashSet<Identifier, FxBuildHasher, RcK>,
+    enum_constants: GenericHashSet<Identifier, FxBuildHasher, RcK>,
 }
 
 impl Namespace {
@@ -107,7 +117,15 @@ impl Namespace {
         self.typedef_names.contains(name)
     }
 
+    pub fn is_enum_constant(&self, name: &Identifier) -> bool {
+        self.enum_constants.contains(name)
+    }
+
     pub fn add_typedef_name(&mut self, name: Identifier) {
         self.typedef_names.insert(name);
+    }
+
+    pub fn add_enum_constant(&mut self, name: Identifier) {
+        self.enum_constants.insert(name);
     }
 }
