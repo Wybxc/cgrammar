@@ -891,5 +891,11 @@ pub struct FunctionDefinition {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
     pub declarator: Declarator,
-    pub body: CompoundStatement,
+    pub body: FunctionBody,
+}
+
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub enum FunctionBody {
+    Statement(CompoundStatement),
+    Asm(Vec<StringLiteral>),
 }

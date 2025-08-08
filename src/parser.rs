@@ -1302,10 +1302,22 @@ pub fn external_declaration<'a>() -> impl Parser<'a, &'a [Token], ExternalDeclar
 
 /// (6.9.1) function definition
 pub fn function_definition<'a>() -> impl Parser<'a, &'a [Token], FunctionDefinition, Extra<'a>> + Clone {
+    let body = choice((
+        keyword("__asm").ignore_then(
+            string_literal()
+                .repeated()
+                .collect::<Vec<StringLiteral>>()
+                .parenthesized()
+                .then_ignore(punctuator(Punctuator::Semicolon))
+                .map(FunctionBody::Asm),
+        ),
+        compound_statement().map(FunctionBody::Statement),
+    ));
+
     attribute_specifier_sequence()
         .then(declaration_specifiers())
         .then(declarator())
-        .then(compound_statement())
+        .then(body)
         .map(
             |(((mut attributes, (specifiers, attributes_after)), declarator), body)| {
                 attributes.extend(attributes_after);
