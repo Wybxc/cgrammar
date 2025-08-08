@@ -350,6 +350,10 @@ pub struct CommaExpression {
     pub expressions: Vec<Expression>,
 }
 
+/// Constant expressions (6.6)
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub struct ConstantExpression(pub Box<Expression>);
+
 // =============================================================================
 // Declarations (6.7)
 // =============================================================================
@@ -410,7 +414,7 @@ pub enum TypeSpecifier {
     Double,
     Signed,
     Unsigned,
-    BitInt(Box<Expression>),
+    BitInt(ConstantExpression),
     Bool,
     Complex,
     Decimal32,
@@ -453,6 +457,7 @@ pub enum MemberDeclaration {
 #[derive(Debug, DebugPls, Default, Clone, PartialEq)]
 pub struct SpecifierQualifierList {
     pub items: Vec<TypeSpecifierQualifier>,
+    pub attributes: Vec<AttributeSpecifier>,
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -468,7 +473,7 @@ pub enum MemberDeclarator {
     Declarator(Declarator),
     BitField {
         declarator: Option<Declarator>,
-        width: Box<Expression>,
+        width: ConstantExpression,
     },
 }
 
@@ -485,7 +490,7 @@ pub struct EnumSpecifier {
 pub struct Enumerator {
     pub name: Identifier,
     pub attributes: Vec<AttributeSpecifier>,
-    pub value: Option<Box<Expression>>,
+    pub value: Option<ConstantExpression>,
 }
 
 /// Atomic type specifiers (6.7.2.4)
@@ -527,14 +532,17 @@ pub enum FunctionSpecifier {
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum AlignmentSpecifier {
     Type(TypeName),
-    Expression(Box<Expression>),
+    Expression(ConstantExpression),
 }
 
 /// Declarators (6.7.6)
 #[derive(Debug, DebugPls, Clone, PartialEq)]
-pub struct Declarator {
-    pub pointer: Option<Pointer>,
-    pub direct_declarator: DirectDeclarator,
+pub enum Declarator {
+    Direct(DirectDeclarator),
+    Pointer {
+        pointer: Pointer,
+        declarator: Box<Declarator>,
+    },
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -552,7 +560,7 @@ pub enum DirectDeclarator {
     Function {
         declarator: Box<DirectDeclarator>,
         attributes: Vec<AttributeSpecifier>,
-        parameters: Option<ParameterTypeList>,
+        parameters: ParameterTypeList,
     },
 }
 
@@ -577,7 +585,6 @@ pub enum ArrayDeclarator {
 pub struct Pointer {
     pub attributes: Vec<AttributeSpecifier>,
     pub type_qualifiers: Vec<TypeQualifier>,
-    pub next: Option<Box<Pointer>>,
 }
 
 /// Parameter type lists (6.7.6)
@@ -593,8 +600,13 @@ pub enum ParameterTypeList {
 pub struct ParameterDeclaration {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
-    pub declarator: Option<Declarator>,
-    pub abstract_declarator: Option<AbstractDeclarator>,
+    pub declarator: Option<ParameterDeclarationKind>,
+}
+
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub enum ParameterDeclarationKind {
+    Declarator(Declarator),
+    Abstract(AbstractDeclarator),
 }
 
 /// Type names (6.7.7)
@@ -605,10 +617,13 @@ pub struct TypeName {
 }
 
 /// Abstract declarators (6.7.7)
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
-pub struct AbstractDeclarator {
-    pub pointer: Option<Pointer>,
-    pub direct_abstract_declarator: Option<DirectAbstractDeclarator>,
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub enum AbstractDeclarator {
+    Direct(DirectAbstractDeclarator),
+    Pointer {
+        pointer: Pointer,
+        abstract_declarator: Option<Box<AbstractDeclarator>>,
+    },
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -622,7 +637,7 @@ pub enum DirectAbstractDeclarator {
     Function {
         declarator: Option<Box<DirectAbstractDeclarator>>,
         attributes: Vec<AttributeSpecifier>,
-        parameters: Option<ParameterTypeList>,
+        parameters: ParameterTypeList,
     },
 }
 
@@ -644,9 +659,10 @@ pub struct DesignatedInitializer {
     pub initializer: Initializer,
 }
 
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct Designation {
-    pub designators: Vec<Designator>,
+    pub designator: Designator,
+    pub designation: Option<Box<Designation>>,
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -658,7 +674,7 @@ pub enum Designator {
 /// Static assert declarations (6.7.11)
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct StaticAssertDeclaration {
-    pub condition: Box<Expression>,
+    pub condition: ConstantExpression,
     pub message: Option<StringLiteral>,
 }
 
