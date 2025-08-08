@@ -935,7 +935,11 @@ pub fn typedef_name<'a>() -> impl Parser<'a, &'a [Token], Identifier, Extra<'a>>
             if extra.state().ctx().is_typedef_name(&name) {
                 Ok(name)
             } else {
-                Err(Rich::custom(extra.span(), format!("`{name}` is not a typedef name")))
+                Err(expected_found(
+                    ["typedef name"],
+                    Some(BalancedToken::Identifier(name)),
+                    extra.span(),
+                ))
             }
         })
         .labelled("typedef name")
@@ -1344,6 +1348,19 @@ fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, &'a [Token], (), Extra<'a
     select! {
         Token::Punctuator(p) if p == punc => ()
     }
+}
+
+fn expected_found<'a, L>(
+    expected: impl IntoIterator<Item = L>,
+    found: Option<BalancedToken>,
+    span: SimpleSpan,
+) -> Rich<'a, Token, SimpleSpan>
+where
+    L: Into<chumsky::error::RichPattern<'a, Token>>,
+{
+    use chumsky::label::LabelError;
+    use chumsky::util::MaybeRef;
+    LabelError::<&'a [Token], L>::expected_found(expected, found.map(MaybeRef::Val), span)
 }
 
 trait ParserExt<O, E> {
