@@ -67,6 +67,7 @@ impl Default for Context {
         let mut builtin = Namespace::default();
         builtin.add_typedef_name(Identifier::from("__builtin_va_list"));
         builtin.add_typedef_name(Identifier::from("__uint128_t"));
+        builtin.add_typedef_name(Identifier::from("_Float16"));
 
         let mut namespaces = GenericVector::new();
         namespaces.push_back(builtin);
