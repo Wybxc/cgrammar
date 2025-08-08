@@ -1223,9 +1223,9 @@ pub fn attribute_specifier_sequence<'a>() -> impl Parser<'a, &'a [Token], Vec<At
 
 /// (6.7.12.1) attribute specifier
 pub fn attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
-    attribute_list()
-        .bracketed()
-        .bracketed()
+    let old_fashioned = keyword("__attribute__").ignore_then(attribute_list().parenthesized().parenthesized());
+
+    choice((old_fashioned, attribute_list().bracketed().bracketed()))
         .map(|attributes| AttributeSpecifier { attributes })
         .labelled("attribute specifier")
         .as_context()
