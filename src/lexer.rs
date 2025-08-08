@@ -1,13 +1,20 @@
 use crate::ast::*;
-use chumsky::prelude::*;
+use chumsky::{
+    input::{Checkpoint, Cursor, MapExtra},
+    inspector::Inspector,
+    prelude::*,
+    text::Char,
+};
+
+type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
 
 /// (6.4.2.1) identifier
-pub fn identifier<'a>() -> impl Parser<'a, &'a str, Identifier> + Clone {
+pub fn identifier<'a>() -> impl Parser<'a, &'a str, Identifier, Extra<'a>> + Clone {
     text::ident().map(|value: &str| Identifier(value.into()))
 }
 
 /// (6.4.4) constant
-pub fn constant<'a>() -> impl Parser<'a, &'a str, Constant> + Clone {
+pub fn constant<'a>() -> impl Parser<'a, &'a str, Constant, Extra<'a>> + Clone {
     choice((
         predefined_constant().map(Constant::Predefined),
         floating_constant().map(Constant::Floating),
@@ -18,7 +25,7 @@ pub fn constant<'a>() -> impl Parser<'a, &'a str, Constant> + Clone {
 }
 
 /// (6.4.4.1) integer constant
-pub fn integer_constant<'a>() -> impl Parser<'a, &'a str, IntegerConstant> + Clone {
+pub fn integer_constant<'a>() -> impl Parser<'a, &'a str, IntegerConstant, Extra<'a>> + Clone {
     choice((
         hexadecimal_constant(),
         binary_constant(),
@@ -30,7 +37,7 @@ pub fn integer_constant<'a>() -> impl Parser<'a, &'a str, IntegerConstant> + Clo
 }
 
 /// (6.4.4.1) decimal constant
-pub fn decimal_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
+pub fn decimal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
     regex(r"[1-9]('?[0-9]+)*")
         .map(|s: &str| s.replace("'", ""))
         .from_str::<i128>()
@@ -38,7 +45,7 @@ pub fn decimal_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
 }
 
 /// (6.4.4.1) octal constant
-pub fn octal_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
+pub fn octal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
     regex(r"0('?[0-7]+)*")
         .map(|s: &str| s.replace("'", ""))
         .map(|s| i128::from_str_radix(&s, 8))
@@ -46,7 +53,7 @@ pub fn octal_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
 }
 
 /// (6.4.4.1) hexadecimal constant
-pub fn hexadecimal_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
+pub fn hexadecimal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
     choice((just("0x"), just("0X")))
         .ignore_then(regex(r"[0-9a-fA-F]('?[0-9a-fA-F]+)*"))
         .map(|s: &str| s.replace("'", ""))
@@ -55,7 +62,7 @@ pub fn hexadecimal_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
 }
 
 /// (6.4.4.1) binary constant
-pub fn binary_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
+pub fn binary_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
     choice((just("0b"), just("0B")))
         .ignore_then(regex(r"[01]('?[01]+)*"))
         .map(|s: &str| s.replace("'", ""))
@@ -64,7 +71,7 @@ pub fn binary_constant<'a>() -> impl Parser<'a, &'a str, i128> + Clone {
 }
 
 /// (6.4.4.1) integer suffix
-pub fn integer_suffix<'a>() -> impl Parser<'a, &'a str, IntegerSuffix> + Clone {
+pub fn integer_suffix<'a>() -> impl Parser<'a, &'a str, IntegerSuffix, Extra<'a>> + Clone {
     choice((
         // Unsigned + Long variations
         just("ull").or(just("ULL")).map(|_| IntegerSuffix::UnsignedLongLong),
@@ -83,14 +90,14 @@ pub fn integer_suffix<'a>() -> impl Parser<'a, &'a str, IntegerSuffix> + Clone {
 }
 
 /// (6.4.4.2) floating constant
-pub fn floating_constant<'a>() -> impl Parser<'a, &'a str, FloatingConstant> + Clone {
+pub fn floating_constant<'a>() -> impl Parser<'a, &'a str, FloatingConstant, Extra<'a>> + Clone {
     choice((decimal_floating_constant(), hexadecimal_floating_constant()))
         .then(floating_suffix().or_not())
         .map(|(value, suffix)| FloatingConstant { value, suffix })
 }
 
 /// (6.4.4.2) decimal floating constant
-pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64> + Clone {
+pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64, Extra<'a>> + Clone {
     regex(r"[0-9]+('[0-9]+)*\.[0-9]+('[0-9]+)*([eE][+-]?[0-9]+('[0-9]+)*)?")
         .map(|s: &str| s.replace("'", ""))
         .from_str::<f64>()
@@ -98,7 +105,7 @@ pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64> + Clone 
 }
 
 /// (6.4.4.2) hexadecimal floating constant
-pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64> + Clone {
+pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64, Extra<'a>> + Clone {
     regex(r"0[xX][0-9a-fA-F]+('[0-9a-fA-F]+)*\.[0-9a-fA-F]+('[0-9a-fA-F]+)*([pP][+-]?[0-9]+('[0-9]+)*)?")
         .map(|s: &str| s.replace("'", ""))
         .map(|s| hexf_parse::parse_hexf64(&s, false))
@@ -106,7 +113,7 @@ pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64> + Cl
 }
 
 /// (6.4.4.2) floating suffix
-pub fn floating_suffix<'a>() -> impl Parser<'a, &'a str, FloatingSuffix> + Clone {
+pub fn floating_suffix<'a>() -> impl Parser<'a, &'a str, FloatingSuffix, Extra<'a>> + Clone {
     choice((
         just("df").or(just("DF")).map(|_| FloatingSuffix::DF),
         just("dd").or(just("DD")).map(|_| FloatingSuffix::DD),
@@ -117,7 +124,7 @@ pub fn floating_suffix<'a>() -> impl Parser<'a, &'a str, FloatingSuffix> + Clone
 }
 
 /// (6.4.4.4) encoding prefix
-pub fn encoding_prefix<'a>() -> impl Parser<'a, &'a str, EncodingPrefix> + Clone {
+pub fn encoding_prefix<'a>() -> impl Parser<'a, &'a str, EncodingPrefix, Extra<'a>> + Clone {
     choice((
         just("u8").map(|_| EncodingPrefix::U8),
         just("u").map(|_| EncodingPrefix::U),
@@ -127,7 +134,7 @@ pub fn encoding_prefix<'a>() -> impl Parser<'a, &'a str, EncodingPrefix> + Clone
 }
 
 /// (6.4.4.4) escape sequence
-pub fn escape_sequence<'a>() -> impl Parser<'a, &'a str, char> + Clone {
+pub fn escape_sequence<'a>() -> impl Parser<'a, &'a str, char, Extra<'a>> + Clone {
     just('\\').ignore_then(choice((
         // Simple escape sequences
         just('\'').map(|_| '\''),
@@ -186,7 +193,7 @@ pub fn escape_sequence<'a>() -> impl Parser<'a, &'a str, char> + Clone {
 }
 
 /// (6.4.4.4) character constant
-pub fn character_constant<'a>() -> impl Parser<'a, &'a str, CharacterConstant> + Clone {
+pub fn character_constant<'a>() -> impl Parser<'a, &'a str, CharacterConstant, Extra<'a>> + Clone {
     let prefix = encoding_prefix().or_not();
 
     let c_char = choice((escape_sequence(), none_of("'\\")));
@@ -199,7 +206,7 @@ pub fn character_constant<'a>() -> impl Parser<'a, &'a str, CharacterConstant> +
 }
 
 /// (6.4.4.5) predefined constant
-pub fn predefined_constant<'a>() -> impl Parser<'a, &'a str, PredefinedConstant> + Clone {
+pub fn predefined_constant<'a>() -> impl Parser<'a, &'a str, PredefinedConstant, Extra<'a>> + Clone {
     choice((
         just("false").map(|_| PredefinedConstant::False),
         just("true").map(|_| PredefinedConstant::True),
@@ -208,7 +215,7 @@ pub fn predefined_constant<'a>() -> impl Parser<'a, &'a str, PredefinedConstant>
 }
 
 /// (6.4.5) string-literal
-pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiteral> + Clone {
+pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiteral, Extra<'a>> + Clone {
     let prefix = encoding_prefix().or_not();
 
     let content = escape_sequence().or(none_of("\"\\")).repeated().collect::<String>();
@@ -219,7 +226,7 @@ pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiteral> + Clone {
 }
 
 /// (6.4.6) punctuator (excluding parentheses and brackets)
-pub fn punctuator<'a>() -> impl Parser<'a, &'a str, Punctuator> + Clone {
+pub fn punctuator<'a>() -> impl Parser<'a, &'a str, Punctuator, Extra<'a>> + Clone {
     // Put longer operators first to avoid partial matches
     let assignment_ops = choice((
         just("<<=").map(|_| Punctuator::LeftShiftAssign),
@@ -278,8 +285,8 @@ pub fn punctuator<'a>() -> impl Parser<'a, &'a str, Punctuator> + Clone {
 
 /// (6.7.12.1) balanced token
 pub fn balanced_token<'a>(
-    balanced_token_sequence: impl Parser<'a, &'a str, BalancedTokenSequence> + Clone,
-) -> impl Parser<'a, &'a str, BalancedToken> + Clone {
+    balanced_token_sequence: impl Parser<'a, &'a str, BalancedTokenSequence, Extra<'a>> + Clone,
+) -> impl Parser<'a, &'a str, BalancedToken, Extra<'a>> + Clone {
     // Parenthesized: ( balanced-token-sequence? )
     let parenthesized = balanced_token_sequence.clone().delimited_by(just('('), just(')'));
 
@@ -309,10 +316,10 @@ pub fn balanced_token<'a>(
 }
 
 /// (6.7.12.1) balanced token sequence
-pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSequence> {
+pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSequence, Extra<'a>> + Clone {
     recursive(|balanced_token_sequence| {
         balanced_token(balanced_token_sequence)
-            .separated_by(text::whitespace().or(comment()))
+            .separated_by(whitespace())
             .allow_leading()
             .allow_trailing()
             .collect::<Vec<_>>()
@@ -320,19 +327,60 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
     })
 }
 
-/// comment
-pub fn comment<'a>() -> impl Parser<'a, &'a str, ()> + Clone {
-    choice((
-        // Single-line comments
-        just("//").ignore_then(choice((just("\\\n").ignored(), none_of('\n').ignored())).repeated()),
-        // Multi-line comments
-        just("/*")
-            .ignore_then(choice((none_of('*').ignored(), just('*').then(none_of('/')).ignored())))
-            .then_ignore(just("*/")),
-    ))
+/// any other token as unknown
+pub fn unknown<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
+    none_of(" \t\n\r()[]{}").repeated().at_least(1).collect()
 }
 
-/// any other token as unknown
-pub fn unknown<'a>() -> impl Parser<'a, &'a str, ()> + Clone {
-    none_of(" \t\n\r()[]{}").repeated().at_least(1).collect()
+fn whitespace<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
+    line_directive().or(text::whitespace().at_least(1)).repeated()
+}
+
+fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
+    empty()
+        .try_map_with(|_, extra: &mut MapExtra<'_, '_, &'a str, Extra<'a>>| {
+            if extra.state().line_begin {
+                Ok(())
+            } else {
+                Err(Simple::new(None, extra.span()))
+            }
+        })
+        .ignore_then(just('#'))
+        .ignore_then(none_of("\n").repeated().collect::<String>())
+        .ignored()
+}
+
+// =============================================================================
+// Lexer State
+// =============================================================================
+
+#[derive(Clone, Copy)]
+pub struct State {
+    line_begin: bool,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self { line_begin: true }
+    }
+}
+
+impl<'src> Inspector<'src, &'src str> for State {
+    type Checkpoint = Self;
+
+    fn on_token(&mut self, token: &char) {
+        if token.is_newline() {
+            self.line_begin = true;
+        } else if self.line_begin && !token.is_whitespace() {
+            self.line_begin = false;
+        }
+    }
+
+    fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, &'src str>) -> Self::Checkpoint {
+        *self
+    }
+
+    fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, &'src str, Self::Checkpoint>) {
+        *self = *marker.inspector();
+    }
 }
