@@ -718,9 +718,10 @@ pub struct StaticAssertDeclaration {
 }
 
 /// Attribute specifiers (6.7.12.1)
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
-pub struct AttributeSpecifier {
-    pub attributes: Vec<Attribute>,
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub enum AttributeSpecifier {
+    Attributes(Vec<Attribute>),
+    Asm(Vec<StringLiteral>),
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -899,11 +900,5 @@ pub struct FunctionDefinition {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
     pub declarator: Declarator,
-    pub body: FunctionBody,
-}
-
-#[derive(Debug, DebugPls, Clone, PartialEq)]
-pub enum FunctionBody {
-    Statement(CompoundStatement),
-    Asm(Vec<StringLiteral>),
+    pub body: CompoundStatement,
 }

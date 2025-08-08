@@ -1239,10 +1239,11 @@ pub fn attribute_specifier_sequence<'a>() -> impl Parser<'a, &'a [Token], Vec<At
 pub fn attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
     choice((
         old_fashioned_attribute_specifier(),
+        asm_attribute_specifier(),
         attribute_list()
             .bracketed()
             .bracketed()
-            .map(|attributes| AttributeSpecifier { attributes }),
+            .map(AttributeSpecifier::Attributes),
     ))
     .labelled("attribute specifier")
     .as_context()
@@ -1252,8 +1253,21 @@ pub fn attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecif
 pub fn old_fashioned_attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
     keyword("__attribute__")
         .ignore_then(attribute_list().parenthesized().parenthesized())
-        .map(|attributes| AttributeSpecifier { attributes })
+        .map(AttributeSpecifier::Attributes)
         .labelled("old fashioned attribute specifier")
+        .as_context()
+}
+
+pub fn asm_attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
+    keyword("__asm")
+        .ignore_then(
+            string_literal()
+                .repeated()
+                .collect::<Vec<StringLiteral>>()
+                .parenthesized(),
+        )
+        .map(AttributeSpecifier::Asm)
+        .labelled("asm attribute specifier")
         .as_context()
 }
 
@@ -1328,22 +1342,10 @@ pub fn external_declaration<'a>() -> impl Parser<'a, &'a [Token], ExternalDeclar
 
 /// (6.9.1) function definition
 pub fn function_definition<'a>() -> impl Parser<'a, &'a [Token], FunctionDefinition, Extra<'a>> + Clone {
-    let body = choice((
-        keyword("__asm").ignore_then(
-            string_literal()
-                .repeated()
-                .collect::<Vec<StringLiteral>>()
-                .parenthesized()
-                .then_ignore(punctuator(Punctuator::Semicolon))
-                .map(FunctionBody::Asm),
-        ),
-        compound_statement().map(FunctionBody::Statement),
-    ));
-
     attribute_specifier_sequence()
         .then(declaration_specifiers())
         .then(declarator())
-        .then(body)
+        .then(compound_statement())
         .map(
             |(((mut attributes, (specifiers, attributes_after)), declarator), body)| {
                 attributes.extend(attributes_after);
