@@ -868,6 +868,7 @@ pub fn array_declarator<'a>() -> impl Parser<'a, &'a [Token], ArrayDeclarator, E
             .map(|(type_qualifiers, size)| ArrayDeclarator::Normal { type_qualifiers, size }),
     ))
     .bracketed()
+    .recover_with(recover_bracketed(ArrayDeclarator::Error))
     .labelled("array declarator")
     .as_context()
 }
@@ -1077,7 +1078,10 @@ pub fn designation<'a>() -> impl Parser<'a, &'a [Token], Designation, Extra<'a>>
 /// (6.7.10) designator
 pub fn designator<'a>() -> impl Parser<'a, &'a [Token], Designator, Extra<'a>> + Clone {
     choice((
-        expression().bracketed().map(Box::new).map(Designator::Array),
+        constant_expression()
+            .bracketed()
+            .recover_with(recover_bracketed(ConstantExpression::Error))
+            .map(Designator::Array),
         punctuator(Punctuator::Dot)
             .ignore_then(identifier())
             .map(Designator::Member),
@@ -1323,9 +1327,9 @@ pub fn attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecif
         old_fashioned_attribute_specifier(),
         asm_attribute_specifier(),
         attribute_list()
+            .map(AttributeSpecifier::Attributes) // TODO: error recovery
             .bracketed()
-            .bracketed()
-            .map(AttributeSpecifier::Attributes),
+            .bracketed(),
     ))
     .labelled("attribute specifier")
     .as_context()

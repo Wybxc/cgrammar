@@ -626,6 +626,7 @@ pub enum ArrayDeclarator {
     VLA {
         type_qualifiers: Vec<TypeQualifier>,
     },
+    Error,
 }
 
 /// Pointers (6.7.6)
@@ -726,7 +727,7 @@ pub struct Designation {
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum Designator {
-    Array(Box<Expression>),
+    Array(ConstantExpression),
     Member(Identifier),
 }
 
