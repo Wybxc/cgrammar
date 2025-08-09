@@ -12,6 +12,9 @@ use rstest::rstest;
 #[case("_Atomic(*int) a;")]
 #[case("typeof(*int) a;")]
 #[case("alignas(*int) float a[4];")]
+#[case("int (*p 1);")]
+#[case("int a[f f];")]
+#[case("int a[1] = {[?]=1};")]
 fn test_error_recovery(#[case] input: String) {
     let input = {
         let lexer = balanced_token_sequence();
