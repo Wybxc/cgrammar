@@ -1521,13 +1521,6 @@ fn recover_bracketed<'a, O: Clone>(
     })
 }
 
-#[allow(dead_code)] // TODO: Use this function in the future
-fn recover_braced<'a, O: Clone>(error: O) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone {
-    recover_via_parser(select! {
-        Token::Braced(_) => error.clone()
-    })
-}
-
 fn expected_found<'a, L>(
     expected: impl IntoIterator<Item = L>,
     found: Option<BalancedToken>,
