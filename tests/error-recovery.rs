@@ -16,14 +16,14 @@ use rstest::rstest;
 #[case("int a[f f];")]
 #[case("int a[1] = {[?]=1};")]
 fn test_error_recovery(#[case] input: String) {
-    let input = {
+    let tokens = {
         let lexer = balanced_token_sequence();
         lexer.parse(&input).unwrap()
     };
-    let output = {
+    let result = {
         let parser = translation_unit();
-        parser.parse(&input.0)
+        parser.parse(tokens.as_input())
     };
-    assert!(output.has_output());
-    assert!(output.has_errors());
+    assert!(result.has_output());
+    assert!(result.has_errors());
 }

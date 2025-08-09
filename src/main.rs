@@ -5,10 +5,10 @@ fn main() {
     let src = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
     let lexer = balanced_token_sequence();
-    let input = lexer.parse(src.as_str()).unwrap();
+    let tokens = lexer.parse(src.as_str()).unwrap();
 
     let parser = translation_unit();
-    let ast = parser.parse(&input.0);
+    let ast = parser.parse(tokens.as_input());
     if ast.has_output() {
         println!("{}", dbg_pls::pretty(&ast.output().unwrap()));
     } else {

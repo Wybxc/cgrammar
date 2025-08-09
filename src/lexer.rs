@@ -1,4 +1,4 @@
-use crate::ast::*;
+use crate::{ast::*, span::*};
 use chumsky::{
     input::{Checkpoint, Cursor, MapExtra},
     inspector::Inspector,
@@ -326,11 +326,26 @@ pub fn balanced_token<'a>(
 pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSequence, Extra<'a>> + Clone {
     recursive(|balanced_token_sequence| {
         balanced_token(balanced_token_sequence)
+            .map_with(|token: BalancedToken, extra| {
+                let range = SourceRange {
+                    start: extra.span().start,
+                    end: extra.span().end,
+                    context: extra.state().source_context(),
+                };
+                Spanned::new(token, range)
+            })
             .separated_by(whitespace())
             .allow_leading()
             .allow_trailing()
             .collect::<Vec<_>>()
-            .map(BalancedTokenSequence)
+            .map_with(|tokens, extra| {
+                let eoi = SourceRange {
+                    start: extra.span().end,
+                    end: extra.span().end,
+                    context: extra.state().source_context(),
+                };
+                BalancedTokenSequence { tokens, eoi }
+            })
     })
 }
 
@@ -364,11 +379,29 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
 #[derive(Clone, Copy)]
 pub struct State {
     line_begin: bool,
+    line: usize,
+    bol: usize,
+    cursor: usize,
 }
 
 impl Default for State {
     fn default() -> Self {
-        Self { line_begin: true }
+        Self {
+            line_begin: true,
+            line: 0,
+            bol: 0,
+            cursor: 0,
+        }
+    }
+}
+
+impl State {
+    pub fn source_context(&self) -> SourceContext {
+        SourceContext {
+            file: None, // TODO: Implement file tracking
+            line: self.line,
+            bol: self.bol,
+        }
     }
 }
 
@@ -376,8 +409,11 @@ impl<'src> Inspector<'src, &'src str> for State {
     type Checkpoint = Self;
 
     fn on_token(&mut self, token: &char) {
+        self.cursor += token.len_utf8();
         if token.is_newline() {
             self.line_begin = true;
+            self.line += 1;
+            self.bol = self.cursor;
         } else if self.line_begin && !token.is_whitespace() {
             self.line_begin = false;
         }

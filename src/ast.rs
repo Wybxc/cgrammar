@@ -3,8 +3,10 @@
 use dbg_pls::DebugPls;
 use std::fmt;
 
+use crate::span::{SourceRange, Spanned};
+
 // =============================================================================
-// Basic Types
+// Lexical Elements (6.4)
 // =============================================================================
 
 /// Identifier
@@ -22,10 +24,6 @@ impl From<&str> for Identifier {
         Identifier(s.to_string())
     }
 }
-
-// =============================================================================
-// Lexical Elements (6.4)
-// =============================================================================
 
 /// Constants (6.4.4)
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -170,6 +168,30 @@ pub enum Punctuator {
     RightBraceAlt,
     HashAlt,
     HashHashAlt,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BalancedTokenSequence {
+    pub tokens: Vec<Spanned<BalancedToken>>,
+    pub eoi: SourceRange,
+}
+
+impl DebugPls for BalancedTokenSequence {
+    fn fmt(&self, f: dbg_pls::Formatter<'_>) {
+        f.debug_list().entries(&self.tokens).finish()
+    }
+}
+
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub enum BalancedToken {
+    Parenthesized(BalancedTokenSequence),
+    Bracketed(BalancedTokenSequence),
+    Braced(BalancedTokenSequence),
+    Identifier(Identifier),
+    StringLiteral(StringLiterals),
+    Constant(Constant),
+    Punctuator(Punctuator),
+    Unknown, // For any other tokens not explicitly defined
 }
 
 // =============================================================================
@@ -749,34 +771,13 @@ pub enum AttributeSpecifier {
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct Attribute {
     pub token: AttributeToken,
-    pub arguments: BalancedTokenSequence,
+    pub arguments: Option<BalancedTokenSequence>,
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
 pub enum AttributeToken {
     Standard(Identifier),
     Prefixed { prefix: Identifier, identifier: Identifier },
-}
-
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
-pub struct BalancedTokenSequence(pub Vec<BalancedToken>);
-
-impl AsRef<[BalancedToken]> for BalancedTokenSequence {
-    fn as_ref(&self) -> &[BalancedToken] {
-        &self.0
-    }
-}
-
-#[derive(Debug, DebugPls, Clone, PartialEq)]
-pub enum BalancedToken {
-    Parenthesized(BalancedTokenSequence),
-    Bracketed(BalancedTokenSequence),
-    Braced(BalancedTokenSequence),
-    Identifier(Identifier),
-    StringLiteral(StringLiterals),
-    Constant(Constant),
-    Punctuator(Punctuator),
-    Unknown, // For any other tokens not explicitly defined
 }
 
 // =============================================================================

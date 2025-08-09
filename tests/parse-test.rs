@@ -30,10 +30,10 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
     let input = String::from_utf8(output.stdout).unwrap();
 
     let lexer = balanced_token_sequence();
-    let input = lexer.parse(&input).unwrap();
+    let tokens = lexer.parse(&input).unwrap();
 
     let parser = translation_unit();
-    let result = parser.parse(&input.0);
+    let result = parser.parse(tokens.as_input());
     if result.has_errors() {
         let mut file = std::fs::OpenOptions::new()
             .append(true)
