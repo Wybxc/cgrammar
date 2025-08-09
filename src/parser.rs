@@ -1055,6 +1055,7 @@ pub fn designator<'a>() -> impl Parser<'a, &'a [Token], Designator, Extra<'a>> +
 /// (6.7.11) static assert declaration
 pub fn static_assert_declaration<'a>() -> impl Parser<'a, &'a [Token], StaticAssertDeclaration, Extra<'a>> + Clone {
     keyword("static_assert")
+        .or(keyword("_Static_assert"))
         .ignore_then(
             constant_expression()
                 .then(punctuator(Punctuator::Comma).ignore_then(string_literal()).or_not())
