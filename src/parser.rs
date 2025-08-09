@@ -1262,12 +1262,12 @@ pub fn iteration_statement<'a>() -> impl Parser<'a, &'a [Token], IterationStatem
     let for_stmt = keyword("for")
         .ignore_then(
             choice((
+                declaration().map(ForInit::Declaration).map(Some),
                 expression()
                     .map(Box::new)
                     .map(ForInit::Expression)
                     .or_not()
                     .then_ignore(punctuator(Punctuator::Semicolon)),
-                declaration().map(ForInit::Declaration).map(Some),
             ))
             .then(expression().map(Box::new).or_not())
             .then_ignore(punctuator(Punctuator::Semicolon))

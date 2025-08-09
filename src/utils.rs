@@ -23,6 +23,10 @@ impl<T, B> Brand<T, B> {
     pub fn into_inner(self) -> T {
         self.0
     }
+
+    pub fn inner(&self) -> &T {
+        &self.0
+    }
 }
 
 pub trait Cacher {
