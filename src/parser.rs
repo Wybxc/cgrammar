@@ -101,9 +101,11 @@ pub fn generic_association<'a>() -> impl Parser<'a, &'a [Token], GenericAssociat
 pub fn postfix_expression<'a>() -> impl Parser<'a, &'a [Token], PostfixExpression, Extra<'a>> + Clone {
     let increment = punctuator(Punctuator::Increment);
     let decrement = punctuator(Punctuator::Decrement);
-    let array = expression()
-        .bracketed()
-        .recover_with(recover_bracketed(Expression::Error));
+    let array = allow_recover(
+        expression()
+            .bracketed()
+            .recover_with(recover_bracketed(Expression::Error)),
+    );
     let function = assignment_expression()
         .map(Brand::into_inner)
         .separated_by(punctuator(Punctuator::Comma))
@@ -216,10 +218,10 @@ pub fn cast_expression<'a>() -> impl Parser<'a, &'a [Token], CastExpression, Ext
     let cast = type_name()
         .parenthesized()
         .recover_with(recover_parenthesized(TypeName::Error))
-        .then(cast_expression().map(Box::new))
+        .then(allow_recover(cast_expression().map(Box::new)))
         .map(|(type_name, expression)| CastExpression::Cast { type_name, expression });
     let unary = unary_expression().map(CastExpression::Unary);
-    choice((no_recover(cast.clone()), unary, cast))
+    choice((no_recover(cast.clone()), no_recover(unary.clone()), cast, unary))
 }
 
 /// (6.5.5) multiplicative expression
@@ -1494,6 +1496,15 @@ where
     O: Clone,
 {
     map_ctx(|ctx: &Context| Context { no_recover: true, ..*ctx }, parser)
+}
+
+/// Temporarily allow error recovery for the given parser.
+fn allow_recover<'a, A, O>(parser: A) -> impl Parser<'a, &'a [Token], O, Extra<'a>> + Clone
+where
+    A: Parser<'a, &'a [Token], O, Extra<'a>> + Clone,
+    O: Clone,
+{
+    map_ctx(|ctx: &Context| Context { no_recover: false, ..*ctx }, parser)
 }
 
 fn recover_via_parser<'a, A, O>(parser: A) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone

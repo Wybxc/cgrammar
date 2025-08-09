@@ -6,8 +6,8 @@ use rstest::rstest;
 #[case("int a = (1 1);")]
 #[case("int a = b[?];")]
 #[case("int a = sizeof();")]
-#[case("int a = alignof(1);")]
 #[case("int a = (*int);")]
+#[case("int a = (*int)1;")]
 fn test_error_recovery(#[case] input: String) {
     let input = {
         let lexer = balanced_token_sequence();
