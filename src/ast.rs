@@ -245,7 +245,7 @@ pub enum PostfixExpression {
 }
 
 /// Compound literals (6.5.2.5)
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct CompoundLiteral {
     pub storage_class_specifiers: Vec<StorageClassSpecifier>,
     pub type_name: TypeName,
@@ -363,7 +363,10 @@ pub struct CommaExpression {
 
 /// Constant expressions (6.6)
 #[derive(Debug, DebugPls, Clone, PartialEq)]
-pub struct ConstantExpression(pub Box<Expression>);
+pub enum ConstantExpression {
+    Expression(Box<Expression>),
+    Error,
+}
 
 // =============================================================================
 // Declarations (6.7)
@@ -513,7 +516,7 @@ pub struct Enumerator {
 }
 
 /// Atomic type specifiers (6.7.2.4)
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
+#[derive(Debug, DebugPls, Clone, PartialEq)]
 pub struct AtomicTypeSpecifier {
     pub type_name: TypeName,
 }
@@ -565,13 +568,15 @@ pub enum Declarator {
         pointer: Pointer,
         declarator: Box<Declarator>,
     },
+    Error,
 }
 
 impl Declarator {
-    pub fn identifier(&self) -> &Identifier {
+    pub fn identifier(&self) -> Option<&Identifier> {
         match self {
             Declarator::Direct(direct) => direct.identifier(),
             Declarator::Pointer { declarator, .. } => declarator.identifier(),
+            Declarator::Error => None,
         }
     }
 }
@@ -596,9 +601,9 @@ pub enum DirectDeclarator {
 }
 
 impl DirectDeclarator {
-    pub fn identifier(&self) -> &Identifier {
+    pub fn identifier(&self) -> Option<&Identifier> {
         match self {
-            DirectDeclarator::Identifier { identifier, .. } => identifier,
+            DirectDeclarator::Identifier { identifier, .. } => Some(identifier),
             DirectDeclarator::Parenthesized(declarator) => declarator.identifier(),
             DirectDeclarator::Array { declarator, .. } => declarator.identifier(),
             DirectDeclarator::Function { declarator, .. } => declarator.identifier(),
@@ -659,10 +664,13 @@ pub enum ParameterDeclarationKind {
 }
 
 /// Type names (6.7.7)
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
-pub struct TypeName {
-    pub specifiers: SpecifierQualifierList,
-    pub abstract_declarator: Option<AbstractDeclarator>,
+#[derive(Debug, DebugPls, Clone, PartialEq)]
+pub enum TypeName {
+    TypeName {
+        specifiers: SpecifierQualifierList,
+        abstract_declarator: Option<AbstractDeclarator>,
+    },
+    Error,
 }
 
 /// Abstract declarators (6.7.7)
@@ -673,6 +681,7 @@ pub enum AbstractDeclarator {
         pointer: Pointer,
         abstract_declarator: Option<Box<AbstractDeclarator>>,
     },
+    Error,
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]
@@ -732,6 +741,7 @@ pub struct StaticAssertDeclaration {
 pub enum AttributeSpecifier {
     Attributes(Vec<Attribute>),
     Asm(StringLiterals),
+    Error,
 }
 
 #[derive(Debug, DebugPls, Clone, PartialEq)]

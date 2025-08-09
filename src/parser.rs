@@ -25,7 +25,7 @@ pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpressio
             .parenthesized()
             .map(Box::new)
             .map(PrimaryExpression::Parenthesized)
-            .recover_with(via_parser(parenthesized().to(PrimaryExpression::Error))),
+            .recover_with(recover_parenthesized(PrimaryExpression::Error)),
     ))
     .labelled("primiary expression")
     .as_context()
@@ -57,7 +57,7 @@ pub fn generic_selection<'a>() -> impl Parser<'a, &'a [Token], GenericSelection,
                 .map(Box::new)
                 .then_ignore(punctuator(Punctuator::Comma))
                 .then(generic_association_list())
-                .parenthesized(),
+                .parenthesized(), // TODO: error recovery
         )
         .map(|(controlling_expression, associations)| GenericSelection { controlling_expression, associations })
         .labelled("generic selection")
@@ -97,12 +97,12 @@ pub fn postfix_expression<'a>() -> impl Parser<'a, &'a [Token], PostfixExpressio
     let decrement = punctuator(Punctuator::Decrement);
     let array = expression()
         .bracketed()
-        .recover_with(via_parser(bracketed().to(Expression::Error)));
+        .recover_with(recover_bracketed(Expression::Error));
     let function = assignment_expression()
         .map(Brand::into_inner)
         .separated_by(punctuator(Punctuator::Comma))
         .collect::<Vec<Expression>>()
-        .parenthesized();
+        .parenthesized(); // TODO: error recovery
     let member_access = punctuator(Punctuator::Dot).ignore_then(identifier());
     let member_access_ptr = punctuator(Punctuator::Arrow).ignore_then(identifier());
 
@@ -140,7 +140,7 @@ pub fn postfix_expression<'a>() -> impl Parser<'a, &'a [Token], PostfixExpressio
 pub fn compound_literal<'a>() -> impl Parser<'a, &'a [Token], CompoundLiteral, Extra<'a>> + Clone {
     storage_class_specifiers()
         .then(type_name())
-        .parenthesized()
+        .parenthesized() // TODO: error recovery
         .then(braced_initializer())
         .map(|((storage_class_specifiers, type_name), initializer)| CompoundLiteral {
             storage_class_specifiers,
@@ -182,8 +182,11 @@ pub fn unary_expression<'a>() -> impl Parser<'a, &'a [Token], UnaryExpression, E
     let unary = unary_operator.then(cast_expression());
 
     let sizeof_expr = keyword("sizeof").ignore_then(unary_expression()).map(Box::new);
-    let sizeof_type = keyword("sizeof").ignore_then(type_name().parenthesized());
-    let alignof_type = keyword("alignof").ignore_then(type_name().parenthesized());
+    let type_name = type_name()
+        .parenthesized()
+        .recover_with(recover_parenthesized(TypeName::Error));
+    let sizeof_type = keyword("sizeof").ignore_then(type_name.clone());
+    let alignof_type = keyword("alignof").ignore_then(type_name);
 
     let postfix = postfix_expression();
 
@@ -206,6 +209,7 @@ pub fn cast_expression<'a>() -> impl Parser<'a, &'a [Token], CastExpression, Ext
     choice((
         type_name()
             .parenthesized()
+            .recover_with(recover_parenthesized(TypeName::Error))
             .then(cast_expression().map(Box::new))
             .map(|(type_name, expression)| CastExpression::Cast { type_name, expression }),
         unary_expression().map(CastExpression::Unary),
@@ -370,7 +374,7 @@ pub fn constant_expression<'a>() -> impl Parser<'a, &'a [Token], ConstantExpress
     conditional_expression()
         .map(Brand::into_inner)
         .map(Box::new)
-        .map(ConstantExpression)
+        .map(ConstantExpression::Expression)
         .labelled("constant expression")
         .as_context()
 }
@@ -492,10 +496,9 @@ pub fn typedef_declarator_list<'a>() -> impl Parser<'a, &'a [Token], Vec<Declara
 pub fn typedef_declarator<'a>() -> impl Parser<'a, &'a [Token], Declarator, Extra<'a>> + Clone {
     declarator()
         .map_with(move |declarator, extra| {
-            extra
-                .state()
-                .ctx_mut()
-                .add_typedef_name(declarator.identifier().clone());
+            if let Some(ident) = declarator.identifier() {
+                extra.state().ctx_mut().add_typedef_name(ident.clone());
+            }
             declarator
         })
         .labelled("init declarator")
@@ -536,7 +539,11 @@ pub fn type_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeSpecifier, Extra
         keyword("_Decimal64").to(TypeSpecifier::Decimal64),
         keyword("_Decimal128").to(TypeSpecifier::Decimal128),
         keyword("_BitInt")
-            .ignore_then(constant_expression().parenthesized())
+            .ignore_then(
+                constant_expression()
+                    .parenthesized()
+                    .recover_with(recover_parenthesized(ConstantExpression::Error)),
+            )
             .map(TypeSpecifier::BitInt),
         struct_or_union_specifier().map(TypeSpecifier::Struct),
         enum_specifier().map(TypeSpecifier::Enum),
@@ -699,7 +706,11 @@ pub fn enumerator<'a>() -> impl Parser<'a, &'a [Token], Enumerator, Extra<'a>> +
 /// (6.7.2.4) atomic type specifier
 pub fn atomic_type_specifier<'a>() -> impl Parser<'a, &'a [Token], AtomicTypeSpecifier, Extra<'a>> + Clone {
     keyword("_Atomic")
-        .ignore_then(type_name().parenthesized())
+        .ignore_then(
+            type_name()
+                .parenthesized()
+                .recover_with(recover_parenthesized(TypeName::Error)),
+        )
         .map(|type_name| AtomicTypeSpecifier { type_name })
         .labelled("atomic type specifier")
         .as_context()
@@ -708,16 +719,23 @@ pub fn atomic_type_specifier<'a>() -> impl Parser<'a, &'a [Token], AtomicTypeSpe
 /// (6.7.2.5) typeof specifier
 pub fn typeof_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeofSpecifier, Extra<'a>> + Clone {
     let typeof_arg = choice((
-        type_name().map(TypeofSpecifierArgument::TypeName),
-        expression().map(Box::new).map(TypeofSpecifierArgument::Expression),
+        type_name()
+            .parenthesized()
+            .recover_with(recover_parenthesized(TypeName::Error))
+            .map(TypeofSpecifierArgument::TypeName),
+        expression()
+            .parenthesized()
+            .recover_with(recover_parenthesized(Expression::Error))
+            .map(Box::new)
+            .map(TypeofSpecifierArgument::Expression),
     ));
 
     choice((
         keyword("typeof")
-            .ignore_then(typeof_arg.clone().parenthesized())
+            .ignore_then(typeof_arg.clone())
             .map(TypeofSpecifier::Typeof),
         keyword("typeof_unqual")
-            .ignore_then(typeof_arg.parenthesized())
+            .ignore_then(typeof_arg)
             .map(TypeofSpecifier::TypeofUnqual),
     ))
     .labelled("typeof specifier")
@@ -753,13 +771,16 @@ pub fn function_specifier<'a>() -> impl Parser<'a, &'a [Token], FunctionSpecifie
 /// (6.7.5) alignment specifier
 pub fn alignment_specifier<'a>() -> impl Parser<'a, &'a [Token], AlignmentSpecifier, Extra<'a>> + Clone {
     keyword("alignas")
-        .ignore_then(
-            choice((
-                constant_expression().map(AlignmentSpecifier::Expression),
-                type_name().map(AlignmentSpecifier::Type),
-            ))
-            .parenthesized(),
-        )
+        .ignore_then(choice((
+            constant_expression()
+                .parenthesized()
+                .recover_with(recover_parenthesized(ConstantExpression::Error))
+                .map(AlignmentSpecifier::Expression),
+            type_name()
+                .parenthesized()
+                .recover_with(recover_parenthesized(TypeName::Error))
+                .map(AlignmentSpecifier::Type),
+        )))
         .labelled("alignment specifier")
         .as_context()
 }
@@ -783,6 +804,7 @@ pub fn direct_declarator<'a>() -> impl Parser<'a, &'a [Token], DirectDeclarator,
 
     let parenthesized = declarator()
         .parenthesized()
+        .recover_with(recover_parenthesized(Declarator::Error))
         .map(Box::new)
         .map(DirectDeclarator::Parenthesized);
 
@@ -800,7 +822,7 @@ pub fn direct_declarator<'a>() -> impl Parser<'a, &'a [Token], DirectDeclarator,
                 },
             ),
             parameter_type_list()
-                .parenthesized()
+                .parenthesized() // TODO: error recovery
                 .then(attribute_specifier_sequence())
                 .map(|(parameters, attributes)| -> DirectDeclaratorFn {
                     Box::new(move |declarator| DirectDeclarator::Function {
@@ -919,7 +941,7 @@ pub fn parameter_declaration<'a>() -> impl Parser<'a, &'a [Token], ParameterDecl
 pub fn type_name<'a>() -> impl Parser<'a, &'a [Token], TypeName, Extra<'a>> + Clone {
     specifier_qualifier_list()
         .then(abstract_declarator().or_not())
-        .map(|(specifiers, abstract_declarator)| TypeName { specifiers, abstract_declarator })
+        .map(|(specifiers, abstract_declarator)| TypeName::TypeName { specifiers, abstract_declarator })
         .labelled("type name")
         .as_context()
 }
@@ -938,6 +960,7 @@ pub fn abstract_declarator<'a>() -> impl Parser<'a, &'a [Token], AbstractDeclara
 #[apply(cached)]
 pub fn direct_abstract_declarator<'a>() -> impl Parser<'a, &'a [Token], DirectAbstractDeclarator, Extra<'a>> + Clone {
     let parenthesized = abstract_declarator()
+        .recover_with(recover_parenthesized(AbstractDeclarator::Error))
         .parenthesized()
         .map(Box::new)
         .map(DirectAbstractDeclarator::Parenthesized);
@@ -953,7 +976,7 @@ pub fn direct_abstract_declarator<'a>() -> impl Parser<'a, &'a [Token], DirectAb
             },
         ),
         parameter_type_list()
-            .parenthesized()
+            .parenthesized() // TODO: error recovery
             .then(attribute_specifier_sequence())
             .map(|(parameters, attributes)| -> DirectAbstractDeclaratorFn {
                 Box::new(move |declarator| {
@@ -1062,7 +1085,7 @@ pub fn static_assert_declaration<'a>() -> impl Parser<'a, &'a [Token], StaticAss
         .ignore_then(
             constant_expression()
                 .then(punctuator(Punctuator::Comma).ignore_then(string_literal()).or_not())
-                .parenthesized(),
+                .parenthesized(), // TODO: error recovery
         )
         .then_ignore(punctuator(Punctuator::Semicolon))
         .map(|(condition, message)| StaticAssertDeclaration { condition, message })
@@ -1175,13 +1198,23 @@ pub fn expression_statement<'a>() -> impl Parser<'a, &'a [Token], ExpressionStat
 /// (6.8.4) selection statement
 pub fn selection_statement<'a>() -> impl Parser<'a, &'a [Token], SelectionStatement, Extra<'a>> + Clone {
     let if_stmt = keyword("if")
-        .ignore_then(expression().map(Box::new).parenthesized())
+        .ignore_then(
+            expression()
+                .parenthesized()
+                .recover_with(recover_parenthesized(Expression::Error))
+                .map(Box::new),
+        )
         .then(statement().map(Box::new))
         .then(keyword("else").ignore_then(statement().map(Box::new)).or_not())
         .map(|((condition, then_stmt), else_stmt)| SelectionStatement::If { condition, then_stmt, else_stmt });
 
     let switch_stmt = keyword("switch")
-        .ignore_then(expression().map(Box::new).parenthesized())
+        .ignore_then(
+            expression()
+                .parenthesized()
+                .recover_with(recover_parenthesized(Expression::Error))
+                .map(Box::new),
+        )
         .then(statement().map(Box::new))
         .map(|(expression, statement)| SelectionStatement::Switch { expression, statement });
 
@@ -1193,14 +1226,24 @@ pub fn selection_statement<'a>() -> impl Parser<'a, &'a [Token], SelectionStatem
 /// (6.8.5) iteration statement
 pub fn iteration_statement<'a>() -> impl Parser<'a, &'a [Token], IterationStatement, Extra<'a>> + Clone {
     let while_stmt = keyword("while")
-        .ignore_then(expression().map(Box::new).parenthesized())
+        .ignore_then(
+            expression()
+                .parenthesized()
+                .recover_with(recover_parenthesized(Expression::Error))
+                .map(Box::new),
+        )
         .then(statement().map(Box::new))
         .map(|(condition, body)| IterationStatement::While { condition, body });
 
     let do_while_stmt = keyword("do")
         .ignore_then(statement().map(Box::new))
         .then_ignore(keyword("while"))
-        .then(expression().map(Box::new).parenthesized())
+        .then(
+            expression()
+                .parenthesized()
+                .recover_with(recover_parenthesized(Expression::Error))
+                .map(Box::new),
+        )
         .then_ignore(punctuator(Punctuator::Semicolon))
         .map(|(body, condition)| IterationStatement::DoWhile { body, condition });
 
@@ -1217,7 +1260,7 @@ pub fn iteration_statement<'a>() -> impl Parser<'a, &'a [Token], IterationStatem
             .then(expression().map(Box::new).or_not())
             .then_ignore(punctuator(Punctuator::Semicolon))
             .then(expression().map(Box::new).or_not())
-            .parenthesized(),
+            .parenthesized(), // TODO: error recovery
         )
         .then(statement().map(Box::new))
         .map(|(((init, condition), update), body)| IterationStatement::For { init, condition, update, body });
@@ -1283,16 +1326,25 @@ pub fn attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecif
 #[apply(cached)]
 pub fn old_fashioned_attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
     keyword("__attribute__")
-        .ignore_then(attribute_list().parenthesized().parenthesized())
-        .map(AttributeSpecifier::Attributes)
+        .ignore_then(
+            attribute_list()
+                .parenthesized()
+                .parenthesized()
+                .map(AttributeSpecifier::Attributes)
+                .recover_with(recover_parenthesized(AttributeSpecifier::Error)),
+        )
         .labelled("old fashioned attribute specifier")
         .as_context()
 }
 
 pub fn asm_attribute_specifier<'a>() -> impl Parser<'a, &'a [Token], AttributeSpecifier, Extra<'a>> + Clone {
     keyword("__asm")
-        .ignore_then(string_literal().parenthesized())
-        .map(AttributeSpecifier::Asm)
+        .ignore_then(
+            string_literal()
+                .map(AttributeSpecifier::Asm)
+                .parenthesized()
+                .recover_with(recover_parenthesized(AttributeSpecifier::Error)),
+        )
         .labelled("asm attribute specifier")
         .as_context()
 }
@@ -1416,22 +1468,26 @@ fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, &'a [Token], (), Extra<'a
     }
 }
 
-fn parenthesized<'a>() -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
-    select! {
-        Token::Parenthesized(_) => ()
-    }
+fn recover_parenthesized<'a, O: Clone>(
+    error: O,
+) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone {
+    via_parser(select! {
+        Token::Parenthesized(_) => error.clone()
+    })
 }
 
-fn bracketed<'a>() -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
-    select! {
-        Token::Bracketed(_) => ()
-    }
+fn recover_bracketed<'a, O: Clone>(
+    error: O,
+) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone {
+    via_parser(select! {
+        Token::Bracketed(_) => error.clone()
+    })
 }
 
-fn braced<'a>() -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
-    select! {
-        Token::Braced(_) => ()
-    }
+fn recover_braced<'a, O: Clone>(error: O) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone {
+    via_parser(select! {
+        Token::Braced(_) => error.clone()
+    })
 }
 
 fn expected_found<'a, L>(

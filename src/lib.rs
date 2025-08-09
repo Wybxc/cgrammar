@@ -1,7 +1,7 @@
 mod ast;
+mod context;
 mod lexer;
 mod parser;
-mod context;
 mod utils;
 
 pub use ast::*;
