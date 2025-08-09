@@ -58,7 +58,7 @@ pub fn enumeration_constant<'a>() -> impl Parser<'a, &'a [Token], Identifier, Ex
 pub fn generic_selection<'a>() -> impl Parser<'a, &'a [Token], GenericSelection, Extra<'a>> + Clone {
     keyword("_Generic")
         .ignore_then(
-            assignment_expression()
+            assignment_expression() // TODO: generic over type
                 .map(Brand::into_inner)
                 .map(Box::new)
                 .then_ignore(punctuator(Punctuator::Comma))
@@ -213,18 +213,13 @@ pub fn unary_expression<'a>() -> impl Parser<'a, &'a [Token], UnaryExpression, E
 /// (6.5.4) cast expression
 #[apply(cached)]
 pub fn cast_expression<'a>() -> impl Parser<'a, &'a [Token], CastExpression, Extra<'a>> + Clone {
-    choice((
-        type_name()
-            .parenthesized()
-            .then(cast_expression().map(Box::new))
-            .map(|(type_name, expression)| CastExpression::Cast { type_name, expression }),
-        unary_expression().map(CastExpression::Unary),
-        type_name()
-            .parenthesized()
-            .recover_with(recover_parenthesized(TypeName::Error))
-            .then(cast_expression().map(Box::new))
-            .map(|(type_name, expression)| CastExpression::Cast { type_name, expression }),
-    ))
+    let cast = type_name()
+        .parenthesized()
+        .recover_with(recover_parenthesized(TypeName::Error))
+        .then(cast_expression().map(Box::new))
+        .map(|(type_name, expression)| CastExpression::Cast { type_name, expression });
+    let unary = unary_expression().map(CastExpression::Unary);
+    choice((no_recover(cast.clone()), unary, cast))
 }
 
 /// (6.5.5) multiplicative expression
@@ -1386,10 +1381,10 @@ pub fn attribute<'a>() -> impl Parser<'a, &'a [Token], Attribute, Extra<'a>> + C
 
 /// (6.7.12.1) attribute token
 pub fn attribute_token<'a>() -> impl Parser<'a, &'a [Token], AttributeToken, Extra<'a>> + Clone {
-    let standard = identifier();
-    let prefixed = identifier()
+    let standard = identifier_or_keyword();
+    let prefixed = identifier_or_keyword()
         .then_ignore(punctuator(Punctuator::Scope))
-        .then(identifier());
+        .then(identifier_or_keyword());
 
     choice((
         prefixed.map(|(prefix, identifier)| AttributeToken::Prefixed { prefix, identifier }),
@@ -1450,10 +1445,22 @@ pub fn function_definition<'a>() -> impl Parser<'a, &'a [Token], FunctionDefinit
 // Parser utilities
 // =============================================================================
 
-fn identifier<'a>() -> impl Parser<'a, &'a [Token], Identifier, Extra<'a>> + Clone {
+fn identifier_or_keyword<'a>() -> impl Parser<'a, &'a [Token], Identifier, Extra<'a>> + Clone {
     select! {
         Token::Identifier(value) => value
     }
+}
+
+fn identifier<'a>() -> impl Parser<'a, &'a [Token], Identifier, Extra<'a>> + Clone {
+    identifier_or_keyword().try_map(|id, span| match id.0.as_str() {
+        "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do" | "double" | "else" | "enum"
+        | "extern" | "float" | "for" | "goto" | "if" | "inline" | "int" | "long" | "register" | "restrict"
+        | "return" | "short" | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef" | "union"
+        | "unsigned" | "void" | "volatile" | "_Alignas" => {
+            Err(expected_found(["identifier"], Some(Token::Identifier(id)), span))
+        }
+        _ => Ok(id),
+    })
 }
 
 fn constant<'a>() -> impl Parser<'a, &'a [Token], Constant, Extra<'a>> + Clone {

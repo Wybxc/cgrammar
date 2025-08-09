@@ -65,7 +65,7 @@ pub struct Context {
 impl Default for Context {
     fn default() -> Self {
         let mut builtin = Namespace::default();
-        builtin.add_typedef_name(Identifier::from("__builtin_va_list"));
+        builtin.add_typedef_name(Identifier::from("__builtin_va_list")); // TODO: va_arg
         builtin.add_typedef_name(Identifier::from("__uint128_t"));
         builtin.add_typedef_name(Identifier::from("_Float16"));
         builtin.add_typedef_name(Identifier::from("_Bool"));

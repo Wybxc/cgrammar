@@ -1,16 +1,17 @@
 use cgrammar::*;
 use chumsky::prelude::*;
+use rstest::rstest;
 
-const SRC: &str = r#"
-int a = (1 1);
-int b = a[?];
-"#;
-
-#[test]
-fn test_error_recovery() {
+#[rstest]
+#[case("int a = (1 1);")]
+#[case("int a = b[?];")]
+#[case("int a = sizeof();")]
+#[case("int a = alignof(1);")]
+#[case("int a = (*int);")]
+fn test_error_recovery(#[case] input: String) {
     let input = {
         let lexer = balanced_token_sequence();
-        lexer.parse(SRC).unwrap()
+        lexer.parse(&input).unwrap()
     };
     let output = {
         let parser = translation_unit();
