@@ -553,6 +553,7 @@ pub fn type_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeSpecifier, Extra
                     .recover_with(recover_parenthesized(ConstantExpression::Error)),
             )
             .map(TypeSpecifier::BitInt),
+        atomic_type_specifier().map(TypeSpecifier::Atomic),
         struct_or_union_specifier().map(TypeSpecifier::Struct),
         enum_specifier().map(TypeSpecifier::Enum),
         typeof_specifier().map(TypeSpecifier::Typeof),
@@ -773,16 +774,18 @@ pub fn function_specifier<'a>() -> impl Parser<'a, &'a [Token], FunctionSpecifie
 
 /// (6.7.5) alignment specifier
 pub fn alignment_specifier<'a>() -> impl Parser<'a, &'a [Token], AlignmentSpecifier, Extra<'a>> + Clone {
+    let expr = constant_expression()
+        .parenthesized()
+        .recover_with(recover_parenthesized(ConstantExpression::Error));
+    let typ = type_name()
+        .parenthesized()
+        .recover_with(recover_parenthesized(TypeName::Error));
+
     keyword("alignas")
         .ignore_then(choice((
-            constant_expression()
-                .parenthesized()
-                .recover_with(recover_parenthesized(ConstantExpression::Error))
-                .map(AlignmentSpecifier::Expression),
-            type_name()
-                .parenthesized()
-                .recover_with(recover_parenthesized(TypeName::Error))
-                .map(AlignmentSpecifier::Type),
+            no_recover(typ.clone()).map(AlignmentSpecifier::Type),
+            expr.map(AlignmentSpecifier::Expression),
+            typ.map(AlignmentSpecifier::Type),
         )))
         .labelled("alignment specifier")
         .as_context()
