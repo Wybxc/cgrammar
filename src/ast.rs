@@ -532,6 +532,7 @@ pub enum TypeofSpecifier {
 pub enum TypeofSpecifierArgument {
     Expression(Box<Expression>),
     TypeName(TypeName),
+    Error,
 }
 
 /// Type qualifiers (6.7.3)

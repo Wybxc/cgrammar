@@ -7,7 +7,13 @@ use macro_rules_attribute::apply;
 
 pub type Token = BalancedToken;
 pub type TokenStream = BalancedTokenSequence;
-type Extra<'a> = chumsky::extra::Full<Rich<'a, Token>, State, ()>;
+type Extra<'a> = chumsky::extra::Full<Rich<'a, Token>, State, Context>;
+
+#[derive(Default, Clone, Copy)]
+#[non_exhaustive]
+pub struct Context {
+    pub no_recover: bool,
+}
 
 // =============================================================================
 // Expressions
@@ -194,8 +200,9 @@ pub fn unary_expression<'a>() -> impl Parser<'a, &'a [Token], UnaryExpression, E
         pre_increment.map(UnaryExpression::PreIncrement),
         pre_decrement.map(UnaryExpression::PreDecrement),
         unary.map(|(operator, operand)| UnaryExpression::Unary { operator, operand: Box::new(operand) }),
-        sizeof_type.map(UnaryExpression::SizeofType), // sizeof type must be before sizeof expr
+        no_recover(sizeof_type.clone()).map(UnaryExpression::SizeofType), // sizeof type must be before sizeof expr
         sizeof_expr.map(UnaryExpression::Sizeof),
+        sizeof_type.map(UnaryExpression::SizeofType),
         alignof_type.map(UnaryExpression::Alignof),
         postfix.map(UnaryExpression::Postfix),
     ))
@@ -209,10 +216,14 @@ pub fn cast_expression<'a>() -> impl Parser<'a, &'a [Token], CastExpression, Ext
     choice((
         type_name()
             .parenthesized()
-            .recover_with(recover_parenthesized(TypeName::Error))
             .then(cast_expression().map(Box::new))
             .map(|(type_name, expression)| CastExpression::Cast { type_name, expression }),
         unary_expression().map(CastExpression::Unary),
+        type_name()
+            .parenthesized()
+            .recover_with(recover_parenthesized(TypeName::Error))
+            .then(cast_expression().map(Box::new))
+            .map(|(type_name, expression)| CastExpression::Cast { type_name, expression }),
     ))
 }
 
@@ -719,16 +730,11 @@ pub fn atomic_type_specifier<'a>() -> impl Parser<'a, &'a [Token], AtomicTypeSpe
 /// (6.7.2.5) typeof specifier
 pub fn typeof_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeofSpecifier, Extra<'a>> + Clone {
     let typeof_arg = choice((
-        type_name()
-            .parenthesized()
-            .recover_with(recover_parenthesized(TypeName::Error))
-            .map(TypeofSpecifierArgument::TypeName),
-        expression()
-            .parenthesized()
-            .recover_with(recover_parenthesized(Expression::Error))
-            .map(Box::new)
-            .map(TypeofSpecifierArgument::Expression),
-    ));
+        type_name().map(TypeofSpecifierArgument::TypeName),
+        expression().map(Box::new).map(TypeofSpecifierArgument::Expression),
+    ))
+    .parenthesized()
+    .recover_with(recover_parenthesized(TypeofSpecifierArgument::Error));
 
     choice((
         keyword("typeof")
@@ -925,7 +931,9 @@ pub fn parameter_declaration<'a>() -> impl Parser<'a, &'a [Token], ParameterDecl
     attribute_specifier_sequence()
         .then(declaration_specifiers())
         .then(choice((
-            declarator().map(ParameterDeclarationKind::Declarator).map(Some),
+            no_recover(declarator())
+                .map(ParameterDeclarationKind::Declarator)
+                .map(Some),
             abstract_declarator().map(ParameterDeclarationKind::Abstract).or_not(),
         )))
         .map(|((mut attributes, (specifiers, attributes_after)), declarator)| {
@@ -1468,10 +1476,35 @@ fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, &'a [Token], (), Extra<'a
     }
 }
 
+/// Temporarily disable error recovery for the given parser.
+fn no_recover<'a, A, O>(parser: A) -> impl Parser<'a, &'a [Token], O, Extra<'a>> + Clone
+where
+    A: Parser<'a, &'a [Token], O, Extra<'a>> + Clone,
+    O: Clone,
+{
+    map_ctx(|ctx: &Context| Context { no_recover: true, ..*ctx }, parser)
+}
+
+fn recover_via_parser<'a, A, O>(parser: A) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone
+where
+    A: Parser<'a, &'a [Token], O, Extra<'a>> + Clone,
+    O: Clone,
+{
+    via_parser(parser.try_map_with(
+        |error, extra: &mut chumsky::input::MapExtra<'_, '_, &'a [BalancedToken], Extra<'a>>| {
+            if extra.ctx().no_recover {
+                Err(Rich::custom(extra.span(), "cannot recover in this context"))
+            } else {
+                Ok(error)
+            }
+        },
+    ))
+}
+
 fn recover_parenthesized<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone {
-    via_parser(select! {
+    recover_via_parser(select! {
         Token::Parenthesized(_) => error.clone()
     })
 }
@@ -1479,13 +1512,14 @@ fn recover_parenthesized<'a, O: Clone>(
 fn recover_bracketed<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone {
-    via_parser(select! {
+    recover_via_parser(select! {
         Token::Bracketed(_) => error.clone()
     })
 }
 
+#[allow(dead_code)] // TODO: Use this function in the future
 fn recover_braced<'a, O: Clone>(error: O) -> impl chumsky::recovery::Strategy<'a, &'a [Token], O, Extra<'a>> + Clone {
-    via_parser(select! {
+    recover_via_parser(select! {
         Token::Braced(_) => error.clone()
     })
 }
