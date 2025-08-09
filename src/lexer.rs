@@ -45,10 +45,13 @@ pub fn decimal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clo
 
 /// (6.4.4.1) octal constant
 pub fn octal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
-    regex(r"0(?:'?[0-7])*")
-        .map(|s: &str| s.replace("'", ""))
-        .map(|s| i128::from_str_radix(&s, 8))
-        .unwrapped()
+    choice((
+        choice((just("0o"), just("0O"))).ignore_then(regex(r"[0-7](?:'?[0-7])*")),
+        regex(r"0(?:'?[0-7])*"),
+    ))
+    .map(|s: &str| s.replace("'", ""))
+    .map(|s| i128::from_str_radix(&s, 8))
+    .unwrapped()
 }
 
 /// (6.4.4.1) hexadecimal constant
