@@ -15,8 +15,15 @@ fn main() {
         eprintln!("Parse failed!");
     }
     if ast.has_errors() {
-        for error in ast.errors() {
-            eprintln!("{error:?}");
+        let mut cache = FnCache::new(|path: &str| {
+            if path.is_empty() {
+                Ok(src.as_str())
+            } else {
+                Err("File not found")
+            }
+        });
+        for error in ast.into_errors() {
+            report(error).eprint(&mut cache).unwrap();
         }
         std::process::exit(1);
     }
