@@ -206,11 +206,12 @@ pub fn character_constant<'a>() -> impl Parser<'a, &'a str, CharacterConstant, E
 
 /// (6.4.4.5) predefined constant
 pub fn predefined_constant<'a>() -> impl Parser<'a, &'a str, PredefinedConstant, Extra<'a>> + Clone {
-    choice((
-        just("false").map(|_| PredefinedConstant::False),
-        just("true").map(|_| PredefinedConstant::True),
-        just("nullptr").map(|_| PredefinedConstant::Nullptr),
-    ))
+    text::ident().try_map(|name, span| match name {
+        "false" => Ok(PredefinedConstant::False),
+        "true" => Ok(PredefinedConstant::True),
+        "nullptr" => Ok(PredefinedConstant::Nullptr),
+        _ => Err(Simple::new(None, span)),
+    })
 }
 
 /// (6.4.5) string-literal
