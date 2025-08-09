@@ -705,8 +705,8 @@ pub fn atomic_type_specifier<'a>() -> impl Parser<'a, &'a [Token], AtomicTypeSpe
 /// (6.7.2.5) typeof specifier
 pub fn typeof_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeofSpecifier, Extra<'a>> + Clone {
     let typeof_arg = choice((
-        expression().map(Box::new).map(TypeofSpecifierArgument::Expression),
         type_name().map(TypeofSpecifierArgument::TypeName),
+        expression().map(Box::new).map(TypeofSpecifierArgument::Expression),
     ));
 
     choice((
