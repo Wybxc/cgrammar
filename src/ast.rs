@@ -198,6 +198,7 @@ pub enum PrimaryExpression {
     StringLiteral(StringLiterals),
     Parenthesized(Box<Expression>),
     Generic(GenericSelection),
+    Error,
 }
 
 /// Generic selection (6.5.1.1)

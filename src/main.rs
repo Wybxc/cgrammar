@@ -11,6 +11,8 @@ fn main() {
     let ast = parser.parse(&input.0);
     if ast.has_output() {
         println!("{}", dbg_pls::pretty(&ast.output().unwrap()));
+    } else {
+        println!("Parse failed!");
     }
     if ast.has_errors() {
         for error in ast.errors() {

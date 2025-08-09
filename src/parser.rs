@@ -25,9 +25,7 @@ pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpressio
             .parenthesized()
             .map(Box::new)
             .map(PrimaryExpression::Parenthesized)
-            .recover_with(via_parser(select_ref! {
-                Token::Parenthesized(_) => PrimaryExpression::Parenthesized(Box::new(Expression::Error))
-            })),
+            .recover_with(via_parser(parenthesized().to(PrimaryExpression::Error))),
     ))
     .labelled("primiary expression")
     .as_context()
@@ -97,7 +95,9 @@ pub fn generic_association<'a>() -> impl Parser<'a, &'a [Token], GenericAssociat
 pub fn postfix_expression<'a>() -> impl Parser<'a, &'a [Token], PostfixExpression, Extra<'a>> + Clone {
     let increment = punctuator(Punctuator::Increment);
     let decrement = punctuator(Punctuator::Decrement);
-    let array = expression().bracketed();
+    let array = expression()
+        .bracketed()
+        .recover_with(via_parser(bracketed().to(Expression::Error)));
     let function = assignment_expression()
         .map(Brand::into_inner)
         .separated_by(punctuator(Punctuator::Comma))
@@ -1413,6 +1413,24 @@ fn keyword<'a>(kwd: &str) -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone
 fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
     select! {
         Token::Punctuator(p) if p == punc => ()
+    }
+}
+
+fn parenthesized<'a>() -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
+    select! {
+        Token::Parenthesized(_) => ()
+    }
+}
+
+fn bracketed<'a>() -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
+    select! {
+        Token::Bracketed(_) => ()
+    }
+}
+
+fn braced<'a>() -> impl Parser<'a, &'a [Token], (), Extra<'a>> + Clone {
+    select! {
+        Token::Braced(_) => ()
     }
 }
 
