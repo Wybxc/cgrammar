@@ -186,6 +186,7 @@ pub enum Expression {
     Conditional(ConditionalExpression),
     Assignment(AssignmentExpression),
     Comma(CommaExpression),
+    Error,
 }
 
 /// Primary expressions (6.5.1)

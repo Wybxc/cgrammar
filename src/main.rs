@@ -9,12 +9,13 @@ fn main() {
 
     let parser = translation_unit();
     let ast = parser.parse(&input.0);
+    if ast.has_output() {
+        println!("{}", dbg_pls::pretty(&ast.output().unwrap()));
+    }
     if ast.has_errors() {
         for error in ast.errors() {
             println!("{error:?}");
         }
         std::process::exit(1);
-    } else {
-        println!("{}", dbg_pls::pretty(&ast.unwrap()));
     }
 }

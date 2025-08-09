@@ -24,7 +24,10 @@ pub fn primary_expression<'a>() -> impl Parser<'a, &'a [Token], PrimaryExpressio
         expression()
             .parenthesized()
             .map(Box::new)
-            .map(PrimaryExpression::Parenthesized),
+            .map(PrimaryExpression::Parenthesized)
+            .recover_with(via_parser(select_ref! {
+                Token::Parenthesized(_) => PrimaryExpression::Parenthesized(Box::new(Expression::Error))
+            })),
     ))
     .labelled("primiary expression")
     .as_context()
