@@ -538,6 +538,7 @@ pub enum TypeQualifier {
     Atomic,
     Nonnull,
     Nullable,
+    ThreadLocal,
 }
 
 /// Function specifiers (6.7.4)

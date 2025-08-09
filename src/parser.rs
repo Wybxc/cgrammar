@@ -730,6 +730,7 @@ pub fn type_qualifier<'a>() -> impl Parser<'a, &'a [Token], TypeQualifier, Extra
         keyword("_Atomic").to(TypeQualifier::Atomic),
         keyword("_Nonnull").to(TypeQualifier::Nonnull),
         keyword("_Nullable").to(TypeQualifier::Nullable),
+        keyword("_Thread_local").to(TypeQualifier::ThreadLocal),
     ))
     .labelled("type qualifier")
     .as_context()
