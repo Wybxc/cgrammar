@@ -537,6 +537,7 @@ pub fn type_specifier<'a>() -> impl Parser<'a, &'a [Token], TypeSpecifier, Extra
             .map(TypeSpecifier::BitInt),
         struct_or_union_specifier().map(TypeSpecifier::Struct),
         enum_specifier().map(TypeSpecifier::Enum),
+        typeof_specifier().map(TypeSpecifier::Typeof),
         typedef_name().map(TypeSpecifier::TypedefName), // Must be last to avoid conflicts
     ))
     .labelled("type specifier")
