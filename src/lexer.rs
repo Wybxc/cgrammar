@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::{ast::*, span::*};
 use chumsky::{
     input::{Checkpoint, Cursor, MapExtra},
@@ -5,6 +7,7 @@ use chumsky::{
     prelude::*,
     text::Char,
 };
+use slab::Slab;
 
 type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
 
@@ -330,7 +333,7 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
                 let range = SourceRange {
                     start: extra.span().start,
                     end: extra.span().end,
-                    context: extra.state().source_context(),
+                    context: extra.state().context.clone(),
                 };
                 Spanned::new(token, range)
             })
@@ -342,7 +345,7 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
                 let eoi = SourceRange {
                     start: extra.span().end,
                     end: extra.span().end,
-                    context: extra.state().source_context(),
+                    context: extra.state().context.clone(),
                 };
                 BalancedTokenSequence { tokens, eoi }
             })
@@ -368,62 +371,87 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
             }
         })
         .ignore_then(just('#'))
-        .ignore_then(none_of("\n").repeated().collect::<String>())
-        .ignored()
+        .ignore_then(custom(|inp| {
+            let mut directive = String::new();
+            while let Some(token) = inp.next() {
+                directive.push(token);
+                if token.is_newline() {
+                    break;
+                }
+            }
+            let directive = directive.split_whitespace().collect::<Vec<_>>();
+            let state: &mut State = inp.state();
+            if let [line, file, ..] = &directive[..] {
+                state.context.line = line.parse().unwrap();
+                state.context.file = Some(file.trim_matches('"').to_string().into());
+            }
+            Ok(())
+        }))
 }
 
 // =============================================================================
 // Lexer State
 // =============================================================================
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct State {
     line_begin: bool,
-    line: usize,
-    bol: usize,
     cursor: usize,
+    context: SourceContext,
+    checkpoints: RefCell<Slab<SourceContext>>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
             line_begin: true,
-            line: 0,
-            bol: 0,
             cursor: 0,
+            context: SourceContext::default(),
+            checkpoints: RefCell::new(Slab::new()),
         }
     }
 }
 
-impl State {
-    pub fn source_context(&self) -> SourceContext {
-        SourceContext {
-            file: None, // TODO: Implement file tracking
-            line: self.line,
-            bol: self.bol,
-        }
-    }
+#[derive(Clone, Copy)]
+pub struct StateCheckpoint {
+    line_begin: bool,
+    cursor: usize,
+    context: usize,
 }
 
 impl<'src> Inspector<'src, &'src str> for State {
-    type Checkpoint = Self;
+    type Checkpoint = StateCheckpoint;
 
     fn on_token(&mut self, token: &char) {
         self.cursor += token.len_utf8();
         if token.is_newline() {
             self.line_begin = true;
-            self.line += 1;
-            self.bol = self.cursor;
+            self.context.line += 1;
+            self.context.bol = self.cursor;
         } else if self.line_begin && !token.is_whitespace() {
             self.line_begin = false;
         }
     }
 
     fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, &'src str>) -> Self::Checkpoint {
-        *self
+        let mut checkpoints = self.checkpoints.borrow_mut();
+        let context = checkpoints.insert(self.context.clone());
+        StateCheckpoint {
+            line_begin: self.line_begin,
+            cursor: self.cursor,
+            context,
+        }
     }
 
     fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, &'src str, Self::Checkpoint>) {
-        *self = *marker.inspector();
+        let checkpoint = marker.inspector();
+        self.line_begin = checkpoint.line_begin;
+        self.cursor = checkpoint.cursor;
+        self.context = self
+            .checkpoints
+            .borrow()
+            .get(checkpoint.context)
+            .expect("Invalid checkpoint")
+            .clone();
     }
 }

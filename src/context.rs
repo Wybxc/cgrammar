@@ -12,28 +12,24 @@ use crate::Identifier;
 
 #[derive(Default)]
 pub struct State {
-    current: RefCell<Context>,
+    current: Context,
     checkpoints: RefCell<Slab<Context>>,
 }
 
 impl State {
     pub fn new() -> Self {
         Self {
-            current: RefCell::new(Context::default()),
+            current: Context::default(),
             checkpoints: RefCell::new(Slab::new()),
         }
     }
 
-    pub fn ctx(&self) -> Context {
-        self.current.borrow().clone()
+    pub fn ctx(&self) -> &Context {
+        &self.current
     }
 
     pub fn ctx_mut(&mut self) -> &mut Context {
-        self.current.get_mut()
-    }
-
-    pub fn set_ctx(&self, ctx: Context) {
-        *self.current.borrow_mut() = ctx;
+        &mut self.current
     }
 }
 
@@ -47,13 +43,13 @@ where
 
     fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, I>) -> Self::Checkpoint {
         let mut checkpoints = self.checkpoints.borrow_mut();
-        checkpoints.insert(self.current.borrow().clone())
+        checkpoints.insert(self.current.clone())
     }
 
     fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, I, Self::Checkpoint>) {
         let checkpoints = self.checkpoints.borrow();
         let context = checkpoints.get(*marker.inspector()).expect("Invalid checkpoint");
-        *self.current.borrow_mut() = context.clone();
+        self.current = context.clone();
     }
 }
 

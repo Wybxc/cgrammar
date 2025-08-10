@@ -15,15 +15,10 @@ fn main() {
         eprintln!("Parse failed!");
     }
     if ast.has_errors() {
-        let mut cache = FnCache::new(|path: &str| {
-            if path.is_empty() {
-                Ok(src.as_str())
-            } else {
-                Err("File not found")
-            }
-        });
+        let mut cache = FileCache::new(src.as_str().into());
         for error in ast.into_errors() {
-            report(error).eprint(&mut cache).unwrap();
+            let report = report(error, &mut cache).unwrap();
+            report.eprint(&mut cache).unwrap();
         }
         std::process::exit(1);
     }
