@@ -43,6 +43,12 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
             .unwrap();
         writeln!(file, "{}", path.to_string_lossy()).unwrap();
 
+        if std::env::var("GITHUB_ACTIONS").is_ok() {
+            println!("::group::{}", path.to_string_lossy());
+            println!("{}", input);
+            println!("::endgroup::");
+        }
+
         for error in result.errors() {
             println!("{error:?}");
         }
