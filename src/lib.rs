@@ -10,3 +10,4 @@ pub use ast::*;
 pub use lexer::*;
 pub use parser::*;
 pub use report::*;
+pub use span::*;

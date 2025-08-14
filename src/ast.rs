@@ -1,4 +1,4 @@
-//! https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf
+//! <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf>
 
 use dbg_pls::DebugPls;
 use std::fmt;
