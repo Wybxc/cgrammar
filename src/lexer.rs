@@ -362,6 +362,25 @@ fn whitespace<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
 }
 
 fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
+    let pragma = just("#pragma").ignore_then(none_of("\n").repeated()).ignored();
+
+    let line = just('#').ignore_then(custom(|inp| {
+        let mut directive = String::new();
+        while let Some(token) = inp.next() {
+            directive.push(token);
+            if token.is_newline() {
+                break;
+            }
+        }
+        let directive = directive.split_whitespace().collect::<Vec<_>>();
+        let state: &mut State = inp.state();
+        if let [line, file, ..] = &directive[..] {
+            state.context.line = line.parse().unwrap();
+            state.context.file = Some(file.trim_matches('"').to_string().into());
+        }
+        Ok(())
+    }));
+
     empty()
         .try_map_with(|_, extra: &mut MapExtra<'_, '_, &'a str, Extra<'a>>| {
             if extra.state().line_begin {
@@ -370,23 +389,7 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
                 Err(Simple::new(None, extra.span()))
             }
         })
-        .ignore_then(just('#'))
-        .ignore_then(custom(|inp| {
-            let mut directive = String::new();
-            while let Some(token) = inp.next() {
-                directive.push(token);
-                if token.is_newline() {
-                    break;
-                }
-            }
-            let directive = directive.split_whitespace().collect::<Vec<_>>();
-            let state: &mut State = inp.state();
-            if let [line, file, ..] = &directive[..] {
-                state.context.line = line.parse().unwrap();
-                state.context.file = Some(file.trim_matches('"').to_string().into());
-            }
-            Ok(())
-        }))
+        .ignore_then(choice((pragma, line)))
 }
 
 // =============================================================================
