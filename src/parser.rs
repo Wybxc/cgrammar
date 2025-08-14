@@ -1,10 +1,11 @@
 use chumsky::prelude::*;
 use macro_rules_attribute::apply;
 
-use crate::{ast::*, context::*, report::*, span::*, utils::*};
+use crate::{ast::*, context::*, span::*, utils::*};
 
 pub type Token = BalancedToken;
 pub type TokenStream = BalancedTokenSequence;
+pub type Error<'a> = Rich<'a, BalancedToken, SourceRange>;
 type Extra<'a> = chumsky::extra::Full<Error<'a>, State, Context>;
 
 #[derive(Default, Clone, Copy)]

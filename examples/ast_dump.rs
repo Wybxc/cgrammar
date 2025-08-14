@@ -1,4 +1,4 @@
-use cgrammar::*;
+use cgrammar::{report::*, *};
 use chumsky::Parser;
 
 fn main() {

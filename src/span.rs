@@ -4,11 +4,13 @@ use chumsky::{
     input::{Input, MappedInput},
     span::SimpleSpan,
 };
+#[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
 
 use crate::{BalancedToken, BalancedTokenSequence};
 
-#[derive(Debug, DebugPls, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct SourceContext {
     pub file: Option<Rc<str>>,
     pub line: usize,
@@ -29,6 +31,7 @@ impl<T> Spanned<T> {
     }
 }
 
+#[cfg(feature = "dbg-pls")]
 impl<T> DebugPls for Spanned<T>
 where
     T: DebugPls,
