@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 
-use crate::{ast::*, span::*};
 use chumsky::{
     input::{Checkpoint, Cursor, MapExtra},
     inspector::Inspector,
@@ -8,6 +7,8 @@ use chumsky::{
     text::Char,
 };
 use slab::Slab;
+
+use crate::{ast::*, span::*};
 
 type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
 

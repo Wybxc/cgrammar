@@ -1,10 +1,11 @@
-use cgrammar::*;
-use chumsky::prelude::*;
-use rstest::rstest;
 use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+
+use cgrammar::*;
+use chumsky::prelude::*;
+use rstest::rstest;
 
 #[rstest]
 fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {

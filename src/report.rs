@@ -1,10 +1,10 @@
 use std::{collections::hash_map::Entry, fmt, path::PathBuf, rc::Rc};
 
-use crate::{ast::*, span::*};
-
 use ariadne::{Cache, Label, Report, ReportKind, Source};
 use chumsky::error::Rich;
 use rustc_hash::FxHashMap;
+
+use crate::{ast::*, span::*};
 
 pub type Error<'a> = Rich<'a, BalancedToken, SourceRange>;
 

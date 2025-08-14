@@ -1,7 +1,7 @@
-use crate::{ast::*, context::*, report::*, span::*, utils::*};
-
 use chumsky::prelude::*;
 use macro_rules_attribute::apply;
+
+use crate::{ast::*, context::*, report::*, span::*, utils::*};
 
 pub type Token = BalancedToken;
 pub type TokenStream = BalancedTokenSequence;
