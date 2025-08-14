@@ -1,3 +1,5 @@
+//! Span utilities.
+
 use std::rc::Rc;
 
 use chumsky::{

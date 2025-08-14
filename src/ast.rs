@@ -11,7 +11,7 @@ use crate::span::{SourceRange, Spanned};
 // Lexical Elements (6.4)
 // =============================================================================
 
-/// Identifier
+/// Identifier (6.4.2.1)
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Identifier(pub String);
@@ -46,6 +46,7 @@ pub struct IntegerConstant {
     pub suffix: Option<IntegerSuffix>,
 }
 
+/// Integer suffixes (6.4.4.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum IntegerSuffix {
@@ -66,6 +67,7 @@ pub struct FloatingConstant {
     pub suffix: Option<FloatingSuffix>,
 }
 
+/// Floating-point suffixes (6.4.4.2)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum FloatingSuffix {
@@ -84,6 +86,7 @@ pub struct CharacterConstant {
     pub value: String,
 }
 
+/// Encoding prefixes (6.4.4.4)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum EncodingPrefix {
@@ -102,11 +105,12 @@ pub enum PredefinedConstant {
     Nullptr,
 }
 
-/// String literals (6.4.5)
+/// Concatenation of string literals (6.4.5)
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct StringLiterals(pub Vec<StringLiteral>);
 
+/// String literal (6.4.5)
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct StringLiteral {
@@ -184,6 +188,7 @@ pub enum Punctuator {
     HashHashAlt,
 }
 
+/// Balanced token sequence (6.4.4.3)
 #[derive(Debug, Clone, PartialEq)]
 pub struct BalancedTokenSequence {
     pub tokens: Vec<Spanned<BalancedToken>>,
@@ -197,6 +202,7 @@ impl DebugPls for BalancedTokenSequence {
     }
 }
 
+/// Balanced tokens (6.4.4.3)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum BalancedToken {
@@ -249,6 +255,7 @@ pub struct GenericSelection {
     pub associations: Vec<GenericAssociation>,
 }
 
+/// Generic association (6.5.1.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum GenericAssociation {
@@ -312,6 +319,7 @@ pub enum UnaryExpression {
     Alignof(TypeName),
 }
 
+/// Unary operators (6.5.3)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum UnaryOperator {
@@ -334,7 +342,7 @@ pub enum CastExpression {
     },
 }
 
-/// Binary expressions
+/// Binary expressions (6.5.14)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct BinaryExpression {
@@ -343,6 +351,7 @@ pub struct BinaryExpression {
     pub right: Box<Expression>,
 }
 
+/// Binary operators (6.5.14)
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum BinaryOperator {
@@ -391,6 +400,7 @@ pub struct AssignmentExpression {
     pub right: Box<Expression>,
 }
 
+/// Assignment operators (6.5.16)
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum AssignmentOperator {
@@ -451,6 +461,7 @@ pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
 }
 
+/// Declaration specifiers (6.7)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DeclarationSpecifier {
@@ -519,6 +530,7 @@ pub struct StructOrUnionSpecifier {
     pub members: Option<Vec<MemberDeclaration>>,
 }
 
+/// Struct or union (6.7.2.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum StructOrUnion {
@@ -546,6 +558,7 @@ pub struct SpecifierQualifierList {
     pub attributes: Vec<AttributeSpecifier>,
 }
 
+/// Type specifier qualifiers (6.7.2.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeSpecifierQualifier {
@@ -575,6 +588,7 @@ pub struct EnumSpecifier {
     pub enumerators: Option<Vec<Enumerator>>,
 }
 
+/// Enumerator (6.7.2.2)
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Enumerator {
@@ -657,6 +671,7 @@ impl Declarator {
     }
 }
 
+/// Direct declarators (6.7.6)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DirectDeclarator {
@@ -715,6 +730,7 @@ pub struct Pointer {
     pub type_qualifiers: Vec<TypeQualifier>,
 }
 
+/// Pointer or block (clang extension)
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PointerOrBlock {
@@ -740,6 +756,7 @@ pub struct ParameterDeclaration {
     pub declarator: Option<ParameterDeclarationKind>,
 }
 
+/// Parameter declaration kinds (6.7.6)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ParameterDeclarationKind {
@@ -770,6 +787,7 @@ pub enum AbstractDeclarator {
     Error,
 }
 
+/// Direct abstract declarators (6.7.7)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DirectAbstractDeclarator {
@@ -794,12 +812,14 @@ pub enum Initializer {
     Braced(BracedInitializer),
 }
 
+/// Braced initializers (6.7.10)
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct BracedInitializer {
     pub initializers: Vec<DesignatedInitializer>,
 }
 
+/// Designated initializers (6.7.10)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct DesignatedInitializer {
@@ -807,6 +827,7 @@ pub struct DesignatedInitializer {
     pub initializer: Initializer,
 }
 
+/// Designation (6.7.10)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Designation {
@@ -814,6 +835,7 @@ pub struct Designation {
     pub designation: Option<Box<Designation>>,
 }
 
+/// Designators (6.7.10)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Designator {
@@ -838,6 +860,7 @@ pub enum AttributeSpecifier {
     Error,
 }
 
+/// Attribute (6.7.12.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Attribute {
@@ -845,6 +868,7 @@ pub struct Attribute {
     pub arguments: Option<BalancedTokenSequence>,
 }
 
+/// Attribute tokens (6.7.12.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum AttributeToken {
@@ -864,6 +888,7 @@ pub enum Statement {
     Unlabeled(UnlabeledStatement),
 }
 
+/// Unlabeled statements (6.8)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum UnlabeledStatement {
@@ -878,6 +903,7 @@ pub enum UnlabeledStatement {
     },
 }
 
+/// Primary blocks (6.8.4)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PrimaryBlock {
@@ -903,6 +929,7 @@ pub enum Label {
     },
 }
 
+/// Labeled statements (6.8.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct LabeledStatement {
@@ -917,6 +944,7 @@ pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
 }
 
+/// Block items (6.8.2)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum BlockItem {
@@ -968,6 +996,7 @@ pub enum IterationStatement {
     },
 }
 
+/// For initialization subclause (6.8.5)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ForInit {
@@ -996,6 +1025,7 @@ pub struct TranslationUnit {
     pub external_declarations: Vec<ExternalDeclaration>,
 }
 
+/// External declarations (6.9)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ExternalDeclaration {

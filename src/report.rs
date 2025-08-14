@@ -1,9 +1,11 @@
+//! Error reporting with Ariadne.
+
 use std::{collections::hash_map::Entry, fmt, path::PathBuf, rc::Rc};
 
 use ariadne::{Cache, Label, Report, ReportKind, Source};
 use rustc_hash::FxHashMap;
 
-use crate::{ast::*, parser::Error, span::*};
+use crate::{ast::*, parser::parser_utils::Error, span::*};
 
 #[derive(Clone)]
 pub struct Span {

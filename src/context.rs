@@ -10,6 +10,7 @@ use slab::Slab;
 
 use crate::Identifier;
 
+/// Parsing state.
 #[derive(Default)]
 pub struct State {
     current: Context,

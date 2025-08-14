@@ -10,7 +10,77 @@ use slab::Slab;
 
 use crate::{ast::*, span::*};
 
-type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
+/// Utilities for the lexer.
+pub mod lexer_utils {
+    use super::*;
+
+    pub type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
+
+    #[derive(Clone)]
+    pub struct State {
+        pub line_begin: bool,
+        pub cursor: usize,
+        pub context: SourceContext,
+        checkpoints: RefCell<Slab<SourceContext>>,
+    }
+
+    impl Default for State {
+        fn default() -> Self {
+            Self {
+                line_begin: true,
+                cursor: 0,
+                context: SourceContext::default(),
+                checkpoints: RefCell::new(Slab::new()),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct StateCheckpoint {
+        line_begin: bool,
+        cursor: usize,
+        context: usize,
+    }
+
+    impl<'src> Inspector<'src, &'src str> for State {
+        type Checkpoint = StateCheckpoint;
+
+        fn on_token(&mut self, token: &char) {
+            self.cursor += token.len_utf8();
+            if token.is_newline() {
+                self.line_begin = true;
+                self.context.line += 1;
+                self.context.bol = self.cursor;
+            } else if self.line_begin && !token.is_whitespace() {
+                self.line_begin = false;
+            }
+        }
+
+        fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, &'src str>) -> Self::Checkpoint {
+            let mut checkpoints = self.checkpoints.borrow_mut();
+            let context = checkpoints.insert(self.context.clone());
+            StateCheckpoint {
+                line_begin: self.line_begin,
+                cursor: self.cursor,
+                context,
+            }
+        }
+
+        fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, &'src str, Self::Checkpoint>) {
+            let checkpoint = marker.inspector();
+            self.line_begin = checkpoint.line_begin;
+            self.cursor = checkpoint.cursor;
+            self.context = self
+                .checkpoints
+                .borrow()
+                .get(checkpoint.context)
+                .expect("Invalid checkpoint")
+                .clone();
+        }
+    }
+}
+
+use lexer_utils::*;
 
 /// (6.4.2.1) identifier
 pub fn identifier<'a>() -> impl Parser<'a, &'a str, Identifier, Extra<'a>> + Clone {
@@ -391,71 +461,4 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
             }
         })
         .ignore_then(choice((pragma, line)))
-}
-
-// =============================================================================
-// Lexer State
-// =============================================================================
-
-#[derive(Clone)]
-pub struct State {
-    line_begin: bool,
-    cursor: usize,
-    context: SourceContext,
-    checkpoints: RefCell<Slab<SourceContext>>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            line_begin: true,
-            cursor: 0,
-            context: SourceContext::default(),
-            checkpoints: RefCell::new(Slab::new()),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct StateCheckpoint {
-    line_begin: bool,
-    cursor: usize,
-    context: usize,
-}
-
-impl<'src> Inspector<'src, &'src str> for State {
-    type Checkpoint = StateCheckpoint;
-
-    fn on_token(&mut self, token: &char) {
-        self.cursor += token.len_utf8();
-        if token.is_newline() {
-            self.line_begin = true;
-            self.context.line += 1;
-            self.context.bol = self.cursor;
-        } else if self.line_begin && !token.is_whitespace() {
-            self.line_begin = false;
-        }
-    }
-
-    fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, &'src str>) -> Self::Checkpoint {
-        let mut checkpoints = self.checkpoints.borrow_mut();
-        let context = checkpoints.insert(self.context.clone());
-        StateCheckpoint {
-            line_begin: self.line_begin,
-            cursor: self.cursor,
-            context,
-        }
-    }
-
-    fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, &'src str, Self::Checkpoint>) {
-        let checkpoint = marker.inspector();
-        self.line_begin = checkpoint.line_begin;
-        self.cursor = checkpoint.cursor;
-        self.context = self
-            .checkpoints
-            .borrow()
-            .get(checkpoint.context)
-            .expect("Invalid checkpoint")
-            .clone();
-    }
 }

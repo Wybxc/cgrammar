@@ -1,18 +1,27 @@
 use chumsky::prelude::*;
 use macro_rules_attribute::apply;
 
-use crate::{ast::*, context::*, span::*, utils::*};
+use crate::{ast::*, context::State, span::*, utils::*};
 
-pub type Token = BalancedToken;
-pub type TokenStream = BalancedTokenSequence;
-pub type Error<'a> = Rich<'a, BalancedToken, SourceRange>;
-type Extra<'a> = chumsky::extra::Full<Error<'a>, State, Context>;
+/// Utilities for the parser.
+pub mod parser_utils {
+    use super::*;
 
-#[derive(Default, Clone, Copy)]
-#[non_exhaustive]
-pub struct Context {
-    pub no_recover: bool,
+    pub type Token = BalancedToken;
+    pub type TokenStream = BalancedTokenSequence;
+    pub type Error<'a> = Rich<'a, BalancedToken, SourceRange>;
+    pub type Extra<'a> = chumsky::extra::Full<Error<'a>, State, Context>;
+
+    /// Parsing context.
+    #[derive(Default, Clone, Copy)]
+    #[non_exhaustive]
+    pub struct Context {
+        /// Whether to disable error recovery.
+        pub no_recover: bool,
+    }
 }
+
+use parser_utils::*;
 
 // =============================================================================
 // Expressions
@@ -36,6 +45,7 @@ pub fn primary_expression<'a>() -> impl Parser<'a, Tokens<'a>, PrimaryExpression
     .as_context()
 }
 
+/// (6.5.1) enumeration constant
 pub fn enumeration_constant<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clone {
     identifier()
         .try_map_with(|name, extra| {
@@ -491,6 +501,7 @@ pub fn init_declarator<'a>() -> impl Parser<'a, Tokens<'a>, InitDeclarator, Extr
         .as_context()
 }
 
+/// (6.7) typedef declarator list (variant of init declarator list)
 pub fn typedef_declarator_list<'a>() -> impl Parser<'a, Tokens<'a>, Vec<Declarator>, Extra<'a>> + Clone {
     typedef_declarator()
         .separated_by(punctuator(Punctuator::Comma))
@@ -500,6 +511,7 @@ pub fn typedef_declarator_list<'a>() -> impl Parser<'a, Tokens<'a>, Vec<Declarat
         .as_context()
 }
 
+/// (6.7) typedef declarator (variant of init declarator)
 pub fn typedef_declarator<'a>() -> impl Parser<'a, Tokens<'a>, Declarator, Extra<'a>> + Clone {
     declarator()
         .map_with(move |declarator, extra| {
@@ -1334,6 +1346,7 @@ pub fn attribute_specifier<'a>() -> impl Parser<'a, Tokens<'a>, AttributeSpecifi
     .as_context()
 }
 
+/// (extension) old fashioned (`__attribute__`) attribute specifier
 #[apply(cached)]
 pub fn old_fashioned_attribute_specifier<'a>() -> impl Parser<'a, Tokens<'a>, AttributeSpecifier, Extra<'a>> + Clone {
     keyword("__attribute__")
@@ -1348,6 +1361,7 @@ pub fn old_fashioned_attribute_specifier<'a>() -> impl Parser<'a, Tokens<'a>, At
         .as_context()
 }
 
+/// (extension) asm attribute specifier
 pub fn asm_attribute_specifier<'a>() -> impl Parser<'a, Tokens<'a>, AttributeSpecifier, Extra<'a>> + Clone {
     keyword("__asm")
         .ignore_then(
