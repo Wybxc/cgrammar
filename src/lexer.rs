@@ -300,7 +300,7 @@ pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiterals, Extra<'a
     prefix
         .then(content.delimited_by(just('"'), just('"')))
         .map(|(encoding_prefix, value)| StringLiteral { encoding_prefix, value })
-        .separated_by(text::whitespace())
+        .separated_by(whitespace())
         .at_least(1)
         .collect::<Vec<StringLiteral>>()
         .map(StringLiterals)

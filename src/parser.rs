@@ -747,6 +747,7 @@ pub fn typeof_specifier<'a>() -> impl Parser<'a, Tokens<'a>, TypeofSpecifier, Ex
 
     choice((
         keyword("typeof")
+            .or(keyword("__typeof__"))
             .ignore_then(typeof_arg.clone())
             .map(TypeofSpecifier::Typeof),
         keyword("typeof_unqual")
@@ -763,6 +764,7 @@ pub fn type_qualifier<'a>() -> impl Parser<'a, Tokens<'a>, TypeQualifier, Extra<
     choice((
         keyword("const").to(TypeQualifier::Const),
         keyword("restrict").to(TypeQualifier::Restrict),
+        keyword("__restrict").to(TypeQualifier::Restrict),
         keyword("volatile").to(TypeQualifier::Volatile),
         keyword("_Atomic").to(TypeQualifier::Atomic),
         keyword("_Nonnull").to(TypeQualifier::Nonnull),
@@ -1363,7 +1365,7 @@ pub fn old_fashioned_attribute_specifier<'a>() -> impl Parser<'a, Tokens<'a>, At
 
 /// (extension) asm attribute specifier
 pub fn asm_attribute_specifier<'a>() -> impl Parser<'a, Tokens<'a>, AttributeSpecifier, Extra<'a>> + Clone {
-    keyword("__asm")
+    choice((keyword("__asm"), keyword("__asm__")))
         .ignore_then(
             string_literal()
                 .map(AttributeSpecifier::Asm)

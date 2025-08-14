@@ -1,4 +1,4 @@
-use cgrammar::{report::*, *};
+use cgrammar::*;
 use chumsky::Parser;
 
 fn main() {
@@ -15,10 +15,8 @@ fn main() {
         eprintln!("Parse failed!");
     }
     if ast.has_errors() {
-        let mut cache = FileCache::new(src.as_str().into());
         for error in ast.into_errors() {
-            let report = report(error, &mut cache).unwrap();
-            report.eprint(&mut cache).unwrap();
+            eprintln!("Error: {:?}", error);
         }
         std::process::exit(1);
     }

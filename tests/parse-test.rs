@@ -21,7 +21,7 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
 
     let input = std::fs::read_to_string(&path).unwrap();
     let mut prepocessor = std::process::Command::new("cc")
-        .args(["-E", "-x", "c", "--std=c2x", "-"])
+        .args(["-E", "-x", "c", "--std=c2x", "-D__extension__=", "-"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .spawn()
