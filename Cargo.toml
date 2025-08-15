@@ -9,7 +9,6 @@ readme = "README.md"
 
 
 [dependencies]
-ariadne = { version = "0.5.1", optional = true }
 chumsky = { version = "0.10.0", features = ["extension", "pratt", "regex"] }
 dbg-pls = { version = "0.4.3", features = [
     "derive",
@@ -23,7 +22,6 @@ slab = "0.4.11"
 
 [features]
 dbg-pls = ["dep:dbg-pls"]
-ariadne = ["dep:ariadne"]
 
 [dev-dependencies]
 pathdiff = "0.2.3"

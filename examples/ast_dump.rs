@@ -16,7 +16,7 @@ fn main() {
     }
     if ast.has_errors() {
         for error in ast.into_errors() {
-            eprintln!("Error: {:?}", error);
+            report(error);
         }
         std::process::exit(1);
     }
