@@ -2,6 +2,11 @@
 name = "cgrammar"
 version = "0.1.0"
 edition = "2024"
+description = "A comprehensive C language grammar parser library written in Rust, implementing the C23 standard (ISO/IEC 9899:2023)."
+repository = "https://github.com/Wybxc/cgrammar"
+license-file = "LICENSE"
+readme = "README.md"
+
 
 [dependencies]
 ariadne = { version = "0.5.1", optional = true }
