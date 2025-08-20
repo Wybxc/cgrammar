@@ -1,7 +1,4 @@
-tests/test-cases/en-cpp-reference-c/cCode361.c
-tests/test-cases/en-cpp-reference-c/cCode362.c
-tests/test-cases/en-cpp-reference-c/cCode415.c
-tests/test-cases/en-cpp-reference-c/cCode414.c
+tests/test-cases/unit-tests/compound_literals.c
 tests/test-cases/en-cpp-reference-c/cCode425.c
 tests/test-cases/en-cpp-reference-c/cCode428.c
 tests/test-cases/en-cpp-reference-c/cCode429.c
@@ -13,8 +10,8 @@ tests/test-cases/unit-tests/flow_try_catch_leak.c
 tests/test-cases/unit-tests/flow_try_catch_while.c
 tests/test-cases/unit-tests/parser_if_init.c
 tests/test-cases/unit-tests/parser_if_init2.c
-tests/test-cases/unit-tests/parser_if_with_initializer_flow.c
 tests/test-cases/unit-tests/parser_if_init3.c
+tests/test-cases/unit-tests/parser_if_with_initializer_flow.c
 tests/test-cases/unit-tests/traits2.c
 tests/test-cases/unit-tests/type_is_owner.c
 tests/test-cases/unit-tests/type_struct_comparison.c
