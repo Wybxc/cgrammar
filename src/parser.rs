@@ -616,7 +616,10 @@ pub fn member_declaration<'a>() -> impl Parser<'a, Tokens<'a>, MemberDeclaration
             attributes,
             specifiers,
             declarators,
-        });
+        })
+        .recover_with(skip_until(any().ignored(), punctuator(Punctuator::Semicolon), || {
+            MemberDeclaration::Error
+        }));
 
     choice((static_assert, normal))
         .labelled("member declaration")
@@ -1213,8 +1216,15 @@ pub fn block_item<'a>() -> impl Parser<'a, Tokens<'a>, BlockItem, Extra<'a>> + C
 /// (6.8.3) expression statement
 pub fn expression_statement<'a>() -> impl Parser<'a, Tokens<'a>, ExpressionStatement, Extra<'a>> + Clone {
     attribute_specifier_sequence()
-        .then(expression().map(Box::new).or_not())
-        .then_ignore(punctuator(Punctuator::Semicolon))
+        .then(
+            expression()
+                .map(Box::new)
+                .or_not()
+                .then_ignore(punctuator(Punctuator::Semicolon))
+                .recover_with(skip_until(any().ignored(), punctuator(Punctuator::Semicolon), || {
+                    Some(Box::new(Expression::Error))
+                })),
+        )
         .map(|(attributes, expression)| ExpressionStatement { attributes, expression })
         .labelled("expression statement")
         .as_context()

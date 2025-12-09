@@ -452,6 +452,7 @@ pub enum Declaration {
     },
     StaticAssert(StaticAssertDeclaration),
     Attribute(Vec<AttributeSpecifier>),
+    Error,
 }
 
 /// Declaration specifiers (6.7)
@@ -548,6 +549,7 @@ pub enum MemberDeclaration {
         declarators: Vec<MemberDeclarator>,
     },
     StaticAssert(StaticAssertDeclaration),
+    Error,
 }
 
 /// Specifier qualifier lists (6.7.2.1)
@@ -994,6 +996,7 @@ pub enum IterationStatement {
         update: Option<Box<Expression>>,
         body: Box<Statement>,
     },
+    Error,
 }
 
 /// For initialization subclause (6.8.5)
