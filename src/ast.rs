@@ -211,6 +211,8 @@ pub enum BalancedToken {
     Braced(BalancedTokenSequence),
     Identifier(Identifier),
     StringLiteral(StringLiterals),
+    /// extension syntax: `xxx` for quoted strings
+    QuotedString(String),
     Constant(Constant),
     Punctuator(Punctuator),
     Unknown, // For any other tokens not explicitly defined
@@ -242,6 +244,7 @@ pub enum PrimaryExpression {
     Constant(Constant),
     EnumerationConstant(Identifier),
     StringLiteral(StringLiterals),
+    QuotedString(String),
     Parenthesized(Box<Expression>),
     Generic(GenericSelection),
     Error,

@@ -35,6 +35,7 @@ pub fn primary_expression<'a>() -> impl Parser<'a, Tokens<'a>, PrimaryExpression
         enumeration_constant().map(PrimaryExpression::EnumerationConstant),
         identifier().map(PrimaryExpression::Identifier),
         string_literal().map(PrimaryExpression::StringLiteral),
+        quoted_string().map(PrimaryExpression::QuotedString),
         expression()
             .parenthesized()
             .map(Box::new)
@@ -1499,6 +1500,12 @@ fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clone {
 fn string_literal<'a>() -> impl Parser<'a, Tokens<'a>, StringLiterals, Extra<'a>> + Clone {
     select! {
         Token::StringLiteral(value) => value
+    }
+}
+
+fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + Clone {
+    select! {
+        Token::QuotedString(value) => value
     }
 }
 

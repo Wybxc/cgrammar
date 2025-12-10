@@ -13,9 +13,10 @@ impl fmt::Display for DiagnosticToken {
             BalancedToken::Braced(_) => write!(f, "{{...}}"),
             BalancedToken::Identifier(_) => write!(f, "identifier"),
             BalancedToken::StringLiteral(_) => write!(f, "string literal"),
+            BalancedToken::QuotedString(_) => write!(f, "quoted string"),
             BalancedToken::Constant(_) => write!(f, "constant"),
             BalancedToken::Punctuator(_) => write!(f, "punctuator"),
-            BalancedToken::Unknown => todo!(),
+            BalancedToken::Unknown => write!(f, "unknown token"),
         }
     }
 }

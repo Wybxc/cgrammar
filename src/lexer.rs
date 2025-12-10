@@ -306,6 +306,13 @@ pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiterals, Extra<'a
         .map(StringLiterals)
 }
 
+/// extension syntax: `xxx` for quoted strings
+pub fn quoted_string<'a>() -> impl Parser<'a, &'a str, String, Extra<'a>> + Clone {
+    let content = none_of("`").repeated().collect::<String>();
+
+    content.delimited_by(just('`'), just('`'))
+}
+
 /// (6.4.6) punctuator (excluding parentheses and brackets)
 pub fn punctuator<'a>() -> impl Parser<'a, &'a str, Punctuator, Extra<'a>> + Clone {
     // Put longer operators first to avoid partial matches
@@ -380,6 +387,7 @@ pub fn balanced_token<'a>(
     // Other tokens (non-brackets)
     let identifier = identifier();
     let string_literal = string_literal();
+    let quoted_string = quoted_string();
     let constant = constant();
     let punctuator = punctuator();
     let unknown_token = unknown();
@@ -389,6 +397,7 @@ pub fn balanced_token<'a>(
         bracketed.map(BalancedToken::Bracketed),
         braced.map(BalancedToken::Braced),
         string_literal.map(BalancedToken::StringLiteral),
+        quoted_string.map(BalancedToken::QuotedString),
         constant.map(BalancedToken::Constant),
         identifier.map(BalancedToken::Identifier),
         punctuator.map(BalancedToken::Punctuator),
