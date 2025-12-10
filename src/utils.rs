@@ -11,6 +11,7 @@ use chumsky::{
     prelude::*,
 };
 use rustc_hash::FxHashMap;
+use crate::ContextTweaker;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Brand<T, B>(T, PhantomData<B>);
@@ -143,5 +144,4 @@ macro_rules! cached {
     };
 }
 
-use crate::ContextTweaker;
 pub use crate::cached;
