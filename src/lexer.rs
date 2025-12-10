@@ -376,13 +376,22 @@ pub fn balanced_token<'a>(
     balanced_token_sequence: impl Parser<'a, &'a str, BalancedTokenSequence, Extra<'a>> + Clone,
 ) -> impl Parser<'a, &'a str, BalancedToken, Extra<'a>> + Clone {
     // Parenthesized: ( balanced-token-sequence? )
-    let parenthesized = balanced_token_sequence.clone().delimited_by(just('('), just(')'));
+    let parenthesized = balanced_token_sequence
+        .clone()
+        .delimited_by(just('('), just(')'))
+        .recover_with(via_parser(just('(').ignore_then(balanced_token_sequence.clone())));
 
     // Bracketed: [ balanced-token-sequence? ]
-    let bracketed = balanced_token_sequence.clone().delimited_by(just('['), just(']'));
+    let bracketed = balanced_token_sequence
+        .clone()
+        .delimited_by(just('['), just(']'))
+        .recover_with(via_parser(just('[').ignore_then(balanced_token_sequence.clone())));
 
     // Braced: { balanced-token-sequence? }
-    let braced = balanced_token_sequence.clone().delimited_by(just('{'), just('}'));
+    let braced = balanced_token_sequence
+        .clone()
+        .delimited_by(just('{'), just('}'))
+        .recover_with(via_parser(just('{').ignore_then(balanced_token_sequence.clone())));
 
     // Other tokens (non-brackets)
     let identifier = identifier();

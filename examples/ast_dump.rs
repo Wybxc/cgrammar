@@ -5,7 +5,13 @@ fn main() {
     let src = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
     let lexer = balanced_token_sequence();
-    let tokens = lexer.parse(src.as_str()).unwrap();
+    let tokens = lexer.parse(src.as_str());
+    if tokens.has_errors() {
+        for error in tokens.errors() {
+            println!("{}", error);
+        }
+    }
+    let tokens = tokens.output().unwrap();
 
     let parser = translation_unit();
     let ast = parser.parse(tokens.as_input());
