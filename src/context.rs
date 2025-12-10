@@ -11,10 +11,15 @@ use slab::Slab;
 use crate::Identifier;
 
 /// Parsing state.
-#[derive(Default)]
 pub struct State {
     current: Context,
     checkpoints: RefCell<Slab<Context>>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl State {
