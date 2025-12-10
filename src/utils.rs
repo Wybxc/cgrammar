@@ -31,8 +31,8 @@ impl<T, B> Brand<T, B> {
 }
 
 pub trait Cacher {
-    type Parser<'src, T: ContextTweaker> where T: 'static;
-    fn make_parser<'src, T: ContextTweaker + 'static>() -> Self::Parser<'src, T>;
+    type Parser<'src>;
+    fn make_parser<'src>() -> Self::Parser<'src>;
 }
 
 pub struct Cached<P>(OnceCell<P>);
@@ -51,17 +51,16 @@ impl<T> Clone for Shared<T> {
     }
 }
 
-pub fn cached_recursive<'src, C, T>(cacher: C) -> Ext<Shared<Cached<C::Parser<'src, T>>>>
+pub fn cached_recursive<'src, C>(cacher: C) -> Ext<Shared<Cached<C::Parser<'src>>>>
 where
     C: Cacher + 'static,
-    T: ContextTweaker + 'static,
 {
     thread_local! {
         static CACHE: RefCell<FxHashMap<TypeId, Rc<dyn Any>>> = RefCell::new(FxHashMap::default());
     }
 
     macro_rules! P {
-        ($l:lifetime) => { Cached<C::Parser<$l, T>> };
+        ($l:lifetime) => { Cached<C::Parser<$l>> };
     }
 
     let key = cacher.type_id();
@@ -127,15 +126,15 @@ where
 macro_rules! cached {
     (
         $( #[$attrs:meta] )*
-        $pub:vis fn $name:ident <$a:lifetime , $tn:ident : $tt:tt + $tl:lifetime> () -> impl Parser<$b:lifetime, $input:ty, $output:ty, $extra:ty> + Clone
+        $pub:vis fn $name:ident <$a:lifetime> () -> impl Parser<$b:lifetime, $input:ty, $output:ty, $extra:ty> + Clone
             $body:expr
     ) => {
         $( #[$attrs] )*
-        $pub fn $name<$a, $tn : $tt + $tl>() -> impl Parser<$b, $input, $output, $extra> + Clone {
+        $pub fn $name<$a>() -> impl Parser<$b, $input, $output, $extra> + Clone {
             struct C;
             impl $crate::utils::Cacher for C {
-                type Parser<$b, T: $crate::ContextTweaker + 'static> = ::chumsky::Boxed<$b, $b, $input, $output, $extra>;
-                fn make_parser<'src, T: $crate::ContextTweaker + 'static>() -> Self::Parser<'src, T> {
+                type Parser<$b> = ::chumsky::Boxed<$b, $b, $input, $output, $extra>;
+                fn make_parser<'src>() -> Self::Parser<'src> {
                     ::chumsky::Parser::boxed($body)
                 }
             }

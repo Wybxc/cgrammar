@@ -11,28 +11,22 @@ use slab::Slab;
 use crate::Identifier;
 
 /// Parsing state.
-pub struct State<T: ContextTweaker = ()> {
+pub struct State {
     current: Context,
     checkpoints: RefCell<Slab<Context>>,
-    #[allow(dead_code)]
-    tweaker: T,
 }
 
-impl<T: ContextTweaker> Default for State<T> {
+impl Default for State {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: ContextTweaker> State<T> {
+impl State {
     pub fn new() -> Self {
-        let mut current = Context::default();
-        let mut tweaker = T::new();
-        tweaker.init(&mut current);
         Self {
-            current,
+            current: Context::default(),
             checkpoints: RefCell::new(Slab::new()),
-            tweaker,
         }
     }
 
@@ -45,10 +39,9 @@ impl<T: ContextTweaker> State<T> {
     }
 }
 
-impl<'src, I, T> Inspector<'src, I> for State<T>
+impl<'src, I> Inspector<'src, I> for State
 where
     I: Input<'src>,
-    T: ContextTweaker,
 {
     type Checkpoint = usize;
 
@@ -63,22 +56,6 @@ where
         let checkpoints = self.checkpoints.borrow();
         let context = checkpoints.get(*marker.inspector()).expect("Invalid checkpoint");
         self.current = context.clone();
-    }
-}
-
-pub trait ContextTweaker {
-    fn new() -> Self
-    where
-        Self: Sized;
-
-    fn init(&mut self, context: &mut Context);
-}
-
-impl ContextTweaker for () {
-    fn new() -> Self {}
-
-    fn init(&mut self, _context: &mut Context) {
-        // No-op
     }
 }
 

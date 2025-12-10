@@ -1,4 +1,5 @@
 use cgrammar::*;
+use chumsky::prelude::*;
 use rstest::rstest;
 
 #[rstest]
@@ -15,8 +16,14 @@ use rstest::rstest;
 #[case("int a[f f];")]
 #[case("int a[1] = {[?]=1};")]
 fn test_error_recovery(#[case] input: String) {
-    let tokens = CLexer::lex(&input).unwrap();
-    let result = CParser::parse(&tokens);
+    let tokens = {
+        let lexer = balanced_token_sequence();
+        lexer.parse(&input).unwrap()
+    };
+    let result = {
+        let parser = translation_unit();
+        parser.parse(tokens.as_input())
+    };
     assert!(result.has_output());
     assert!(result.has_errors());
 }
