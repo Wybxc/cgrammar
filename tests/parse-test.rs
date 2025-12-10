@@ -4,7 +4,6 @@ use std::{
 };
 
 use cgrammar::*;
-use chumsky::prelude::*;
 use rstest::rstest;
 
 #[rstest]
@@ -30,11 +29,8 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
     let output = prepocessor.wait_with_output().unwrap();
     let input = String::from_utf8(output.stdout).unwrap();
 
-    let lexer = balanced_token_sequence();
-    let tokens = lexer.parse(&input).unwrap();
-
-    let parser = translation_unit();
-    let result = parser.parse(tokens.as_input());
+    let tokens = CLexer::lex(&input).unwrap();
+    let result = CParser::parse(&tokens);
     if result.has_errors() {
         let mut file = std::fs::OpenOptions::new()
             .append(true)

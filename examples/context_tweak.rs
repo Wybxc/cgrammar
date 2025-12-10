@@ -1,8 +1,22 @@
-//! Dump the AST of a C source file.
+//! Dump the AST of a C source file (with context tweaking).
 //!
-//! Usage: `cargo run --example ast_dump --all-features -- path/to/source.c`
+//! Usage: `cargo run --example context_tweak --all-features -- path/to/source.c`
 
 use cgrammar::*;
+
+struct CustomTweaker;
+
+impl ContextTweaker for CustomTweaker {
+    fn new() -> Self {
+        Self
+    }
+
+    fn init(&mut self, context: &mut Context) {
+        context.add_typedef_name("term".into());
+        context.add_typedef_name("thm".into());
+        context.add_enum_constant("GN".into());
+    }
+}
 
 fn main() {
     let src = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
@@ -15,7 +29,7 @@ fn main() {
     }
     let tokens = tokens.output().unwrap();
 
-    let ast = CParser::parse(tokens);
+    let ast = CParserWithTweaker::<CustomTweaker>::parse(tokens);
     if ast.has_output() {
         println!("{}", dbg_pls::pretty(&ast.output().unwrap()));
     } else {
