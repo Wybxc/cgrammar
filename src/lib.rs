@@ -7,7 +7,7 @@ pub mod span;
 mod utils;
 
 pub use ast::*;
+pub use context::State;
 pub use lexer::*;
 pub use parser::*;
 pub use report::*;
-pub use context::State;
