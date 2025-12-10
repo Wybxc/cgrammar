@@ -26,14 +26,13 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-cgrammar = "0.1.0"
+cgrammar = "0.2.0"
 ```
 
 ### Basic Usage
 
 ```rust
 use cgrammar::*;
-use chumsky::Parser;
 
 fn main() {
     let source_code = r#"
@@ -44,12 +43,10 @@ fn main() {
     "#;
 
     // Tokenize the source code
-    let lexer = balanced_token_sequence();
-    let tokens = lexer.parse(source_code).unwrap();
+    let tokens = CLexer::lex(source_code).unwrap();
 
     // Parse into AST
-    let parser = translation_unit();
-    let result = parser.parse(tokens.as_input());
+    let result = CParser::parse(tokens);
 
     if let Some(ast) = result.output() {
         println!("Successfully parsed!");
@@ -63,4 +60,4 @@ fn main() {
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache-2.0 License - see the LICENSE file for details.
