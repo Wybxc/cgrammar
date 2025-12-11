@@ -1,4 +1,6 @@
 // String Literal Edge Cases
+#include <wchar.h>
+#include <uchar.h>
 // Basic string literals
 const char *str1 = "hello";
 const char *str2 = "world";

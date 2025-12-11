@@ -1,4 +1,6 @@
 // Character Literal Edge Cases
+#include <wchar.h>
+#include <uchar.h>
 // Basic character literals
 char c1 = 'a';
 char c2 = 'Z';

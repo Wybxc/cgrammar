@@ -1,5 +1,6 @@
 // Wide character and string literals
 #include <wchar.h>
+#include <uchar.h>
 
 wchar_t wc = L'A';
 wchar_t wc2 = L'中';

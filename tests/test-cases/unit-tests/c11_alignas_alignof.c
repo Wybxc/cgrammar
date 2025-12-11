@@ -17,7 +17,7 @@ void test_alignof() {
     int a = _Alignof(int);
     int b = _Alignof(double);
     int c = _Alignof(struct AlignedStruct);
-    int d = alignof(long);
+    int d = _Alignof(long);
 }
 
 // Alignment with arrays
