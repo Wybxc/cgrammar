@@ -18,3 +18,13 @@ tests/test-cases/unit-tests/parser_if_init3.c
 tests/test-cases/unit-tests/traits2.c
 tests/test-cases/unit-tests/type_is_owner.c
 tests/test-cases/unit-tests/type_struct_comparison.c
+tests/test-cases/unit-tests/c11_alignas_alignof.c
+tests/test-cases/unit-tests/c11_complex_numbers.c
+tests/test-cases/unit-tests/c23_constexpr.c
+tests/test-cases/unit-tests/edge_asm_statements.c
+tests/test-cases/unit-tests/edge_imaginary_numbers.c
+tests/test-cases/unit-tests/edge_sizeof_alignof.c
+tests/test-cases/unit-tests/edge_unicode_identifiers.c
+tests/test-cases/unit-tests/edge_character_literals.c
+tests/test-cases/unit-tests/edge_wide_chars.c
+tests/test-cases/unit-tests/edge_string_literals.c
