@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/Wybxc/cgrammar/compare/v0.2.0...v0.2.1) - 2025-12-11
+
+### Added
+
+- context tweaker
+
+### Fixed
+
+- error in release-pr action
+
+### Other
+
+- update ci
+- format
+- add linguist attributes
+- cleanup after revert
+- Revert "feat: context tweaker"
+- format
+- update readme
+- bump version of chumsky
+
 ## [0.2.0](https://github.com/Wybxc/cgrammar/compare/v0.1.0...v0.2.0) - 2025-12-10
 
 ### Added
