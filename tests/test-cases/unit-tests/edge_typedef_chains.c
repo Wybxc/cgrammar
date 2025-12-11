@@ -47,5 +47,5 @@ typedef const volatile int cv_int_t;
 typedef int (*compare_func_t)(const void *, const void *);
 typedef compare_func_t (*compare_factory_t)(void);
 
-// Typedef with qualifiers and storage
-typedef static const int static_const_int_t;
+// Typedef with qualifiers (storage class not valid with typedef)
+typedef const int const_typedef_int_t;

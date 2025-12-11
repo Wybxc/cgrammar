@@ -36,7 +36,13 @@ void test_switch_complex(int x) {
         case 2:
         case 3:
             break;
-        case 4 ... 10:  // Range case (GCC extension)
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
             break;
         default:
             break;

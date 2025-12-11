@@ -33,6 +33,7 @@ void test_designated_mixed() {
     };
 }
 
-void test_designated_range() {
-    int arr[100] = {[0 ... 9] = 1, [10 ... 19] = 2};
+void test_designated_sparse() {
+    // Standard C99 designated initializers (not range extension)
+    int arr[100] = {[0] = 1, [9] = 1, [10] = 2, [19] = 2, [50] = 5};
 }
