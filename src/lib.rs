@@ -5,6 +5,7 @@ mod parser;
 mod report;
 pub mod span;
 mod utils;
+pub mod visitor;
 
 pub use ast::*;
 pub use context::State;
