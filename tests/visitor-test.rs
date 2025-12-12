@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 
-use cgrammar::*;
 use cgrammar::visitor::*;
+use cgrammar::*;
 use chumsky::prelude::*;
 use rstest::rstest;
 
@@ -128,9 +128,19 @@ fn test_member_access() {
     visitor.visit_translation_unit(&ast);
 
     // Member access should be collected
-    assert!(visitor.members.len() >= 2, "Expected at least 2 member accesses, got {}", visitor.members.len());
-    assert!(visitor.members.contains(&"x".to_string()), "Expected to find member 'x'");
-    assert!(visitor.members.contains(&"y".to_string()), "Expected to find member 'y'");
+    assert!(
+        visitor.members.len() >= 2,
+        "Expected at least 2 member accesses, got {}",
+        visitor.members.len()
+    );
+    assert!(
+        visitor.members.contains(&"x".to_string()),
+        "Expected to find member 'x'"
+    );
+    assert!(
+        visitor.members.contains(&"y".to_string()),
+        "Expected to find member 'y'"
+    );
 }
 
 #[test]
@@ -173,10 +183,7 @@ struct IdentifierFinder {
 
 impl IdentifierFinder {
     fn new(target: &str) -> Self {
-        Self {
-            target: target.to_string(),
-            found: false,
-        }
+        Self { target: target.to_string(), found: false }
     }
 }
 
