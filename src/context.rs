@@ -11,6 +11,7 @@ use slab::Slab;
 use crate::Identifier;
 
 /// Parsing state.
+#[derive(Clone)]
 pub struct State {
     current: Context,
     checkpoints: RefCell<Slab<Context>>,
