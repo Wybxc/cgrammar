@@ -881,6 +881,42 @@ pub enum AttributeToken {
     Prefixed { prefix: Identifier, identifier: Identifier },
 }
 
+impl AttributeToken {
+    /// Check if the attribute token is a prefixed attribute with the given prefix.
+    pub fn is_prefixed(&self, prefix: &str) -> bool {
+        matches!(self, AttributeToken::Prefixed { prefix: p, .. } if p.0 == prefix)
+    }
+
+    /// Check if the attribute token is a standard attribute with the given name.
+    pub fn is_standard(&self, name: &str) -> bool {
+        matches!(self, AttributeToken::Standard(id) if id.0 == name)
+    }
+
+    /// Get the prefix and identifier of a prefixed attribute token, or None if not prefixed.
+    pub fn as_prefixed(&self) -> Option<(&Identifier, &Identifier)> {
+        match self {
+            AttributeToken::Prefixed { prefix, identifier } => Some((prefix, identifier)),
+            _ => None,
+        }
+    }
+
+    /// Get the identifier of a standard attribute token, or None if not standard.
+    pub fn as_standard(&self) -> Option<&Identifier> {
+        match self {
+            AttributeToken::Standard(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// If the attribute token is a prefixed attribute with the given prefix, return its identifier.
+    pub fn get_identifier(&self, prefix: &str) -> Option<&Identifier> {
+        match self {
+            AttributeToken::Prefixed { prefix: p, identifier } if p.0 == prefix => Some(identifier),
+            _ => None,
+        }
+    }
+}
+
 // =============================================================================
 // Statements (6.8)
 // =============================================================================

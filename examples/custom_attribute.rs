@@ -43,10 +43,7 @@ fn main() {
             _ => None,
         })
         .flatten()
-        .filter(|attr| match &attr.token {
-            AttributeToken::Prefixed { prefix, identifier } => prefix.0 == "cst" && identifier.0 == "gl",
-            _ => false,
-        })
+        .filter(|attr| attr.token.get_identifier("cst").is_some_and(|n| n.0 == "gl"))
         .filter_map(|attr| attr.arguments.as_ref())
         .for_each(|gl| {
             let parser = statement();
