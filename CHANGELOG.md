@@ -9,17 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3](https://github.com/Wybxc/cgrammar/compare/v0.2.2...v0.2.3) - 2025-12-17
+
+### Added
+
+- C-style comment parsing in lexer (single-line `//` and multi-line `/* */`)
+- Expose `LexerState` for specifying initial filename in lexing
+- Utility methods on `AttributeToken` for checking and extracting attribute types (`is_prefixed()`, `is_standard()`, `as_prefixed()`, `as_standard()`)
+
 ## [0.2.2](https://github.com/Wybxc/cgrammar/compare/v0.2.1...v0.2.2) - 2025-12-12
 
 ### Added
 
-- visitor
-- example of custom attribute
+- Visitor pattern implementation for AST traversal with semantic-aware identifier visiting (variables, types, labels, etc.)
 
-### Other
+## Changed
 
-- fmt
-- add comprehensive test coverage for C99-C23 syntax features ([#5](https://github.com/Wybxc/cgrammar/pull/5))
+- Example demonstrating custom attribute parsing
+- Comprehensive test coverage for C99-C23 syntax features ([#5](https://github.com/Wybxc/cgrammar/pull/5))
 
 ## [0.2.1](https://github.com/Wybxc/cgrammar/compare/v0.2.0...v0.2.1) - 2025-12-11
 
