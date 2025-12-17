@@ -462,7 +462,10 @@ pub fn unknown<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
 }
 
 fn whitespace<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
-    line_directive().or(text::whitespace().at_least(1)).repeated()
+    line_directive()
+        .or(comment())
+        .or(text::whitespace().at_least(1))
+        .repeated()
 }
 
 fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
@@ -494,4 +497,15 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
             }
         })
         .ignore_then(choice((pragma, line)))
+}
+
+fn comment<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
+    choice((
+        // Single-line comment
+        just("//").ignore_then(none_of("\n").ignored().repeated()),
+        // Multi-line comment
+        just("/*")
+            .ignore_then(any().and_is(just("*/").not()).ignored().repeated())
+            .then_ignore(just("*/")),
+    ))
 }
