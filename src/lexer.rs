@@ -35,6 +35,21 @@ pub mod lexer_utils {
         }
     }
 
+    impl State {
+        pub fn new(file: Option<&str>) -> Self {
+            Self {
+                line_begin: true,
+                cursor: 0,
+                context: SourceContext {
+                    file: file.map(|s| s.into()),
+                    line: 1,
+                    bol: 0,
+                },
+                checkpoints: RefCell::new(Slab::new()),
+            }
+        }
+    }
+
     #[derive(Clone, Copy)]
     pub struct StateCheckpoint {
         line_begin: bool,

@@ -6,7 +6,8 @@ use cgrammar::*;
 use chumsky::Parser;
 
 fn main() {
-    let src = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
+    let file = std::env::args().nth(1).unwrap();
+    let src = std::fs::read_to_string(file.as_str()).unwrap();
 
     let mut init_state = State::new();
     init_state.ctx_mut().add_typedef_name("term".into());
@@ -14,7 +15,8 @@ fn main() {
     let init_state = init_state;
 
     let lexer = balanced_token_sequence();
-    let tokens = lexer.parse(src.as_str());
+    let mut lexer_state = LexerState::new(Some(&file));
+    let tokens = lexer.parse_with_state(src.as_str(), &mut lexer_state);
     if tokens.has_errors() {
         for error in tokens.errors() {
             println!("{}", error);
