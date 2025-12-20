@@ -50,6 +50,7 @@ impl<T> Spanned<T> {
 }
 
 pub type Tokens<'a> = MappedInput<
+    'a,
     BalancedToken,
     SourceRange,
     &'a [Spanned<BalancedToken>],

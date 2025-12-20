@@ -8,7 +8,10 @@ use chumsky::{
 };
 use slab::Slab;
 
-use crate::{ast::*, span::*};
+use crate::{
+    ast::*,
+    span::{SourceContext, SourceRange, Spanned},
+};
 
 /// Utilities for the lexer.
 pub mod lexer_utils {

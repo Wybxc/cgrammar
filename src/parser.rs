@@ -1581,34 +1581,31 @@ where
     LabelError::<Tokens<'a>, L>::expected_found(expected, found.map(MaybeRef::Val), span)
 }
 
-trait ParserExt<O, E> {
-    fn parenthesized<'a>(self) -> impl Parser<'a, Tokens<'a>, O, E> + Clone
+trait ParserExt<O> {
+    fn parenthesized<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
         Self: Sized,
-        Self: Parser<'a, Tokens<'a>, O, E> + Clone,
-        E: chumsky::extra::ParserExtra<'a, Tokens<'a>>,
+        Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
         self.nested_in(select_ref! {
             Token::Parenthesized(tokens) => tokens.as_input()
         })
     }
 
-    fn bracketed<'a>(self) -> impl Parser<'a, Tokens<'a>, O, E> + Clone
+    fn bracketed<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
         Self: Sized,
-        Self: Parser<'a, Tokens<'a>, O, E> + Clone,
-        E: chumsky::extra::ParserExtra<'a, Tokens<'a>>,
+        Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
         self.nested_in(select_ref! {
             Token::Bracketed(tokens) => tokens.as_input()
         })
     }
 
-    fn braced<'a>(self) -> impl Parser<'a, Tokens<'a>, O, E> + Clone
+    fn braced<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
         Self: Sized,
-        Self: Parser<'a, Tokens<'a>, O, E> + Clone,
-        E: chumsky::extra::ParserExtra<'a, Tokens<'a>>,
+        Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
         self.nested_in(select_ref! {
             Token::Braced(tokens) => tokens.as_input()
@@ -1616,9 +1613,4 @@ trait ParserExt<O, E> {
     }
 }
 
-impl<'a, T, O, E> ParserExt<O, E> for T
-where
-    T: Parser<'a, Tokens<'a>, O, E>,
-    E: chumsky::extra::ParserExtra<'a, Tokens<'a>>,
-{
-}
+impl<'a, T, O> ParserExt<O> for T where T: Parser<'a, Tokens<'a>, O, Extra<'a>> {}
