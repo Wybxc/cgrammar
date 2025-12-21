@@ -667,10 +667,20 @@ pub enum Declarator {
 }
 
 impl Declarator {
+    /// Get the identifier from the declarator. None if error inside.
     pub fn identifier(&self) -> Option<&Identifier> {
         match self {
             Declarator::Direct(direct) => direct.identifier(),
             Declarator::Pointer { declarator, .. } => declarator.identifier(),
+            Declarator::Error => None,
+        }
+    }
+
+    /// Get the parameter type list from the declarator. None if not a function declarator.
+    pub fn parameters(&self) -> Option<&ParameterTypeList> {
+        match self {
+            Declarator::Direct(direct) => direct.parameters(),
+            Declarator::Pointer { declarator, .. } => declarator.parameters(),
             Declarator::Error => None,
         }
     }
@@ -698,12 +708,23 @@ pub enum DirectDeclarator {
 }
 
 impl DirectDeclarator {
+    /// Get the identifier from the direct declarator. None if error inside.
     pub fn identifier(&self) -> Option<&Identifier> {
         match self {
             DirectDeclarator::Identifier { identifier, .. } => Some(identifier),
             DirectDeclarator::Parenthesized(declarator) => declarator.identifier(),
             DirectDeclarator::Array { declarator, .. } => declarator.identifier(),
             DirectDeclarator::Function { declarator, .. } => declarator.identifier(),
+        }
+    }
+
+    /// Get the parameter type list from the direct declarator. None if not a function declarator.
+    pub fn parameters(&self) -> Option<&ParameterTypeList> {
+        match self {
+            DirectDeclarator::Function { parameters, .. } => Some(parameters),
+            DirectDeclarator::Parenthesized(declarator) => declarator.parameters(),
+            DirectDeclarator::Array { declarator, .. } => declarator.parameters(),
+            DirectDeclarator::Identifier { .. } => None,
         }
     }
 }
