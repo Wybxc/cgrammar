@@ -892,6 +892,22 @@ pub enum AttributeSpecifier {
     Error,
 }
 
+impl AttributeSpecifier {
+    pub fn try_into_attributes(self) -> Option<Vec<Attribute>> {
+        match self {
+            AttributeSpecifier::Attributes(attrs) => Some(attrs),
+            _ => None,
+        }
+    }
+
+    pub fn try_into_asm(self) -> Option<StringLiterals> {
+        match self {
+            AttributeSpecifier::Asm(asm) => Some(asm),
+            _ => None,
+        }
+    }
+}
+
 /// Attribute (6.7.12.1)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
