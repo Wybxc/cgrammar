@@ -1473,13 +1473,13 @@ pub fn function_definition<'a>() -> impl Parser<'a, Tokens<'a>, FunctionDefiniti
 // Parser utilities
 // =============================================================================
 
-fn identifier_or_keyword<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clone {
+pub fn identifier_or_keyword<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clone {
     select! {
         Token::Identifier(value) => value
     }
 }
 
-fn identifier<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clone {
+pub fn identifier<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clone {
     identifier_or_keyword().try_map(|id, span| match id.0.as_str() {
         "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do" | "double" | "else" | "enum"
         | "extern" | "float" | "for" | "goto" | "if" | "inline" | "int" | "long" | "register" | "restrict"
@@ -1491,38 +1491,38 @@ fn identifier<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clon
     })
 }
 
-fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clone {
+pub fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clone {
     select! {
         Token::Constant(value) => value
     }
 }
 
-fn string_literal<'a>() -> impl Parser<'a, Tokens<'a>, StringLiterals, Extra<'a>> + Clone {
+pub fn string_literal<'a>() -> impl Parser<'a, Tokens<'a>, StringLiterals, Extra<'a>> + Clone {
     select! {
         Token::StringLiteral(value) => value
     }
 }
 
-fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + Clone {
+pub fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + Clone {
     select! {
         Token::QuotedString(value) => value
     }
 }
 
-fn keyword<'a>(kwd: &str) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
+pub fn keyword<'a>(kwd: &str) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
     select! {
         Token::Identifier(Identifier(name)) if name == kwd => ()
     }
 }
 
-fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
+pub fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
     select! {
         Token::Punctuator(p) if p == punc => ()
     }
 }
 
 /// Temporarily disable error recovery for the given parser.
-fn no_recover<'a, A, O>(parser: A) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
+pub fn no_recover<'a, A, O>(parser: A) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
 where
     A: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     O: Clone,
@@ -1531,7 +1531,7 @@ where
 }
 
 /// Temporarily allow error recovery for the given parser.
-fn allow_recover<'a, A, O>(parser: A) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
+pub fn allow_recover<'a, A, O>(parser: A) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
 where
     A: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     O: Clone,
@@ -1539,7 +1539,7 @@ where
     map_ctx(|ctx: &Context| Context { no_recover: false, ..*ctx }, parser)
 }
 
-fn recover_via_parser<'a, A, O>(parser: A) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone
+pub fn recover_via_parser<'a, A, O>(parser: A) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone
 where
     A: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     O: Clone,
@@ -1555,7 +1555,7 @@ where
     ))
 }
 
-fn recover_parenthesized<'a, O: Clone>(
+pub fn recover_parenthesized<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(select! {
@@ -1563,13 +1563,13 @@ fn recover_parenthesized<'a, O: Clone>(
     })
 }
 
-fn recover_bracketed<'a, O: Clone>(error: O) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
+pub fn recover_bracketed<'a, O: Clone>(error: O) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(select! {
         Token::Bracketed(_) => error.clone()
     })
 }
 
-fn expected_found<'a, L>(
+pub fn expected_found<'a, L>(
     expected: impl IntoIterator<Item = L>,
     found: Option<BalancedToken>,
     span: SourceRange,
@@ -1581,7 +1581,7 @@ where
     LabelError::<Tokens<'a>, L>::expected_found(expected, found.map(MaybeRef::Val), span)
 }
 
-trait ParserExt<O> {
+pub trait ParserExt<O> {
     fn parenthesized<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
         Self: Sized,
