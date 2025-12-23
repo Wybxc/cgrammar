@@ -120,7 +120,6 @@ where
     }
 }
 
-#[doc(hidden)]
 #[macro_export]
 macro_rules! cached {
     (
