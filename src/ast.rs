@@ -110,6 +110,12 @@ pub enum PredefinedConstant {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct StringLiterals(pub Vec<StringLiteral>);
 
+impl StringLiterals {
+    pub fn to_joined(&self) -> String {
+        self.0.iter().map(|s| s.value.as_str()).collect::<Vec<_>>().join("")
+    }
+}
+
 /// String literal (6.4.5)
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
