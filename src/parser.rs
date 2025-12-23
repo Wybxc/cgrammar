@@ -1563,7 +1563,9 @@ pub fn recover_parenthesized<'a, O: Clone>(
     })
 }
 
-pub fn recover_bracketed<'a, O: Clone>(error: O) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
+pub fn recover_bracketed<'a, O: Clone>(
+    error: O,
+) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(select! {
         Token::Bracketed(_) => error.clone()
     })
