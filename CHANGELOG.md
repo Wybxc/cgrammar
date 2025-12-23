@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/Wybxc/cgrammar/compare/v0.2.3...v0.3.0) - 2025-12-23
+
+### Added
+
+- `cached` macro: now publicly exported (no longer `doc(hidden)`), usable directly downstream.
+- `StringLiterals::to_joined()`: join multiple string literals into a single `String`.
+- `AttributeSpecifier` helpers: `try_into_attributes()` and `try_into_asm()`.
+- `Declarator`/`DirectDeclarator` parameter accessors: `parameters()` for retrieving a function's parameter type list.
+- Parser utilities are now public: `identifier_or_keyword()`, `identifier()`, `constant()`, `string_literal()`, `quoted_string()`, `keyword()`, `punctuator()`, `no_recover()`, `allow_recover()`, `recover_via_parser()`, `recover_parenthesized()`, `recover_bracketed()`, `expected_found()`.
+- `ParserExt` trait is public: provides convenient combinators `parenthesized()`, `bracketed()`, and `braced()`.
+
+### Changed
+
+- Export structure: `lexer` and `parser` are now public modules (`pub mod`). The crate root no longer glob-exports `lexer::*`; instead, it re-exports only `balanced_token_sequence` and `lexer_utils::State` (aliased as `LexerState`). Consumers should use `cgrammar::lexer::...` for lexer symbols.
+- Dependency upgrade: `chumsky` to `0.12`.
+
 ## [0.2.3](https://github.com/Wybxc/cgrammar/compare/v0.2.2...v0.2.3) - 2025-12-17
 
 ### Added
