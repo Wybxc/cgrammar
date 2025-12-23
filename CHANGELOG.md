@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/Wybxc/cgrammar/compare/v0.2.3...v0.3.0) - 2025-12-23
+
+### Added
+
+- export the `cached` macro
+- accessors for AttributeSpecifier
+- add StringLiterials::to_joined
+- re-organize the export structure
+- expose more parser utilities
+- add parameters retrieval methods to Declarator
+- disable GNU C features in tests
+- upgrade to chumsky 0.12
+
+### Other
+
+- format
+
 ## [0.2.3](https://github.com/Wybxc/cgrammar/compare/v0.2.2...v0.2.3) - 2025-12-17
 
 ### Added
