@@ -1,3 +1,5 @@
+//! Parser for C source code, producing an abstract syntax tree.
+
 use chumsky::prelude::*;
 use macro_rules_attribute::apply;
 
@@ -7,9 +9,13 @@ use crate::{ast::*, context::State, span::*, utils::*};
 pub mod parser_utils {
     use super::*;
 
+    /// Token type used by the parser.
     pub type Token = BalancedToken;
+    /// Token stream type used by the parser.
     pub type TokenStream = BalancedTokenSequence;
+    /// Error type used by the parser.
     pub type Error<'a> = Rich<'a, BalancedToken, SourceRange>;
+    /// Extra parser state including error tracking, state, and context.
     pub type Extra<'a> = chumsky::extra::Full<Error<'a>, State, Context>;
 
     /// Parsing context.
@@ -1473,12 +1479,14 @@ pub fn function_definition<'a>() -> impl Parser<'a, Tokens<'a>, FunctionDefiniti
 // Parser utilities
 // =============================================================================
 
+/// Parse an identifier or keyword token.
 pub fn identifier_or_keyword<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clone {
     select! {
         Token::Identifier(value) => value
     }
 }
 
+/// Parse an identifier (excluding keywords).
 pub fn identifier<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + Clone {
     identifier_or_keyword().try_map(|id, span| match id.0.as_str() {
         "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do" | "double" | "else" | "enum"
@@ -1491,30 +1499,35 @@ pub fn identifier<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + 
     })
 }
 
+/// Parse a constant token.
 pub fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clone {
     select! {
         Token::Constant(value) => value
     }
 }
 
+/// Parse a string literal token.
 pub fn string_literal<'a>() -> impl Parser<'a, Tokens<'a>, StringLiterals, Extra<'a>> + Clone {
     select! {
         Token::StringLiteral(value) => value
     }
 }
 
+/// Parse a quoted string token.
 pub fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + Clone {
     select! {
         Token::QuotedString(value) => value
     }
 }
 
+/// Parse a specific keyword.
 pub fn keyword<'a>(kwd: &str) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
     select! {
         Token::Identifier(Identifier(name)) if name == kwd => ()
     }
 }
 
+/// Parse a specific punctuator token.
 pub fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
     select! {
         Token::Punctuator(p) if p == punc => ()
@@ -1539,6 +1552,7 @@ where
     map_ctx(|ctx: &Context| Context { no_recover: false, ..*ctx }, parser)
 }
 
+/// Create a recovery strategy using a parser, respecting the `no_recover` context flag.
 pub fn recover_via_parser<'a, A, O>(parser: A) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone
 where
     A: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
@@ -1555,6 +1569,7 @@ where
     ))
 }
 
+/// Create a recovery strategy that consumes a parenthesized token and returns the given error value.
 pub fn recover_parenthesized<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
@@ -1563,6 +1578,7 @@ pub fn recover_parenthesized<'a, O: Clone>(
     })
 }
 
+/// Create a recovery strategy that consumes a bracketed token and returns the given error value.
 pub fn recover_bracketed<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
@@ -1571,6 +1587,7 @@ pub fn recover_bracketed<'a, O: Clone>(
     })
 }
 
+/// Create a rich error indicating what was expected and what was found at a given span.
 pub fn expected_found<'a, L>(
     expected: impl IntoIterator<Item = L>,
     found: Option<BalancedToken>,
@@ -1583,7 +1600,9 @@ where
     LabelError::<Tokens<'a>, L>::expected_found(expected, found.map(MaybeRef::Val), span)
 }
 
+/// Extension trait for parsers to add convenience methods for parsing nested token sequences.
 pub trait ParserExt<O> {
+    /// Parse the content within parentheses.
     fn parenthesized<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
         Self: Sized,
@@ -1594,6 +1613,7 @@ pub trait ParserExt<O> {
         })
     }
 
+    /// Parse the content within square brackets.
     fn bracketed<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
         Self: Sized,
@@ -1604,6 +1624,7 @@ pub trait ParserExt<O> {
         })
     }
 
+    /// Parse the content within curly braces.
     fn braced<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
         Self: Sized,

@@ -21,6 +21,7 @@ impl fmt::Display for DiagnosticToken {
     }
 }
 
+/// Report an error to stderr.
 pub fn report<'a>(error: Error<'a>) {
     let error = error.map_token(DiagnosticToken);
     let span = error.span();

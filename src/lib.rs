@@ -1,3 +1,6 @@
+#![warn(missing_docs, missing_copy_implementations)]
+#![doc = include_str!("../README.md")]
+
 mod ast;
 mod context;
 pub mod lexer;

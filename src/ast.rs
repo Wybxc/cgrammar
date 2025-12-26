@@ -1,4 +1,5 @@
 //! <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf>
+#![allow(missing_docs)]
 
 use std::fmt;
 
@@ -39,7 +40,7 @@ pub enum Constant {
 }
 
 /// Integer constants (6.4.4.1)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct IntegerConstant {
     pub value: i128,
@@ -47,7 +48,7 @@ pub struct IntegerConstant {
 }
 
 /// Integer suffixes (6.4.4.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum IntegerSuffix {
     Unsigned,
@@ -60,7 +61,7 @@ pub enum IntegerSuffix {
 }
 
 /// Floating-point constants (6.4.4.2)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct FloatingConstant {
     pub value: f64,
@@ -68,7 +69,7 @@ pub struct FloatingConstant {
 }
 
 /// Floating-point suffixes (6.4.4.2)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum FloatingSuffix {
     F,
@@ -87,7 +88,7 @@ pub struct CharacterConstant {
 }
 
 /// Encoding prefixes (6.4.4.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum EncodingPrefix {
     U8,
@@ -97,7 +98,7 @@ pub enum EncodingPrefix {
 }
 
 /// Predefined constants (6.4.4.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PredefinedConstant {
     False,
@@ -125,7 +126,7 @@ pub struct StringLiteral {
 }
 
 /// Punctuators (6.4.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Punctuator {
     // Brackets
@@ -329,7 +330,7 @@ pub enum UnaryExpression {
 }
 
 /// Unary operators (6.5.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum UnaryOperator {
     Address,
@@ -492,7 +493,7 @@ pub struct InitDeclarator {
 }
 
 /// Storage class specifiers (6.7.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum StorageClassSpecifier {
     Auto,
@@ -541,7 +542,7 @@ pub struct StructOrUnionSpecifier {
 }
 
 /// Struct or union (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum StructOrUnion {
     Struct,
@@ -632,7 +633,7 @@ pub enum TypeofSpecifierArgument {
 }
 
 /// Type qualifiers (6.7.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeQualifier {
     Const,
@@ -645,7 +646,7 @@ pub enum TypeQualifier {
 }
 
 /// Function specifiers (6.7.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum FunctionSpecifier {
     Inline,

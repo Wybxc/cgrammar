@@ -43,10 +43,10 @@ fn main() {
     "#;
 
     // Tokenize the source code
-    let tokens = CLexer::lex(source_code).unwrap();
+    let tokens = balanced_token_sequence().parse(source_code).unwrap();
 
     // Parse into AST
-    let result = CParser::parse(tokens);
+    let result = translation_unit().parse(tokens);
 
     if let Some(ast) = result.output() {
         println!("Successfully parsed!");

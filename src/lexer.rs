@@ -1,3 +1,5 @@
+//! Lexer for C source code, producing balanced token sequences.
+
 use std::cell::RefCell;
 
 use chumsky::{
@@ -17,13 +19,19 @@ use crate::{
 pub mod lexer_utils {
     use super::*;
 
+    /// Extra parser state for the lexer.
     pub type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
 
+    /// Lexer state tracking position and context.
     #[derive(Clone)]
     pub struct State {
+        /// Whether the cursor is at the beginning of a line.
         pub line_begin: bool,
+        /// Current cursor position in the input.
         pub cursor: usize,
+        /// Current source context.
         pub context: SourceContext,
+        /// Saved checkpoints for backtracking.
         checkpoints: RefCell<Slab<SourceContext>>,
     }
 
@@ -39,6 +47,7 @@ pub mod lexer_utils {
     }
 
     impl State {
+        /// Create a new lexer state with an optional file name.
         pub fn new(file: Option<&str>) -> Self {
             Self {
                 line_begin: true,
@@ -53,6 +62,7 @@ pub mod lexer_utils {
         }
     }
 
+    /// A checkpoint for the lexer state.
     #[derive(Clone, Copy)]
     pub struct StateCheckpoint {
         line_begin: bool,

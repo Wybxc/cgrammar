@@ -24,6 +24,7 @@ impl Default for State {
 }
 
 impl State {
+    /// Create a new parsing state.
     pub fn new() -> Self {
         Self {
             current: Context::default(),
@@ -31,10 +32,12 @@ impl State {
         }
     }
 
+    /// Get a reference to the current context.
     pub fn ctx(&self) -> &Context {
         &self.current
     }
 
+    /// Get a mutable reference to the current context.
     pub fn ctx_mut(&mut self) -> &mut Context {
         &mut self.current
     }
