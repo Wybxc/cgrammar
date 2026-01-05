@@ -70,6 +70,32 @@ impl VisitorResult for () {
     }
 }
 
+impl<T> VisitorResult for Result<(), T> {
+    type Residual = T;
+
+    fn output() -> Self {
+        Ok(())
+    }
+
+    fn from_residual(residual: Self::Residual) -> Self {
+        Err(residual)
+    }
+
+    fn from_branch(b: ControlFlow<Self::Residual>) -> Self {
+        match b {
+            ControlFlow::Break(r) => Err(r),
+            ControlFlow::Continue(()) => Ok(()),
+        }
+    }
+
+    fn branch(self) -> ControlFlow<Self::Residual> {
+        match self {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(r) => ControlFlow::Break(r),
+        }
+    }
+}
+
 /// Implementation of `VisitorResult` for `ControlFlow<T>`.
 ///
 /// This implementation allows visitors to return `ControlFlow::Break(value)`
@@ -210,180 +236,128 @@ pub trait Visitor<'a> {
     ///
     /// This is the top-level method that traverses the entire AST.
     /// Override this to perform initialization or finalization of analysis.
-    fn visit_translation_unit(&mut self, tu: &'a TranslationUnit) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_translation_unit(&mut self, tu: &'a TranslationUnit) -> Self::Result {
         walk_translation_unit(self, tu)
     }
 
     /// Visits an external declaration (function definition or global declaration).
-    fn visit_external_declaration(&mut self, d: &'a ExternalDeclaration) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_external_declaration(&mut self, d: &'a ExternalDeclaration) -> Self::Result {
         walk_external_declaration(self, d)
     }
 
     /// Visits a function definition.
-    fn visit_function_definition(&mut self, f: &'a FunctionDefinition) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_function_definition(&mut self, f: &'a FunctionDefinition) -> Self::Result {
         walk_function_definition(self, f)
     }
 
+    /// Visits an attribute specifier.
+    fn visit_attribute_specifier(&mut self, a: &'a AttributeSpecifier) -> Self::Result {
+        walk_attribute_specifier(self, a)
+    }
+
+    /// Visits an attribute.
+    fn visit_attribute(&mut self, _: &'a Attribute) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an asm attribute specifier.
+    fn visit_asm_attribute_specifier(&mut self, _: &'a StringLiterals) -> Self::Result {
+        Self::Result::output()
+    }
+
     /// Visits a statement.
-    fn visit_statement(&mut self, s: &'a Statement) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_statement(&mut self, s: &'a Statement) -> Self::Result {
         walk_statement(self, s)
     }
 
     /// Visits an unlabeled statement.
-    fn visit_unlabeled_statement(&mut self, s: &'a UnlabeledStatement) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_unlabeled_statement(&mut self, s: &'a UnlabeledStatement) -> Self::Result {
         walk_unlabeled_statement(self, s)
     }
 
     /// Visits an expression.
-    fn visit_expression(&mut self, e: &'a Expression) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_expression(&mut self, e: &'a Expression) -> Self::Result {
         walk_expression(self, e)
     }
 
     /// Visits a declaration.
-    fn visit_declaration(&mut self, d: &'a Declaration) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_declaration(&mut self, d: &'a Declaration) -> Self::Result {
         walk_declaration(self, d)
     }
 
     /// Visits a declarator.
-    fn visit_declarator(&mut self, d: &'a Declarator) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_declarator(&mut self, d: &'a Declarator) -> Self::Result {
         walk_declarator(self, d)
     }
 
     /// Visits a direct declarator.
-    fn visit_direct_declarator(&mut self, d: &'a DirectDeclarator) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_direct_declarator(&mut self, d: &'a DirectDeclarator) -> Self::Result {
         walk_direct_declarator(self, d)
     }
 
     /// Visits a postfix expression.
-    fn visit_postfix_expression(&mut self, p: &'a PostfixExpression) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_postfix_expression(&mut self, p: &'a PostfixExpression) -> Self::Result {
         walk_postfix_expression(self, p)
     }
 
     /// Visits a unary expression.
-    fn visit_unary_expression(&mut self, u: &'a UnaryExpression) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_unary_expression(&mut self, u: &'a UnaryExpression) -> Self::Result {
         walk_unary_expression(self, u)
     }
 
     /// Visits a cast expression.
-    fn visit_cast_expression(&mut self, c: &'a CastExpression) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_cast_expression(&mut self, c: &'a CastExpression) -> Self::Result {
         walk_cast_expression(self, c)
     }
 
     /// Visits a compound statement (block of statements).
-    fn visit_compound_statement(&mut self, c: &'a CompoundStatement) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_compound_statement(&mut self, c: &'a CompoundStatement) -> Self::Result {
         walk_compound_statement(self, c)
     }
 
     /// Visits declaration specifiers.
-    fn visit_declaration_specifiers(&mut self, s: &'a DeclarationSpecifiers) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_declaration_specifiers(&mut self, s: &'a DeclarationSpecifiers) -> Self::Result {
         walk_declaration_specifiers(self, s)
     }
 
     /// Visits a type specifier or qualifier.
-    fn visit_type_specifier_qualifier(&mut self, x: &'a TypeSpecifierQualifier) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_type_specifier_qualifier(&mut self, x: &'a TypeSpecifierQualifier) -> Self::Result {
         walk_type_specifier_qualifier(self, x)
     }
 
     /// Visits a type specifier.
-    fn visit_type_specifier(&mut self, ts: &'a TypeSpecifier) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_type_specifier(&mut self, ts: &'a TypeSpecifier) -> Self::Result {
         walk_type_specifier(self, ts)
     }
 
     /// Visits an atomic type specifier.
-    fn visit_atomic_type_specifier(&mut self, a: &'a AtomicTypeSpecifier) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_atomic_type_specifier(&mut self, a: &'a AtomicTypeSpecifier) -> Self::Result {
         walk_atomic_type_specifier(self, a)
     }
 
     /// Visits a typeof specifier.
-    fn visit_typeof(&mut self, t: &'a TypeofSpecifier) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_typeof(&mut self, t: &'a TypeofSpecifier) -> Self::Result {
         walk_typeof(self, t)
     }
 
     /// Visits a specifier qualifier list.
-    fn visit_specifier_qualifier_list(&mut self, s: &'a SpecifierQualifierList) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_specifier_qualifier_list(&mut self, s: &'a SpecifierQualifierList) -> Self::Result {
         walk_specifier_qualifier_list(self, s)
     }
 
     /// Visits a type name.
-    fn visit_type_name(&mut self, tn: &'a TypeName) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_type_name(&mut self, tn: &'a TypeName) -> Self::Result {
         walk_type_name(self, tn)
     }
 
     /// Visits an abstract declarator.
-    fn visit_abstract_declarator(&mut self, a: &'a AbstractDeclarator) -> Self::Result
-    where
-        Self: Sized,
-    {
+    fn visit_abstract_declarator(&mut self, a: &'a AbstractDeclarator) -> Self::Result {
         walk_abstract_declarator(self, a)
     }
 
-    /// Visits a generic identifier (deprecated).
-    ///
-    /// This method is deprecated in favor of the semantic-specific methods
-    /// like `visit_variable_name`, `visit_type_name_identifier`, etc.
-    /// It is kept for backward compatibility and currently forwards to `visit_variable_name`.
-    fn visit_identifier(&mut self, id: &'a Identifier) -> Self::Result {
-        self.visit_variable_name(id)
+    /// Visits a direct abstract declarator.
+    fn visit_direct_abstract_declarator(&mut self, d: &'a DirectAbstractDeclarator) -> Self::Result {
+        walk_direct_abstract_declarator(self, d)
     }
 }
 
@@ -401,7 +375,7 @@ pub trait Visitor<'a> {
 // the traversal stops and the value is propagated back to the caller.
 
 /// Walks a translation unit, visiting each external declaration.
-pub fn walk_translation_unit<'a, V: Visitor<'a>>(v: &mut V, tu: &'a TranslationUnit) -> V::Result {
+pub fn walk_translation_unit<'a, V: Visitor<'a> + ?Sized>(v: &mut V, tu: &'a TranslationUnit) -> V::Result {
     for ed in &tu.external_declarations {
         let br = v.visit_external_declaration(ed).branch();
         if let ControlFlow::Break(res) = br {
@@ -412,7 +386,7 @@ pub fn walk_translation_unit<'a, V: Visitor<'a>>(v: &mut V, tu: &'a TranslationU
 }
 
 /// Walks an external declaration (function or declaration).
-pub fn walk_external_declaration<'a, V: Visitor<'a>>(v: &mut V, d: &'a ExternalDeclaration) -> V::Result {
+pub fn walk_external_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a ExternalDeclaration) -> V::Result {
     match d {
         ExternalDeclaration::Function(f) => v.visit_function_definition(f),
         ExternalDeclaration::Declaration(d) => v.visit_declaration(d),
@@ -420,7 +394,14 @@ pub fn walk_external_declaration<'a, V: Visitor<'a>>(v: &mut V, d: &'a ExternalD
 }
 
 /// Walks a function definition, visiting declaration specifiers, declarator, and body.
-pub fn walk_function_definition<'a, V: Visitor<'a>>(v: &mut V, f: &'a FunctionDefinition) -> V::Result {
+pub fn walk_function_definition<'a, V: Visitor<'a> + ?Sized>(v: &mut V, f: &'a FunctionDefinition) -> V::Result {
+    // walk attributes
+    for attr in &f.attributes {
+        let br = v.visit_attribute_specifier(attr).branch();
+        if let ControlFlow::Break(res) = br {
+            return V::Result::from_residual(res);
+        }
+    }
     // walk specifiers
     let br = v.visit_declaration_specifiers(&f.specifiers).branch();
     if let ControlFlow::Break(res) = br {
@@ -439,7 +420,7 @@ pub fn walk_function_definition<'a, V: Visitor<'a>>(v: &mut V, f: &'a FunctionDe
 ///
 /// For labeled statements, calls `visit_label_name` for the label identifier
 /// before walking the associated statement.
-pub fn walk_statement<'a, V: Visitor<'a>>(v: &mut V, s: &'a Statement) -> V::Result {
+pub fn walk_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a Statement) -> V::Result {
     match s {
         Statement::Labeled(ls) => {
             // visit label identifiers if any
@@ -463,7 +444,7 @@ pub fn walk_statement<'a, V: Visitor<'a>>(v: &mut V, s: &'a Statement) -> V::Res
 /// This handles expression statements, compound statements, selection statements,
 /// iteration statements, and jump statements. For each type, visits relevant
 /// sub-expressions, declarations, and statements.
-pub fn walk_unlabeled_statement<'a, V: Visitor<'a>>(v: &mut V, s: &'a UnlabeledStatement) -> V::Result {
+pub fn walk_unlabeled_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a UnlabeledStatement) -> V::Result {
     match s {
         UnlabeledStatement::Expression(es) => {
             if let Some(expr) = &es.expression {
@@ -573,7 +554,7 @@ pub fn walk_unlabeled_statement<'a, V: Visitor<'a>>(v: &mut V, s: &'a UnlabeledS
 ///
 /// Iterates through all block items, dispatching to appropriate visitor methods.
 /// For label identifiers within the block, calls `visit_label_name`.
-pub fn walk_compound_statement<'a, V: Visitor<'a>>(v: &mut V, c: &'a CompoundStatement) -> V::Result {
+pub fn walk_compound_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CompoundStatement) -> V::Result {
     for item in &c.items {
         let br = match item {
             BlockItem::Declaration(d) => v.visit_declaration(d).branch(),
@@ -594,7 +575,7 @@ pub fn walk_compound_statement<'a, V: Visitor<'a>>(v: &mut V, c: &'a CompoundSta
 ///
 /// This includes handling of binary operators, conditional expressions,
 /// assignments, comma expressions, and more.
-pub fn walk_expression<'a, V: Visitor<'a>>(v: &mut V, e: &'a Expression) -> V::Result {
+pub fn walk_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a Expression) -> V::Result {
     match e {
         Expression::Postfix(p) => v.visit_postfix_expression(p),
         Expression::Unary(u) => v.visit_unary_expression(u),
@@ -643,7 +624,7 @@ pub fn walk_expression<'a, V: Visitor<'a>>(v: &mut V, e: &'a Expression) -> V::R
 /// array access, function calls, member access, and increment/decrement operators.
 /// Calls `visit_variable_name` for identifiers and `visit_enum_constant` for
 /// enumeration constants. Calls `visit_member_name` for member access operations.
-pub fn walk_postfix_expression<'a, V: Visitor<'a>>(v: &mut V, p: &'a PostfixExpression) -> V::Result {
+pub fn walk_postfix_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, p: &'a PostfixExpression) -> V::Result {
     match p {
         PostfixExpression::Primary(pr) => match pr {
             PrimaryExpression::Identifier(id) => v.visit_variable_name(id),
@@ -715,7 +696,7 @@ pub fn walk_postfix_expression<'a, V: Visitor<'a>>(v: &mut V, p: &'a PostfixExpr
 ///
 /// Handles pre/post increment/decrement, unary operators (address-of, dereference, etc.),
 /// sizeof, and alignof operations.
-pub fn walk_unary_expression<'a, V: Visitor<'a>>(v: &mut V, u: &'a UnaryExpression) -> V::Result {
+pub fn walk_unary_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, u: &'a UnaryExpression) -> V::Result {
     match u {
         UnaryExpression::Postfix(p) => v.visit_postfix_expression(p),
         UnaryExpression::PreIncrement(inner) | UnaryExpression::PreDecrement(inner) => v.visit_unary_expression(inner),
@@ -728,7 +709,7 @@ pub fn walk_unary_expression<'a, V: Visitor<'a>>(v: &mut V, u: &'a UnaryExpressi
 /// Walks a cast expression.
 ///
 /// Handles unary expressions and explicit type casts.
-pub fn walk_cast_expression<'a, V: Visitor<'a>>(v: &mut V, c: &'a CastExpression) -> V::Result {
+pub fn walk_cast_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CastExpression) -> V::Result {
     match c {
         CastExpression::Unary(u) => v.visit_unary_expression(u),
         CastExpression::Cast { type_name, expression } => {
@@ -745,7 +726,7 @@ pub fn walk_cast_expression<'a, V: Visitor<'a>>(v: &mut V, c: &'a CastExpression
 ///
 /// Handles normal declarations, typedef declarations, static assertions, and attributes.
 /// Visits declaration specifiers and declarators for each declaration.
-pub fn walk_declaration<'a, V: Visitor<'a>>(v: &mut V, d: &'a Declaration) -> V::Result {
+pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declaration) -> V::Result {
     match d {
         Declaration::Normal { specifiers, declarators, .. } => {
             let br = v.visit_declaration_specifiers(specifiers).branch();
@@ -783,7 +764,7 @@ pub fn walk_declaration<'a, V: Visitor<'a>>(v: &mut V, d: &'a Declaration) -> V:
 }
 
 /// Walks declaration specifiers (storage class, type specifiers, qualifiers, etc.).
-pub fn walk_declaration_specifiers<'a, V: Visitor<'a>>(v: &mut V, s: &'a DeclarationSpecifiers) -> V::Result {
+pub fn walk_declaration_specifiers<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a DeclarationSpecifiers) -> V::Result {
     for it in &s.specifiers {
         let br = match it {
             DeclarationSpecifier::StorageClass(_) => ControlFlow::Continue(()),
@@ -800,7 +781,10 @@ pub fn walk_declaration_specifiers<'a, V: Visitor<'a>>(v: &mut V, s: &'a Declara
 /// Walks a type specifier or qualifier.
 ///
 /// Dispatches to type specifiers or ignores qualifiers.
-pub fn walk_type_specifier_qualifier<'a, V: Visitor<'a>>(v: &mut V, x: &'a TypeSpecifierQualifier) -> V::Result {
+pub fn walk_type_specifier_qualifier<'a, V: Visitor<'a> + ?Sized>(
+    v: &mut V,
+    x: &'a TypeSpecifierQualifier,
+) -> V::Result {
     match x {
         TypeSpecifierQualifier::TypeSpecifier(ts) => v.visit_type_specifier(ts),
         TypeSpecifierQualifier::TypeQualifier(_) => V::Result::output(),
@@ -816,7 +800,7 @@ pub fn walk_type_specifier_qualifier<'a, V: Visitor<'a>>(v: &mut V, x: &'a TypeS
 /// Handles struct, union, enum, typedef names, atomic types, and typeof specifiers.
 /// Calls `visit_struct_name` for struct identifiers, `visit_enum_name` for enum identifiers,
 /// `visit_enumerator_name` for enumerators, and `visit_type_name_identifier` for typedef names.
-pub fn walk_type_specifier<'a, V: Visitor<'a>>(v: &mut V, ts: &'a TypeSpecifier) -> V::Result {
+pub fn walk_type_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, ts: &'a TypeSpecifier) -> V::Result {
     match ts {
         TypeSpecifier::Struct(s) => {
             if let Some(id) = &s.identifier {
@@ -899,14 +883,14 @@ pub fn walk_type_specifier<'a, V: Visitor<'a>>(v: &mut V, ts: &'a TypeSpecifier)
 }
 
 /// Walks an atomic type specifier.
-pub fn walk_atomic_type_specifier<'a, V: Visitor<'a>>(v: &mut V, a: &'a AtomicTypeSpecifier) -> V::Result {
+pub fn walk_atomic_type_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AtomicTypeSpecifier) -> V::Result {
     v.visit_type_name(&a.type_name)
 }
 
 /// Walks a typeof specifier.
 ///
 /// The argument can be an expression or a type name.
-pub fn walk_typeof<'a, V: Visitor<'a>>(v: &mut V, t: &'a TypeofSpecifier) -> V::Result {
+pub fn walk_typeof<'a, V: Visitor<'a> + ?Sized>(v: &mut V, t: &'a TypeofSpecifier) -> V::Result {
     match t {
         TypeofSpecifier::Typeof(arg) | TypeofSpecifier::TypeofUnqual(arg) => match arg {
             TypeofSpecifierArgument::Expression(e) => v.visit_expression(e),
@@ -919,7 +903,10 @@ pub fn walk_typeof<'a, V: Visitor<'a>>(v: &mut V, t: &'a TypeofSpecifier) -> V::
 /// Walks a specifier qualifier list.
 ///
 /// This is used for type names in casts, sizeof/alignof expressions, etc.
-pub fn walk_specifier_qualifier_list<'a, V: Visitor<'a>>(v: &mut V, s: &'a SpecifierQualifierList) -> V::Result {
+pub fn walk_specifier_qualifier_list<'a, V: Visitor<'a> + ?Sized>(
+    v: &mut V,
+    s: &'a SpecifierQualifierList,
+) -> V::Result {
     for item in &s.items {
         let br = v.visit_type_specifier_qualifier(item).branch();
         if let ControlFlow::Break(res) = br {
@@ -932,7 +919,7 @@ pub fn walk_specifier_qualifier_list<'a, V: Visitor<'a>>(v: &mut V, s: &'a Speci
 /// Walks a declarator.
 ///
 /// Recursively handles pointer, direct, and error declarators.
-pub fn walk_declarator<'a, V: Visitor<'a>>(v: &mut V, d: &'a Declarator) -> V::Result {
+pub fn walk_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarator) -> V::Result {
     match d {
         Declarator::Direct(dd) => v.visit_direct_declarator(dd),
         Declarator::Pointer { declarator, .. } => v.visit_declarator(declarator),
@@ -945,7 +932,7 @@ pub fn walk_declarator<'a, V: Visitor<'a>>(v: &mut V, d: &'a Declarator) -> V::R
 /// Handles identifier declarators (where `visit_variable_name` is called),
 /// parenthesized declarators, array declarators, and function declarators.
 /// For function declarators, visits parameter declarations.
-pub fn walk_direct_declarator<'a, V: Visitor<'a>>(v: &mut V, d: &'a DirectDeclarator) -> V::Result {
+pub fn walk_direct_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a DirectDeclarator) -> V::Result {
     match d {
         DirectDeclarator::Identifier { identifier, .. } => v.visit_variable_name(identifier),
         DirectDeclarator::Parenthesized(inner) => v.visit_declarator(inner),
@@ -981,7 +968,7 @@ pub fn walk_direct_declarator<'a, V: Visitor<'a>>(v: &mut V, d: &'a DirectDeclar
 }
 
 /// Walks a type name (used in casts, sizeof, alignof, etc.).
-pub fn walk_type_name<'a, V: Visitor<'a>>(v: &mut V, tn: &'a TypeName) -> V::Result {
+pub fn walk_type_name<'a, V: Visitor<'a> + ?Sized>(v: &mut V, tn: &'a TypeName) -> V::Result {
     match tn {
         TypeName::TypeName { specifiers, abstract_declarator } => {
             let br = v.visit_specifier_qualifier_list(specifiers).branch();
@@ -1002,9 +989,9 @@ pub fn walk_type_name<'a, V: Visitor<'a>>(v: &mut V, tn: &'a TypeName) -> V::Res
 ///
 /// Used in type names where declarators can omit names.
 /// Recursively handles pointers and direct abstract declarators.
-pub fn walk_abstract_declarator<'a, V: Visitor<'a>>(v: &mut V, a: &'a AbstractDeclarator) -> V::Result {
+pub fn walk_abstract_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AbstractDeclarator) -> V::Result {
     match a {
-        AbstractDeclarator::Direct(d) => walk_direct_abstract_declarator(v, d),
+        AbstractDeclarator::Direct(d) => v.visit_direct_abstract_declarator(d),
         AbstractDeclarator::Pointer { abstract_declarator, .. } => {
             if let Some(ad) = abstract_declarator {
                 v.visit_abstract_declarator(ad)
@@ -1020,22 +1007,49 @@ pub fn walk_abstract_declarator<'a, V: Visitor<'a>>(v: &mut V, a: &'a AbstractDe
 ///
 /// Handles array and function declarators without identifiers,
 /// used in type names and abstract declarators.
-pub fn walk_direct_abstract_declarator<'a, V: Visitor<'a>>(v: &mut V, d: &'a DirectAbstractDeclarator) -> V::Result {
+pub fn walk_direct_abstract_declarator<'a, V: Visitor<'a> + ?Sized>(
+    v: &mut V,
+    d: &'a DirectAbstractDeclarator,
+) -> V::Result {
     match d {
         DirectAbstractDeclarator::Parenthesized(ad) => v.visit_abstract_declarator(ad),
         DirectAbstractDeclarator::Array { declarator, .. } => {
             if let Some(dd) = declarator {
-                walk_direct_abstract_declarator(v, dd)
+                v.visit_direct_abstract_declarator(dd)
             } else {
                 V::Result::output()
             }
         }
         DirectAbstractDeclarator::Function { declarator, .. } => {
             if let Some(dd) = declarator {
-                walk_direct_abstract_declarator(v, dd)
+                v.visit_direct_abstract_declarator(dd)
             } else {
                 V::Result::output()
             }
         }
     }
+}
+
+/// Walks an attribute specifier.
+///
+/// This is called when encountering an attribute specifier in a function definition.
+pub fn walk_attribute_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AttributeSpecifier) -> V::Result {
+    match a {
+        AttributeSpecifier::Attributes(attributes) => {
+            for attr in attributes {
+                let br = v.visit_attribute(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
+        }
+        AttributeSpecifier::Asm(string_literals) => {
+            let br = v.visit_asm_attribute_specifier(string_literals).branch();
+            if let ControlFlow::Break(res) = br {
+                return V::Result::from_residual(res);
+            }
+        }
+        AttributeSpecifier::Error => {}
+    }
+    V::Result::output()
 }

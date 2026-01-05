@@ -185,14 +185,6 @@ pub enum Punctuator {
     Comma,
     Hash,
     HashHash,
-
-    // Digraphs
-    LeftBracketAlt,
-    RightBracketAlt,
-    LeftBraceAlt,
-    RightBraceAlt,
-    HashAlt,
-    HashHashAlt,
 }
 
 /// Balanced token sequence (6.4.4.3)

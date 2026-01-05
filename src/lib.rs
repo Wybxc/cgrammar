@@ -9,6 +9,8 @@ mod report;
 pub mod span;
 mod utils;
 pub mod visitor;
+#[cfg(feature = "printer")]
+pub mod printer;
 
 pub use ast::*;
 pub use context::State;

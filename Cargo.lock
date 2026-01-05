@@ -50,6 +50,7 @@ version = "0.4.0"
 dependencies = [
  "chumsky",
  "dbg-pls",
+ "elegance",
  "hexf-parse",
  "imbl",
  "macro_rules_attribute",
@@ -98,6 +99,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "elegance"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d5787cf3383caefc6da57f709700499ddcaee6f853475dfd397b9fc4356251"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]
