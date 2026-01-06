@@ -527,3 +527,504 @@ fn test_comprehensive_visitor() {
     assert!(visitor.members.contains(&"y".to_string()));
     assert_eq!(visitor.labels, vec!["end", "end"]); // goto and label definition
 }
+
+// ============================================================================
+// Mutable Visitor Tests
+// ============================================================================
+
+/// A mutable visitor that renames all variables from old_name to new_name
+struct VariableRenamer {
+    old_name: String,
+    new_name: String,
+    rename_count: usize,
+}
+
+impl VariableRenamer {
+    fn new(old_name: &str, new_name: &str) -> Self {
+        Self {
+            old_name: old_name.to_string(),
+            new_name: new_name.to_string(),
+            rename_count: 0,
+        }
+    }
+}
+
+impl<'a> VisitorMut<'a> for VariableRenamer {
+    type Result = ();
+
+    fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) {
+        if id.0 == self.old_name {
+            id.0 = self.new_name.clone();
+            self.rename_count += 1;
+        }
+    }
+}
+
+#[test]
+fn test_variable_renaming() {
+    let code = "int x; int y; void f() { x = y + x; }";
+    let mut ast = parse_c(code);
+    let mut visitor = VariableRenamer::new("x", "renamed_x");
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert_eq!(visitor.rename_count, 3); // declaration + 2 uses
+
+    // Verify the rename worked by collecting identifiers
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert!(collector.variables.contains(&"renamed_x".to_string()));
+    assert!(
+        !collector.variables.contains(&"x".to_string())
+            || collector.variables.iter().filter(|v| *v == "x").count() == 0
+    );
+}
+
+#[test]
+fn test_rename_multiple_occurrences() {
+    let code = "int a, a, a; void f(int a) { int a; }";
+    let mut ast = parse_c(code);
+    let mut visitor = VariableRenamer::new("a", "b");
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert_eq!(visitor.rename_count, 5);
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert_eq!(collector.variables.iter().filter(|v| *v == "b").count(), 5);
+}
+
+/// A mutable visitor that prefixes all struct names
+struct StructNamePrefixer {
+    prefix: String,
+    count: usize,
+}
+
+impl StructNamePrefixer {
+    fn new(prefix: &str) -> Self {
+        Self { prefix: prefix.to_string(), count: 0 }
+    }
+}
+
+impl<'a> VisitorMut<'a> for StructNamePrefixer {
+    type Result = ();
+
+    fn visit_struct_name_mut(&mut self, id: &'a mut Identifier) {
+        id.0 = format!("{}{}", self.prefix, id.0);
+        self.count += 1;
+    }
+}
+
+#[test]
+fn test_struct_name_prefixing() {
+    let code = "struct Point { int x; }; struct Point p;";
+    let mut ast = parse_c(code);
+    let mut visitor = StructNamePrefixer::new("My");
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert_eq!(visitor.count, 2);
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert!(collector.struct_names.iter().all(|n| n == "MyPoint"));
+}
+
+/// A mutable visitor that renames enum constants
+struct EnumConstantRenamer {
+    mapping: std::collections::HashMap<String, String>,
+    rename_count: usize,
+}
+
+impl EnumConstantRenamer {
+    fn new() -> Self {
+        let mut mapping = std::collections::HashMap::new();
+        mapping.insert("RED".to_string(), "COLOR_RED".to_string());
+        mapping.insert("GREEN".to_string(), "COLOR_GREEN".to_string());
+        mapping.insert("BLUE".to_string(), "COLOR_BLUE".to_string());
+        Self { mapping, rename_count: 0 }
+    }
+}
+
+impl<'a> VisitorMut<'a> for EnumConstantRenamer {
+    type Result = ();
+
+    fn visit_enumerator_name_mut(&mut self, id: &'a mut Identifier) {
+        if let Some(new_name) = self.mapping.get(&id.0) {
+            id.0 = new_name.clone();
+            self.rename_count += 1;
+        }
+    }
+
+    fn visit_enum_constant_mut(&mut self, id: &'a mut Identifier) {
+        if let Some(new_name) = self.mapping.get(&id.0) {
+            id.0 = new_name.clone();
+            self.rename_count += 1;
+        }
+    }
+}
+
+#[test]
+fn test_enum_constant_renaming() {
+    let code = r#"
+        enum Color { RED, GREEN, BLUE };
+        void f() {
+            enum Color c = RED;
+        }
+    "#;
+    let mut ast = parse_c(code);
+    let mut visitor = EnumConstantRenamer::new();
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    // 3 in definition, usage may or may not be counted depending on parser
+    assert!(visitor.rename_count >= 3);
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert_eq!(collector.enumerators, vec!["COLOR_RED", "COLOR_GREEN", "COLOR_BLUE"]);
+}
+
+/// A mutable visitor that uppercases all member names
+struct MemberNameUppercaser {
+    count: usize,
+}
+
+impl<'a> VisitorMut<'a> for MemberNameUppercaser {
+    type Result = ();
+
+    fn visit_member_name_mut(&mut self, id: &'a mut Identifier) {
+        id.0 = id.0.to_uppercase();
+        self.count += 1;
+    }
+}
+
+#[test]
+fn test_member_name_uppercasing() {
+    let code = r#"
+        struct Point { int x; int y; };
+        void f() {
+            struct Point p;
+            p.x = 1;
+            p.y = 2;
+        }
+    "#;
+    let mut ast = parse_c(code);
+    let mut visitor = MemberNameUppercaser { count: 0 };
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert!(visitor.count >= 2);
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert!(collector.members.contains(&"X".to_string()));
+    assert!(collector.members.contains(&"Y".to_string()));
+}
+
+/// A mutable visitor that counts modifications with early termination
+struct LimitedRenamer {
+    old_name: String,
+    new_name: String,
+    max_renames: usize,
+    rename_count: usize,
+}
+
+impl LimitedRenamer {
+    fn new(old_name: &str, new_name: &str, max_renames: usize) -> Self {
+        Self {
+            old_name: old_name.to_string(),
+            new_name: new_name.to_string(),
+            max_renames,
+            rename_count: 0,
+        }
+    }
+}
+
+impl<'a> VisitorMut<'a> for LimitedRenamer {
+    type Result = ControlFlow<()>;
+
+    fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) -> Self::Result {
+        if id.0 == self.old_name {
+            id.0 = self.new_name.clone();
+            self.rename_count += 1;
+            if self.rename_count >= self.max_renames {
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+#[test]
+fn test_limited_renaming_with_early_termination() {
+    let code = "int x, x, x, x, x;";
+    let mut ast = parse_c(code);
+    let mut visitor = LimitedRenamer::new("x", "y", 3);
+    let _ = visitor.visit_translation_unit_mut(&mut ast);
+
+    assert_eq!(visitor.rename_count, 3);
+
+    // Verify that exactly 3 were renamed
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    let y_count = collector.variables.iter().filter(|v| *v == "y").count();
+    let x_count = collector.variables.iter().filter(|v| *v == "x").count();
+    assert_eq!(y_count, 3);
+    assert_eq!(x_count, 2);
+}
+
+/// A mutable visitor that modifies typedef names
+struct TypedefRenamer {
+    old_name: String,
+    new_name: String,
+    count: usize,
+}
+
+impl TypedefRenamer {
+    fn new(old_name: &str, new_name: &str) -> Self {
+        Self {
+            old_name: old_name.to_string(),
+            new_name: new_name.to_string(),
+            count: 0,
+        }
+    }
+}
+
+impl<'a> VisitorMut<'a> for TypedefRenamer {
+    type Result = ();
+
+    fn visit_type_name_identifier_mut(&mut self, id: &'a mut Identifier) {
+        if id.0 == self.old_name {
+            id.0 = self.new_name.clone();
+            self.count += 1;
+        }
+    }
+
+    fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) {
+        // Also rename in typedef declaration
+        if id.0 == self.old_name {
+            id.0 = self.new_name.clone();
+            self.count += 1;
+        }
+    }
+}
+
+#[test]
+fn test_typedef_renaming() {
+    let code = "typedef int MyInt; MyInt x; MyInt y;";
+    let mut ast = parse_c(code);
+    let mut visitor = TypedefRenamer::new("MyInt", "Integer");
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert!(visitor.count >= 3); // typedef name + 2 uses
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert!(collector.type_names.contains(&"Integer".to_string()));
+    assert!(collector.variables.contains(&"Integer".to_string()));
+}
+
+/// A mutable visitor that renames labels
+struct LabelRenamer {
+    old_name: String,
+    new_name: String,
+    count: usize,
+}
+
+impl LabelRenamer {
+    fn new(old_name: &str, new_name: &str) -> Self {
+        Self {
+            old_name: old_name.to_string(),
+            new_name: new_name.to_string(),
+            count: 0,
+        }
+    }
+}
+
+impl<'a> VisitorMut<'a> for LabelRenamer {
+    type Result = ();
+
+    fn visit_label_name_mut(&mut self, id: &'a mut Identifier) {
+        if id.0 == self.old_name {
+            id.0 = self.new_name.clone();
+            self.count += 1;
+        }
+    }
+}
+
+#[test]
+fn test_label_renaming() {
+    let code = r#"
+        void f() {
+            goto end;
+            end: return;
+        }
+    "#;
+    let mut ast = parse_c(code);
+    let mut visitor = LabelRenamer::new("end", "exit_point");
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert_eq!(visitor.count, 2); // goto target + label definition
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert!(collector.labels.iter().all(|l| l == "exit_point"));
+}
+
+/// A mutable visitor that counts variables (read-only operation on mutable
+/// visitor)
+struct MutableVariableCounter {
+    count: usize,
+}
+
+impl<'a> VisitorMut<'a> for MutableVariableCounter {
+    type Result = ();
+
+    fn visit_variable_name_mut(&mut self, _: &'a mut Identifier) {
+        self.count += 1;
+    }
+}
+
+#[test]
+fn test_mutable_visitor_counting() {
+    let code = "int x, y, z; void f(int a) { int b; }";
+    let mut ast = parse_c(code);
+    let mut visitor = MutableVariableCounter { count: 0 };
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert_eq!(visitor.count, 6); // x, y, z, f, a, b
+}
+
+/// A comprehensive mutable visitor that performs multiple transformations
+struct ComprehensiveTransformer {
+    variable_prefix: String,
+    struct_suffix: String,
+    modifications: usize,
+}
+
+impl ComprehensiveTransformer {
+    fn new(variable_prefix: &str, struct_suffix: &str) -> Self {
+        Self {
+            variable_prefix: variable_prefix.to_string(),
+            struct_suffix: struct_suffix.to_string(),
+            modifications: 0,
+        }
+    }
+}
+
+impl<'a> VisitorMut<'a> for ComprehensiveTransformer {
+    type Result = ();
+
+    fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) {
+        if !id.0.starts_with(&self.variable_prefix) {
+            id.0 = format!("{}{}", self.variable_prefix, id.0);
+            self.modifications += 1;
+        }
+    }
+
+    fn visit_struct_name_mut(&mut self, id: &'a mut Identifier) {
+        if !id.0.ends_with(&self.struct_suffix) {
+            id.0 = format!("{}{}", id.0, self.struct_suffix);
+            self.modifications += 1;
+        }
+    }
+}
+
+#[test]
+fn test_comprehensive_transformation() {
+    let code = r#"
+        struct Point { int x; };
+        void f() {
+            struct Point p;
+        }
+    "#;
+    let mut ast = parse_c(code);
+    let mut visitor = ComprehensiveTransformer::new("var_", "_t");
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert!(visitor.modifications > 0);
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+
+    // Check that transformations were applied
+    assert!(collector.variables.iter().any(|v| v.starts_with("var_")));
+    assert!(collector.struct_names.iter().any(|s| s.ends_with("_t")));
+}
+
+#[test]
+fn test_mutable_visitor_with_complex_code() {
+    let code = r#"
+        typedef int Int;
+        struct Data { int value; };
+
+        Int process(Int x) {
+            struct Data d;
+            d.value = x;
+            return d.value;
+        }
+    "#;
+    let mut ast = parse_c(code);
+    let mut visitor = VariableRenamer::new("x", "input");
+    visitor.visit_translation_unit_mut(&mut ast);
+
+    assert_eq!(visitor.rename_count, 2); // parameter + use
+
+    let mut collector = IdentifierCollector::default();
+    collector.visit_translation_unit(&ast);
+    assert!(collector.variables.contains(&"input".to_string()));
+    assert!(!collector.variables.iter().any(|v| v == "x"));
+}
+
+/// Test that mutable visitor can work with Result type
+struct FallibleRenamer {
+    old_name: String,
+    new_name: String,
+    max_renames: usize,
+    rename_count: usize,
+}
+
+impl FallibleRenamer {
+    fn new(old_name: &str, new_name: &str, max_renames: usize) -> Self {
+        Self {
+            old_name: old_name.to_string(),
+            new_name: new_name.to_string(),
+            max_renames,
+            rename_count: 0,
+        }
+    }
+}
+
+impl<'a> VisitorMut<'a> for FallibleRenamer {
+    type Result = Result<(), String>;
+
+    fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) -> Self::Result {
+        if id.0 == self.old_name {
+            if self.rename_count >= self.max_renames {
+                return Err(format!("Maximum renames ({}) exceeded", self.max_renames));
+            }
+            id.0 = self.new_name.clone();
+            self.rename_count += 1;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn test_fallible_renamer_success() {
+    let code = "int x, x;";
+    let mut ast = parse_c(code);
+    let mut visitor = FallibleRenamer::new("x", "y", 5);
+    let result = visitor.visit_translation_unit_mut(&mut ast);
+
+    assert!(result.is_ok());
+    assert_eq!(visitor.rename_count, 2);
+}
+
+#[test]
+fn test_fallible_renamer_failure() {
+    let code = "int x, x, x, x;";
+    let mut ast = parse_c(code);
+    let mut visitor = FallibleRenamer::new("x", "y", 2);
+    let result = visitor.visit_translation_unit_mut(&mut ast);
+
+    assert!(result.is_err());
+    assert_eq!(visitor.rename_count, 2);
+}
