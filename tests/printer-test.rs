@@ -2,7 +2,10 @@
 
 use std::{io::Write, path::PathBuf};
 
-use cgrammar::{visitor::Visitor, *};
+use cgrammar::{
+    visitor::{Visitor, VisitorMut},
+    *,
+};
 use chumsky::prelude::*;
 use elegance::Printer;
 use pretty_assertions::assert_eq;
@@ -24,6 +27,33 @@ fn print_ast(ast: &TranslationUnit) -> String {
     printer.finish().unwrap()
 }
 
+fn remove_spans(tokens: &mut BalancedTokenSequence) {
+    tokens.eoi.start = 0;
+    tokens.eoi.end = 0;
+    for token in &mut tokens.tokens {
+        token.range.start = 0;
+        token.range.end = 0;
+        match &mut token.value {
+            BalancedToken::Parenthesized(tokens) | BalancedToken::Bracketed(tokens) | BalancedToken::Braced(tokens) => {
+                remove_spans(tokens);
+            }
+            _ => {}
+        }
+    }
+}
+
+struct RemoveSpans;
+
+impl VisitorMut<'_> for RemoveSpans {
+    type Result = ();
+
+    fn visit_attribute_mut(&mut self, attr: &'_ mut Attribute) -> Self::Result {
+        if let Some(tokens) = attr.arguments.as_mut() {
+            remove_spans(tokens);
+        }
+    }
+}
+
 // ============================================================================
 // Round-trip Tests (Parse -> Print -> Parse)
 // ============================================================================
@@ -31,13 +61,15 @@ fn print_ast(ast: &TranslationUnit) -> String {
 // Helper function to perform roundtrip parsing and verify AST is valid
 fn verify_roundtrip(code: &str) {
     // First parse
-    let ast1 = parse_c(code);
+    let mut ast1 = parse_c(code);
+    RemoveSpans.visit_translation_unit_mut(&mut ast1);
 
     // Print
     let printed = print_ast(&ast1);
 
     // Re-tokenize and parse the printed output
     let ast2 = parse_c(&printed);
+    RemoveSpans.visit_translation_unit_mut(&mut ast1);
 
     // Verify that the ASTs are equivalent
     assert_eq!(ast1, ast2);
