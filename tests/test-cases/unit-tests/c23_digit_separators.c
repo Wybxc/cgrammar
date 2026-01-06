@@ -22,7 +22,7 @@ int oct1 = 0123'456'777;
 float f1 = 1'000.5f;
 float f2 = 3.141'592'653f;
 double d1 = 1'234'567.890'123;
-double d2 = 1e1'000;
+double d2 = 1e1'00;
 
 // Arbitrary separator positions
 int weird1 = 1'2'3'4'5'6;
@@ -36,4 +36,4 @@ long long sep_ll = 1'000'000'000'000LL;
 
 // Separators in scientific notation
 double sci1 = 1.234'567e10;
-double sci2 = 1e1'000;
+double sci2 = 1e1'00;

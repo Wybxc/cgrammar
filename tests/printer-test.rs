@@ -28,11 +28,9 @@ fn print_ast(ast: &TranslationUnit) -> String {
 }
 
 fn remove_spans(tokens: &mut BalancedTokenSequence) {
-    tokens.eoi.start = 0;
-    tokens.eoi.end = 0;
+    tokens.eoi = Default::default();
     for token in &mut tokens.tokens {
-        token.range.start = 0;
-        token.range.end = 0;
+        token.range = Default::default();
         match &mut token.value {
             BalancedToken::Parenthesized(tokens) | BalancedToken::Bracketed(tokens) | BalancedToken::Braced(tokens) => {
                 remove_spans(tokens);
@@ -68,8 +66,8 @@ fn verify_roundtrip(code: &str) {
     let printed = print_ast(&ast1);
 
     // Re-tokenize and parse the printed output
-    let ast2 = parse_c(&printed);
-    RemoveSpans.visit_translation_unit_mut(&mut ast1);
+    let mut ast2 = parse_c(&printed);
+    RemoveSpans.visit_translation_unit_mut(&mut ast2);
 
     // Verify that the ASTs are equivalent
     assert_eq!(ast1, ast2);

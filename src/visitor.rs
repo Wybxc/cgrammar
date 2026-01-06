@@ -739,7 +739,13 @@ pub fn walk_cast_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CastE
 /// declaration.
 pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declaration) -> V::Result {
     match d {
-        Declaration::Normal { specifiers, declarators, .. } => {
+        Declaration::Normal { attributes, specifiers, declarators } => {
+            for attr in attributes {
+                let br = v.visit_attribute_specifier(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
             let br = v.visit_declaration_specifiers(specifiers).branch();
             if let ControlFlow::Break(res) = br {
                 return V::Result::from_residual(res);
@@ -752,7 +758,13 @@ pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarati
             }
             V::Result::output()
         }
-        Declaration::Typedef { specifiers, declarators, .. } => {
+        Declaration::Typedef { attributes, specifiers, declarators } => {
+            for attr in attributes {
+                let br = v.visit_attribute_specifier(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
             let br = v.visit_declaration_specifiers(specifiers).branch();
             if let ControlFlow::Break(res) = br {
                 return V::Result::from_residual(res);
@@ -769,7 +781,15 @@ pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarati
             if let Some(_m) = &sa.message { /* no-op walk for message */ }
             V::Result::output()
         }
-        Declaration::Attribute(_a) => V::Result::output(),
+        Declaration::Attribute(attrs) => {
+            for attr in attrs {
+                let br = v.visit_attribute_specifier(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
+            V::Result::output()
+        }
         Declaration::Error => V::Result::output(),
     }
 }
@@ -947,13 +967,43 @@ pub fn walk_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarator
 /// For function declarators, visits parameter declarations.
 pub fn walk_direct_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a DirectDeclarator) -> V::Result {
     match d {
-        DirectDeclarator::Identifier { identifier, .. } => v.visit_variable_name(identifier),
+        DirectDeclarator::Identifier { identifier, attributes } => {
+            let br = v.visit_variable_name(identifier).branch();
+            if let ControlFlow::Break(res) = br {
+                return V::Result::from_residual(res);
+            }
+            for attr in attributes {
+                let br = v.visit_attribute_specifier(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
+            V::Result::output()
+        }
         DirectDeclarator::Parenthesized(inner) => v.visit_declarator(inner),
-        DirectDeclarator::Array { declarator, .. } => v.visit_direct_declarator(declarator),
-        DirectDeclarator::Function { declarator, parameters, .. } => {
+        DirectDeclarator::Array { declarator, attributes, .. } => {
             let br = v.visit_direct_declarator(declarator).branch();
             if let ControlFlow::Break(res) = br {
                 return V::Result::from_residual(res);
+            }
+            for attr in attributes {
+                let br = v.visit_attribute_specifier(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
+            V::Result::output()
+        }
+        DirectDeclarator::Function { declarator, attributes, parameters } => {
+            let br = v.visit_direct_declarator(declarator).branch();
+            if let ControlFlow::Break(res) = br {
+                return V::Result::from_residual(res);
+            }
+            for attr in attributes {
+                let br = v.visit_attribute_specifier(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
             }
             match parameters {
                 ParameterTypeList::Parameters(params) | ParameterTypeList::Variadic(params) => {
@@ -1607,7 +1657,13 @@ pub fn walk_cast_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, c: &'
 /// Walks a declaration with mutable access.
 pub fn walk_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut Declaration) -> V::Result {
     match d {
-        Declaration::Normal { specifiers, declarators, .. } => {
+        Declaration::Normal { attributes, specifiers, declarators } => {
+            for attr in attributes {
+                let br = v.visit_attribute_specifier_mut(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
             let br = v.visit_declaration_specifiers_mut(specifiers).branch();
             if let ControlFlow::Break(res) = br {
                 return V::Result::from_residual(res);
@@ -1620,7 +1676,13 @@ pub fn walk_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mu
             }
             V::Result::output()
         }
-        Declaration::Typedef { specifiers, declarators, .. } => {
+        Declaration::Typedef { attributes, specifiers, declarators } => {
+            for attr in attributes {
+                let br = v.visit_attribute_specifier_mut(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
             let br = v.visit_declaration_specifiers_mut(specifiers).branch();
             if let ControlFlow::Break(res) = br {
                 return V::Result::from_residual(res);
@@ -1633,7 +1695,16 @@ pub fn walk_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mu
             }
             V::Result::output()
         }
-        Declaration::StaticAssert(_) | Declaration::Attribute(_) | Declaration::Error => V::Result::output(),
+        Declaration::Attribute(attrs) => {
+            for attr in attrs {
+                let br = v.visit_attribute_specifier_mut(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
+            V::Result::output()
+        }
+        Declaration::StaticAssert(_) | Declaration::Error => V::Result::output(),
     }
 }
 
@@ -1798,13 +1869,43 @@ pub fn walk_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut
 /// Walks a direct declarator with mutable access.
 pub fn walk_direct_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut DirectDeclarator) -> V::Result {
     match d {
-        DirectDeclarator::Identifier { identifier, .. } => v.visit_variable_name_mut(identifier),
+        DirectDeclarator::Identifier { identifier, attributes } => {
+            let br = v.visit_variable_name_mut(identifier).branch();
+            if let ControlFlow::Break(res) = br {
+                return V::Result::from_residual(res);
+            }
+            for attr in attributes {
+                let br = v.visit_attribute_specifier_mut(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
+            V::Result::output()
+        }
         DirectDeclarator::Parenthesized(inner) => v.visit_declarator_mut(inner),
-        DirectDeclarator::Array { declarator, .. } => v.visit_direct_declarator_mut(declarator),
-        DirectDeclarator::Function { declarator, parameters, .. } => {
+        DirectDeclarator::Array { declarator, attributes, .. } => {
             let br = v.visit_direct_declarator_mut(declarator).branch();
             if let ControlFlow::Break(res) = br {
                 return V::Result::from_residual(res);
+            }
+            for attr in attributes {
+                let br = v.visit_attribute_specifier_mut(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
+            }
+            V::Result::output()
+        }
+        DirectDeclarator::Function { declarator, attributes, parameters } => {
+            let br = v.visit_direct_declarator_mut(declarator).branch();
+            if let ControlFlow::Break(res) = br {
+                return V::Result::from_residual(res);
+            }
+            for attr in attributes {
+                let br = v.visit_attribute_specifier_mut(attr).branch();
+                if let ControlFlow::Break(res) = br {
+                    return V::Result::from_residual(res);
+                }
             }
             match parameters {
                 ParameterTypeList::Parameters(params) | ParameterTypeList::Variadic(params) => {

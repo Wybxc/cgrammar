@@ -597,23 +597,29 @@ fn print_constant<'a, R: Render>(pp: &mut Printer<'a, R>, c: &'a Constant) -> Re
             Ok(())
         }
         Constant::Floating(floating_constant) => {
-            let value_str = floating_constant.value.to_string();
-            // Ensure we have a decimal point or exponent for floating point literals
-            // to maintain type information
-            if !value_str.contains('.') && !value_str.contains('e') && !value_str.contains('E') {
-                pp.text_owned(format!("{:.1}", floating_constant.value))?;
+            let value = floating_constant.value;
+            // Handle special floating point values
+            if value.is_infinite() || value.is_nan() {
+                panic!("Cannot print infinite or NaN floating point literals");
             } else {
-                pp.text_owned(value_str)?;
-            }
-            if let Some(suffix) = floating_constant.suffix {
-                let suffix_str = match suffix {
-                    crate::ast::FloatingSuffix::F => "f",
-                    crate::ast::FloatingSuffix::L => "l",
-                    crate::ast::FloatingSuffix::DF => "df",
-                    crate::ast::FloatingSuffix::DD => "dd",
-                    crate::ast::FloatingSuffix::DL => "dl",
-                };
-                pp.text(suffix_str)?;
+                let value_str = value.to_string();
+                // Ensure we have a decimal point or exponent for floating point literals
+                // to maintain type information
+                if !value_str.contains('.') && !value_str.contains('e') && !value_str.contains('E') {
+                    pp.text_owned(format!("{:.1}", value))?;
+                } else {
+                    pp.text_owned(value_str)?;
+                }
+                if let Some(suffix) = floating_constant.suffix {
+                    let suffix_str = match suffix {
+                        crate::ast::FloatingSuffix::F => "f",
+                        crate::ast::FloatingSuffix::L => "l",
+                        crate::ast::FloatingSuffix::DF => "df",
+                        crate::ast::FloatingSuffix::DD => "dd",
+                        crate::ast::FloatingSuffix::DL => "dl",
+                    };
+                    pp.text(suffix_str)?;
+                }
             }
             Ok(())
         }
@@ -1757,16 +1763,17 @@ fn print_direct_declarator<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a Direct
         }
         DirectDeclarator::Function { declarator, attributes, parameters } => {
             pp.visit_direct_declarator(declarator)?;
-            for a in attributes {
-                pp.space()?;
-                pp.visit_attribute_specifier(a)?;
-            }
             pp.igroup(2, |pp| {
                 pp.text("(")?;
                 print_parameter_type_list(pp, parameters)?;
                 pp.scan_break(0, -2)?;
                 pp.text(")")
-            })
+            })?;
+            for a in attributes {
+                pp.space()?;
+                pp.visit_attribute_specifier(a)?;
+            }
+            Ok(())
         }
     }
 }
@@ -1904,16 +1911,17 @@ fn print_direct_abstract_declarator<'a, R: Render>(
             if let Some(dd) = declarator {
                 pp.visit_direct_abstract_declarator(dd)?;
             }
-            for a in attributes {
-                pp.space()?;
-                pp.visit_attribute_specifier(a)?;
-            }
             pp.igroup(2, |pp| {
                 pp.text("(")?;
                 print_parameter_type_list(pp, parameters)?;
                 pp.scan_break(0, -2)?;
                 pp.text(")")
-            })
+            })?;
+            for a in attributes {
+                pp.space()?;
+                pp.visit_attribute_specifier(a)?;
+            }
+            Ok(())
         }
     }
 }
