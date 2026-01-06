@@ -597,7 +597,14 @@ fn print_constant<'a, R: Render>(pp: &mut Printer<'a, R>, c: &'a Constant) -> Re
             Ok(())
         }
         Constant::Floating(floating_constant) => {
-            pp.text_owned(floating_constant.value.to_string())?;
+            let value_str = floating_constant.value.to_string();
+            // Ensure we have a decimal point or exponent for floating point literals
+            // to maintain type information
+            if !value_str.contains('.') && !value_str.contains('e') && !value_str.contains('E') {
+                pp.text_owned(format!("{:.1}", floating_constant.value))?;
+            } else {
+                pp.text_owned(value_str)?;
+            }
             if let Some(suffix) = floating_constant.suffix {
                 let suffix_str = match suffix {
                     crate::ast::FloatingSuffix::F => "f",
@@ -876,11 +883,18 @@ fn print_iteration_statement<'a, R: Render>(
             pp.text("(")?;
             if let Some(i) = init {
                 match i {
-                    ForInit::Expression(e) => pp.visit_expression(e)?,
-                    ForInit::Declaration(d) => pp.visit_declaration(d)?,
+                    ForInit::Expression(e) => {
+                        pp.visit_expression(e)?;
+                        pp.text(";")?;
+                    }
+                    ForInit::Declaration(d) => {
+                        pp.visit_declaration(d)?;
+                        // Declaration already includes the semicolon
+                    }
                 }
+            } else {
+                pp.text(";")?;
             }
-            pp.text(";")?;
             if let Some(c) = condition {
                 pp.space()?;
                 pp.visit_expression(c)?;
@@ -1235,7 +1249,9 @@ fn print_declaration<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a Declaration)
             }
             pp.text("typedef")?;
             pp.space()?;
-            pp.visit_declaration_specifiers(specifiers)?;
+            // Print declaration specifiers, but skip Typedef storage class
+            // since we already printed "typedef"
+            print_declaration_specifiers_skip_typedef(pp, specifiers)?;
             if !declarators.is_empty() {
                 pp.space()?;
                 for (i, decl) in declarators.iter().enumerate() {
@@ -1350,6 +1366,39 @@ fn print_declaration_specifiers<'a, R: Render>(
                     pp.space()?;
                 }
                 print_function_specifier(pp, specifier)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn print_declaration_specifiers_skip_typedef<'a, R: Render>(
+    pp: &mut Printer<'a, R>,
+    s: &'a DeclarationSpecifiers,
+) -> Result<(), R::Error> {
+    let mut first = true;
+    for spec in s.specifiers.iter() {
+        match spec {
+            DeclarationSpecifier::StorageClass(StorageClassSpecifier::Typedef) => {
+                // Skip the Typedef storage class, we already printed it
+                continue;
+            }
+            _ => {
+                if !first {
+                    pp.space()?;
+                }
+                first = false;
+                match spec {
+                    DeclarationSpecifier::StorageClass(scs) => print_storage_class_specifier(pp, scs)?,
+                    DeclarationSpecifier::TypeSpecifierQualifier(tsq) => pp.visit_type_specifier_qualifier(tsq)?,
+                    DeclarationSpecifier::Function { specifier, attributes } => {
+                        for a in attributes {
+                            pp.visit_attribute_specifier(a)?;
+                            pp.space()?;
+                        }
+                        print_function_specifier(pp, specifier)?;
+                    }
+                }
             }
         }
     }
@@ -1655,6 +1704,7 @@ fn print_declarator<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a Declarator) -
         Declarator::Direct(dd) => pp.visit_direct_declarator(dd),
         Declarator::Pointer { pointer, declarator } => {
             print_pointer(pp, pointer)?;
+            pp.space()?;
             pp.visit_declarator(declarator)
         }
         Declarator::Error => Ok(()),
@@ -1819,6 +1869,7 @@ fn print_abstract_declarator<'a, R: Render>(
         AbstractDeclarator::Pointer { pointer, abstract_declarator } => {
             print_pointer(pp, pointer)?;
             if let Some(ad) = abstract_declarator {
+                pp.space()?;
                 pp.visit_abstract_declarator(ad)?;
             }
             Ok(())

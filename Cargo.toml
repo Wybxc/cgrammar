@@ -27,4 +27,5 @@ printer = ["dep:elegance"]
 
 [dev-dependencies]
 pathdiff = "0.2.3"
+pretty_assertions = "1.4.1"
 rstest = "0.26.1"

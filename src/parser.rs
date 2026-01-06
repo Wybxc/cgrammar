@@ -210,7 +210,7 @@ pub fn unary_expression<'a>() -> impl Parser<'a, Tokens<'a>, UnaryExpression, Ex
         .parenthesized()
         .recover_with(recover_parenthesized(TypeName::Error));
     let sizeof_type = keyword("sizeof").ignore_then(type_name.clone());
-    let alignof_type = keyword("alignof").ignore_then(type_name);
+    let alignof_type = keyword("alignof").or(keyword("_Alignof")).ignore_then(type_name);
 
     let postfix = postfix_expression();
 
@@ -559,7 +559,7 @@ pub fn type_specifier<'a>() -> impl Parser<'a, Tokens<'a>, TypeSpecifier, Extra<
         keyword("double").to(TypeSpecifier::Double),
         keyword("signed").to(TypeSpecifier::Signed),
         keyword("unsigned").to(TypeSpecifier::Unsigned),
-        keyword("bool").to(TypeSpecifier::Bool),
+        keyword("bool").or(keyword("_Bool")).to(TypeSpecifier::Bool),
         keyword("_Complex").to(TypeSpecifier::Complex),
         keyword("_Decimal32").to(TypeSpecifier::Decimal32),
         keyword("_Decimal64").to(TypeSpecifier::Decimal64),

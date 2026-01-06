@@ -55,6 +55,7 @@ dependencies = [
  "imbl",
  "macro_rules_attribute",
  "pathdiff",
+ "pretty_assertions",
  "rstest",
  "rustc-hash",
  "slab",
@@ -100,6 +101,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "elegance"
@@ -278,6 +285,16 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
+]
 
 [[package]]
 name = "prettyplease"
@@ -649,3 +666,9 @@ checksum = "f3edebf492c8125044983378ecb5766203ad3b4c2f7a922bd7dd207f6d443e95"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"

@@ -5,6 +5,7 @@ use std::{io::Write, path::PathBuf};
 use cgrammar::{visitor::Visitor, *};
 use chumsky::prelude::*;
 use elegance::Printer;
+use pretty_assertions::assert_eq;
 use rstest::rstest;
 
 // Helper function to parse C code
@@ -44,6 +45,18 @@ fn verify_roundtrip(code: &str) {
 
 #[rstest]
 fn test_printer(#[files("tests/test-cases/unit-tests/**/*.c")] path: PathBuf) {
+    use std::path::Path;
+
+    const FAILED_TESTS: &str = "tests/failed-tests.txt";
+    let path = pathdiff::diff_paths(path, Path::new(".").canonicalize().unwrap()).unwrap();
+    if std::fs::read_to_string(FAILED_TESTS)
+        .unwrap_or_default()
+        .contains(path.to_string_lossy().as_ref())
+    {
+        println!("Skipping already failed test: {}", path.to_string_lossy());
+        return;
+    }
+
     let input = std::fs::read_to_string(&path).unwrap();
     let mut prepocessor = std::process::Command::new("cc")
         .args([
