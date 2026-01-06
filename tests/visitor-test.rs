@@ -1,7 +1,6 @@
 use std::ops::ControlFlow;
 
-use cgrammar::visitor::*;
-use cgrammar::*;
+use cgrammar::{visitor::*, *};
 use chumsky::prelude::*;
 use rstest::rstest;
 

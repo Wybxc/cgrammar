@@ -1552,7 +1552,8 @@ where
     map_ctx(|ctx: &Context| Context { no_recover: false, ..*ctx }, parser)
 }
 
-/// Create a recovery strategy using a parser, respecting the `no_recover` context flag.
+/// Create a recovery strategy using a parser, respecting the `no_recover`
+/// context flag.
 pub fn recover_via_parser<'a, A, O>(parser: A) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone
 where
     A: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
@@ -1569,7 +1570,8 @@ where
     ))
 }
 
-/// Create a recovery strategy that consumes a parenthesized token and returns the given error value.
+/// Create a recovery strategy that consumes a parenthesized token and returns
+/// the given error value.
 pub fn recover_parenthesized<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
@@ -1578,7 +1580,8 @@ pub fn recover_parenthesized<'a, O: Clone>(
     })
 }
 
-/// Create a recovery strategy that consumes a bracketed token and returns the given error value.
+/// Create a recovery strategy that consumes a bracketed token and returns the
+/// given error value.
 pub fn recover_bracketed<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
@@ -1587,7 +1590,8 @@ pub fn recover_bracketed<'a, O: Clone>(
     })
 }
 
-/// Create a rich error indicating what was expected and what was found at a given span.
+/// Create a rich error indicating what was expected and what was found at a
+/// given span.
 pub fn expected_found<'a, L>(
     expected: impl IntoIterator<Item = L>,
     found: Option<BalancedToken>,
@@ -1600,7 +1604,8 @@ where
     LabelError::<Tokens<'a>, L>::expected_found(expected, found.map(MaybeRef::Val), span)
 }
 
-/// Extension trait for parsers to add convenience methods for parsing nested token sequences.
+/// Extension trait for parsers to add convenience methods for parsing nested
+/// token sequences.
 pub trait ParserExt<O> {
     /// Parse the content within parentheses.
     fn parenthesized<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone

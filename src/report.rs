@@ -1,7 +1,8 @@
 //! Error reporting.
 
-use crate::{ast::*, parser_utils::Error};
 use std::fmt;
+
+use crate::{ast::*, parser_utils::Error};
 
 struct DiagnosticToken(BalancedToken);
 

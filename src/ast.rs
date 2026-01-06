@@ -675,7 +675,8 @@ impl Declarator {
         }
     }
 
-    /// Get the parameter type list from the declarator. None if not a function declarator.
+    /// Get the parameter type list from the declarator. None if not a function
+    /// declarator.
     pub fn parameters(&self) -> Option<&ParameterTypeList> {
         match self {
             Declarator::Direct(direct) => direct.parameters(),
@@ -717,7 +718,8 @@ impl DirectDeclarator {
         }
     }
 
-    /// Get the parameter type list from the direct declarator. None if not a function declarator.
+    /// Get the parameter type list from the direct declarator. None if not a
+    /// function declarator.
     pub fn parameters(&self) -> Option<&ParameterTypeList> {
         match self {
             DirectDeclarator::Function { parameters, .. } => Some(parameters),
@@ -918,17 +920,20 @@ pub enum AttributeToken {
 }
 
 impl AttributeToken {
-    /// Check if the attribute token is a prefixed attribute with the given prefix.
+    /// Check if the attribute token is a prefixed attribute with the given
+    /// prefix.
     pub fn is_prefixed(&self, prefix: &str) -> bool {
         matches!(self, AttributeToken::Prefixed { prefix: p, .. } if p.0 == prefix)
     }
 
-    /// Check if the attribute token is a standard attribute with the given name.
+    /// Check if the attribute token is a standard attribute with the given
+    /// name.
     pub fn is_standard(&self, name: &str) -> bool {
         matches!(self, AttributeToken::Standard(id) if id.0 == name)
     }
 
-    /// Get the prefix and identifier of a prefixed attribute token, or None if not prefixed.
+    /// Get the prefix and identifier of a prefixed attribute token, or None if
+    /// not prefixed.
     pub fn as_prefixed(&self) -> Option<(&Identifier, &Identifier)> {
         match self {
             AttributeToken::Prefixed { prefix, identifier } => Some((prefix, identifier)),
@@ -936,7 +941,8 @@ impl AttributeToken {
         }
     }
 
-    /// Get the identifier of a standard attribute token, or None if not standard.
+    /// Get the identifier of a standard attribute token, or None if not
+    /// standard.
     pub fn as_standard(&self) -> Option<&Identifier> {
         match self {
             AttributeToken::Standard(id) => Some(id),
@@ -944,7 +950,8 @@ impl AttributeToken {
         }
     }
 
-    /// If the attribute token is a prefixed attribute with the given prefix, return its identifier.
+    /// If the attribute token is a prefixed attribute with the given prefix,
+    /// return its identifier.
     pub fn get_identifier(&self, prefix: &str) -> Option<&Identifier> {
         match self {
             AttributeToken::Prefixed { prefix: p, identifier } if p.0 == prefix => Some(identifier),

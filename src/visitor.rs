@@ -1,8 +1,9 @@
 //! Visitor pattern implementation for traversing the C AST.
 //!
-//! This module provides a flexible visitor pattern for traversing and analyzing C abstract syntax trees.
-//! It distinguishes between different semantic types of identifiers (variable names, type names, labels, etc.)
-//! to enable more precise analysis and transformation of C code.
+//! This module provides a flexible visitor pattern for traversing and analyzing
+//! C abstract syntax trees. It distinguishes between different semantic types
+//! of identifiers (variable names, type names, labels, etc.) to enable more
+//! precise analysis and transformation of C code.
 //!
 //! # Example
 //!
@@ -23,8 +24,7 @@
 
 use std::ops::ControlFlow;
 
-use crate::Identifier;
-use crate::ast::*;
+use crate::{Identifier, ast::*};
 
 /// A trait that represents the result type of visitor operations.
 ///
@@ -45,7 +45,8 @@ pub trait VisitorResult {
     /// Creates a result from a residual value (used when breaking early).
     fn from_residual(residual: Self::Residual) -> Self;
 
-    /// Creates a result from a control flow, handling both continue and break cases.
+    /// Creates a result from a control flow, handling both continue and break
+    /// cases.
     fn from_branch(b: ControlFlow<Self::Residual>) -> Self;
 
     /// Converts this result into a control flow for early termination handling.
@@ -122,14 +123,14 @@ impl<T> VisitorResult for ControlFlow<T> {
 
 /// The main visitor trait for traversing C AST nodes.
 ///
-/// Implementers of this trait can customize behavior for different AST node types.
-/// The trait provides default implementations that perform recursive traversal via
-/// corresponding `walk_*` functions.
+/// Implementers of this trait can customize behavior for different AST node
+/// types. The trait provides default implementations that perform recursive
+/// traversal via corresponding `walk_*` functions.
 ///
 /// # Result Type
 ///
-/// The associated `Result` type determines how visitor methods report their outcome.
-/// Common choices are:
+/// The associated `Result` type determines how visitor methods report their
+/// outcome. Common choices are:
 /// - `()` for simple analysis without early termination
 /// - `ControlFlow<T>` for analysis that may terminate early with a result
 ///
@@ -146,7 +147,8 @@ pub trait Visitor<'a> {
     /// Visits a variable name identifier.
     ///
     /// This is called when encountering an identifier in an expression context
-    /// (e.g., variable references) or in a declarator (e.g., variable declarations).
+    /// (e.g., variable references) or in a declarator (e.g., variable
+    /// declarations).
     ///
     /// # Examples
     /// - `x` in `x = 5`
@@ -158,7 +160,8 @@ pub trait Visitor<'a> {
 
     /// Visits a typedef name identifier.
     ///
-    /// This is called when encountering a typedef name used as a type specifier.
+    /// This is called when encountering a typedef name used as a type
+    /// specifier.
     ///
     /// # Examples
     /// - `size_t` in `size_t len;`
@@ -169,7 +172,8 @@ pub trait Visitor<'a> {
 
     /// Visits an enumeration constant identifier.
     ///
-    /// This is called when encountering an enumeration constant in an expression.
+    /// This is called when encountering an enumeration constant in an
+    /// expression.
     ///
     /// # Examples
     /// - `RED` in `color = RED;` where RED is an enum constant
@@ -179,7 +183,8 @@ pub trait Visitor<'a> {
 
     /// Visits a label name identifier.
     ///
-    /// This is called when encountering a goto label or a label in switch statements.
+    /// This is called when encountering a goto label or a label in switch
+    /// statements.
     ///
     /// # Examples
     /// - `error_handler:` in label declarations
@@ -190,7 +195,8 @@ pub trait Visitor<'a> {
 
     /// Visits a struct or union member name identifier.
     ///
-    /// This is called when accessing a struct/union member via `.` or `->` operators.
+    /// This is called when accessing a struct/union member via `.` or `->`
+    /// operators.
     ///
     /// # Examples
     /// - `x` in `point.x`
@@ -240,7 +246,8 @@ pub trait Visitor<'a> {
         walk_translation_unit(self, tu)
     }
 
-    /// Visits an external declaration (function definition or global declaration).
+    /// Visits an external declaration (function definition or global
+    /// declaration).
     fn visit_external_declaration(&mut self, d: &'a ExternalDeclaration) -> Self::Result {
         walk_external_declaration(self, d)
     }
@@ -393,7 +400,8 @@ pub fn walk_external_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a 
     }
 }
 
-/// Walks a function definition, visiting declaration specifiers, declarator, and body.
+/// Walks a function definition, visiting declaration specifiers, declarator,
+/// and body.
 pub fn walk_function_definition<'a, V: Visitor<'a> + ?Sized>(v: &mut V, f: &'a FunctionDefinition) -> V::Result {
     // walk attributes
     for attr in &f.attributes {
@@ -441,9 +449,9 @@ pub fn walk_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a Statement) 
 
 /// Walks an unlabeled statement.
 ///
-/// This handles expression statements, compound statements, selection statements,
-/// iteration statements, and jump statements. For each type, visits relevant
-/// sub-expressions, declarations, and statements.
+/// This handles expression statements, compound statements, selection
+/// statements, iteration statements, and jump statements. For each type, visits
+/// relevant sub-expressions, declarations, and statements.
 pub fn walk_unlabeled_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a UnlabeledStatement) -> V::Result {
     match s {
         UnlabeledStatement::Expression(es) => {
@@ -550,10 +558,11 @@ pub fn walk_unlabeled_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a U
     }
 }
 
-/// Walks a compound statement (block), visiting declarations, statements, and labels.
+/// Walks a compound statement (block), visiting declarations, statements, and
+/// labels.
 ///
-/// Iterates through all block items, dispatching to appropriate visitor methods.
-/// For label identifiers within the block, calls `visit_label_name`.
+/// Iterates through all block items, dispatching to appropriate visitor
+/// methods. For label identifiers within the block, calls `visit_label_name`.
 pub fn walk_compound_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CompoundStatement) -> V::Result {
     for item in &c.items {
         let br = match item {
@@ -621,9 +630,10 @@ pub fn walk_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a Expression
 /// Walks a postfix expression.
 ///
 /// Handles primary expressions (identifiers, enum constants, literals, etc.),
-/// array access, function calls, member access, and increment/decrement operators.
-/// Calls `visit_variable_name` for identifiers and `visit_enum_constant` for
-/// enumeration constants. Calls `visit_member_name` for member access operations.
+/// array access, function calls, member access, and increment/decrement
+/// operators. Calls `visit_variable_name` for identifiers and
+/// `visit_enum_constant` for enumeration constants. Calls `visit_member_name`
+/// for member access operations.
 pub fn walk_postfix_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, p: &'a PostfixExpression) -> V::Result {
     match p {
         PostfixExpression::Primary(pr) => match pr {
@@ -694,8 +704,8 @@ pub fn walk_postfix_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, p: &'a Po
 
 /// Walks a unary expression.
 ///
-/// Handles pre/post increment/decrement, unary operators (address-of, dereference, etc.),
-/// sizeof, and alignof operations.
+/// Handles pre/post increment/decrement, unary operators (address-of,
+/// dereference, etc.), sizeof, and alignof operations.
 pub fn walk_unary_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, u: &'a UnaryExpression) -> V::Result {
     match u {
         UnaryExpression::Postfix(p) => v.visit_postfix_expression(p),
@@ -724,8 +734,9 @@ pub fn walk_cast_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CastE
 
 /// Walks a declaration.
 ///
-/// Handles normal declarations, typedef declarations, static assertions, and attributes.
-/// Visits declaration specifiers and declarators for each declaration.
+/// Handles normal declarations, typedef declarations, static assertions, and
+/// attributes. Visits declaration specifiers and declarators for each
+/// declaration.
 pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declaration) -> V::Result {
     match d {
         Declaration::Normal { specifiers, declarators, .. } => {
@@ -763,7 +774,8 @@ pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarati
     }
 }
 
-/// Walks declaration specifiers (storage class, type specifiers, qualifiers, etc.).
+/// Walks declaration specifiers (storage class, type specifiers, qualifiers,
+/// etc.).
 pub fn walk_declaration_specifiers<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a DeclarationSpecifiers) -> V::Result {
     for it in &s.specifiers {
         let br = match it {
@@ -797,9 +809,10 @@ pub fn walk_type_specifier_qualifier<'a, V: Visitor<'a> + ?Sized>(
 
 /// Walks a type specifier.
 ///
-/// Handles struct, union, enum, typedef names, atomic types, and typeof specifiers.
-/// Calls `visit_struct_name` for struct identifiers, `visit_enum_name` for enum identifiers,
-/// `visit_enumerator_name` for enumerators, and `visit_type_name_identifier` for typedef names.
+/// Handles struct, union, enum, typedef names, atomic types, and typeof
+/// specifiers. Calls `visit_struct_name` for struct identifiers,
+/// `visit_enum_name` for enum identifiers, `visit_enumerator_name` for
+/// enumerators, and `visit_type_name_identifier` for typedef names.
 pub fn walk_type_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, ts: &'a TypeSpecifier) -> V::Result {
     match ts {
         TypeSpecifier::Struct(s) => {
@@ -1032,7 +1045,8 @@ pub fn walk_direct_abstract_declarator<'a, V: Visitor<'a> + ?Sized>(
 
 /// Walks an attribute specifier.
 ///
-/// This is called when encountering an attribute specifier in a function definition.
+/// This is called when encountering an attribute specifier in a function
+/// definition.
 pub fn walk_attribute_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AttributeSpecifier) -> V::Result {
     match a {
         AttributeSpecifier::Attributes(attributes) => {

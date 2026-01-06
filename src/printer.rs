@@ -2,8 +2,7 @@
 
 use elegance::{Printer, Render};
 
-use crate::ast::*;
-use crate::visitor::Visitor;
+use crate::{ast::*, visitor::Visitor};
 
 // pub trait Parenthesize {
 //     fn precedence(&self) -> i32;
@@ -22,8 +21,9 @@ use crate::visitor::Visitor;
 
 //     fn wrapped(&mut self) {
 //         let expr = std::mem::replace(self, Self::error());
-//         *self = Self::from_primary(PrimaryExpression::Parenthesized(Box::new(expr.into_expression())));
-//     }
+//         *self =
+// Self::from_primary(PrimaryExpression::Parenthesized(Box::new(expr.
+// into_expression())));     }
 
 //     fn wrapped_at(&mut self, precedence: i32) {
 //         if precedence < self.precedence() {
@@ -39,10 +39,10 @@ use crate::visitor::Visitor;
 //             Expression::Unary(e) => e.precedence(),
 //             Expression::Cast(e) => e.precedence(),
 //             Expression::Binary(e) => match e.operator {
-//                 BinaryOperator::Multiply | BinaryOperator::Divide | BinaryOperator::Modulo => 30,
-//                 BinaryOperator::Add | BinaryOperator::Subtract => 40,
-//                 BinaryOperator::LeftShift | BinaryOperator::RightShift => 50,
-//                 BinaryOperator::Less
+//                 BinaryOperator::Multiply | BinaryOperator::Divide |
+// BinaryOperator::Modulo => 30,                 BinaryOperator::Add |
+// BinaryOperator::Subtract => 40,                 BinaryOperator::LeftShift |
+// BinaryOperator::RightShift => 50,                 BinaryOperator::Less
 //                 | BinaryOperator::Greater
 //                 | BinaryOperator::LessEqual
 //                 | BinaryOperator::GreaterEqual => 60,
@@ -137,10 +137,10 @@ use crate::visitor::Visitor;
 //     fn parenthesize_at(&mut self, _: i32) {
 //         match self {
 //             // type-name : assignment-expression
-//             GenericAssociation::Type { expression, .. } => expression.parenthesize_at(140),
-//             // default : assignment-expression
-//             GenericAssociation::Default { expression } => expression.parenthesize_at(140),
-//         }
+//             GenericAssociation::Type { expression, .. } =>
+// expression.parenthesize_at(140),             // default :
+// assignment-expression             GenericAssociation::Default { expression }
+// => expression.parenthesize_at(140),         }
 //     }
 // }
 
@@ -237,8 +237,8 @@ use crate::visitor::Visitor;
 //                 self.wrapped_at(precedence);
 //             }
 //             // sizeof ( type-name ) | alignof ( type-name )
-//             UnaryExpression::SizeofType(_) | UnaryExpression::Alignof(_) => {}
-//         }
+//             UnaryExpression::SizeofType(_) | UnaryExpression::Alignof(_) =>
+// {}         }
 //     }
 // }
 
@@ -898,10 +898,7 @@ fn print_iteration_statement<'a, R: Render>(
     }
 }
 
-fn print_compound_statement<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    c: &'a CompoundStatement,
-) -> Result<(), R::Error> {
+fn print_compound_statement<'a, R: Render>(pp: &mut Printer<'a, R>, c: &'a CompoundStatement) -> Result<(), R::Error> {
     pp.igroup(2, |pp| {
         pp.text("{")?;
         pp.hard_break()?;
@@ -1037,10 +1034,7 @@ fn print_assignment_operator<'a, R: Render>(pp: &mut Printer<'a, R>, op: &Assign
     pp.text(text)
 }
 
-fn print_postfix_expression<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    p: &'a PostfixExpression,
-) -> Result<(), R::Error> {
+fn print_postfix_expression<'a, R: Render>(pp: &mut Printer<'a, R>, p: &'a PostfixExpression) -> Result<(), R::Error> {
     match p {
         PostfixExpression::Primary(pr) => print_primary_expression(pp, pr),
         PostfixExpression::ArrayAccess { array, index } => {
@@ -1095,10 +1089,7 @@ fn print_postfix_expression<'a, R: Render>(
     }
 }
 
-fn print_primary_expression<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    pr: &'a PrimaryExpression,
-) -> Result<(), R::Error> {
+fn print_primary_expression<'a, R: Render>(pp: &mut Printer<'a, R>, pr: &'a PrimaryExpression) -> Result<(), R::Error> {
     match pr {
         PrimaryExpression::Identifier(id) => pp.visit_variable_name(id),
         PrimaryExpression::Constant(c) => print_constant(pp, c),
@@ -1152,10 +1143,7 @@ fn print_primary_expression<'a, R: Render>(
     }
 }
 
-fn print_unary_expression<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    u: &'a UnaryExpression,
-) -> Result<(), R::Error> {
+fn print_unary_expression<'a, R: Render>(pp: &mut Printer<'a, R>, u: &'a UnaryExpression) -> Result<(), R::Error> {
     match u {
         UnaryExpression::Postfix(p) => pp.visit_postfix_expression(p),
         UnaryExpression::PreIncrement(inner) => {
@@ -1202,10 +1190,7 @@ fn print_unary_operator<'a, R: Render>(pp: &mut Printer<'a, R>, op: &UnaryOperat
     pp.text(text)
 }
 
-fn print_cast_expression<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    c: &'a CastExpression,
-) -> Result<(), R::Error> {
+fn print_cast_expression<'a, R: Render>(pp: &mut Printer<'a, R>, c: &'a CastExpression) -> Result<(), R::Error> {
     match c {
         CastExpression::Unary(u) => pp.visit_unary_expression(u),
         CastExpression::Cast { type_name, expression } => {
@@ -1300,10 +1285,7 @@ fn print_initializer<'a, R: Render>(pp: &mut Printer<'a, R>, init: &'a Initializ
     }
 }
 
-fn print_braced_initializer<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    b: &'a BracedInitializer,
-) -> Result<(), R::Error> {
+fn print_braced_initializer<'a, R: Render>(pp: &mut Printer<'a, R>, b: &'a BracedInitializer) -> Result<(), R::Error> {
     pp.igroup(2, |pp| {
         pp.text("{")?;
         for (i, init) in b.initializers.iter().enumerate() {
@@ -1390,10 +1372,7 @@ fn print_storage_class_specifier<'a, R: Render>(
     pp.text(text)
 }
 
-fn print_function_specifier<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    fs: &FunctionSpecifier,
-) -> Result<(), R::Error> {
+fn print_function_specifier<'a, R: Render>(pp: &mut Printer<'a, R>, fs: &FunctionSpecifier) -> Result<(), R::Error> {
     let text = match fs {
         FunctionSpecifier::Inline => "inline",
         FunctionSpecifier::Noreturn => "_Noreturn",
@@ -1505,10 +1484,7 @@ fn print_struct_or_union_specifier<'a, R: Render>(
     Ok(())
 }
 
-fn print_member_declaration<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    m: &'a MemberDeclaration,
-) -> Result<(), R::Error> {
+fn print_member_declaration<'a, R: Render>(pp: &mut Printer<'a, R>, m: &'a MemberDeclaration) -> Result<(), R::Error> {
     match m {
         MemberDeclaration::Normal { attributes, specifiers, declarators } => {
             for a in attributes {
@@ -1704,10 +1680,7 @@ fn print_pointer<'a, R: Render>(pp: &mut Printer<'a, R>, p: &'a Pointer) -> Resu
     Ok(())
 }
 
-fn print_direct_declarator<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    d: &'a DirectDeclarator,
-) -> Result<(), R::Error> {
+fn print_direct_declarator<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a DirectDeclarator) -> Result<(), R::Error> {
     match d {
         DirectDeclarator::Identifier { identifier, attributes } => {
             pp.visit_variable_name(identifier)?;
@@ -1748,10 +1721,7 @@ fn print_direct_declarator<'a, R: Render>(
     }
 }
 
-fn print_array_declarator<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    a: &'a ArrayDeclarator,
-) -> Result<(), R::Error> {
+fn print_array_declarator<'a, R: Render>(pp: &mut Printer<'a, R>, a: &'a ArrayDeclarator) -> Result<(), R::Error> {
     match a {
         ArrayDeclarator::Normal { type_qualifiers, size } => {
             for (i, tq) in type_qualifiers.iter().enumerate() {
@@ -1793,10 +1763,7 @@ fn print_array_declarator<'a, R: Render>(
     }
 }
 
-fn print_parameter_type_list<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    p: &'a ParameterTypeList,
-) -> Result<(), R::Error> {
+fn print_parameter_type_list<'a, R: Render>(pp: &mut Printer<'a, R>, p: &'a ParameterTypeList) -> Result<(), R::Error> {
     match p {
         ParameterTypeList::Parameters(params) => {
             for (i, param) in params.iter().enumerate() {

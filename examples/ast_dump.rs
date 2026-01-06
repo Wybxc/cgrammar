@@ -1,3 +1,4 @@
+#![cfg(feature = "dbg-pls")]
 //! Dump the AST of a C source file.
 //!
 //! Usage: `cargo run --example ast_dump --all-features -- path/to/source.c`

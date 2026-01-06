@@ -68,8 +68,8 @@ where
         let cache = cache.borrow();
         cache.get(&key).and_then(|b| b.clone().downcast::<P!['static]>().ok())
     }) {
-        // SAFETY: The parser created by `cacher` is guaranteed to be valid for any lifetime,
-        // so we can safely transmute it to the desired lifetime.
+        // SAFETY: The parser created by `cacher` is guaranteed to be valid for any
+        // lifetime, so we can safely transmute it to the desired lifetime.
         let parser = unsafe { std::mem::transmute::<Rc<P!['static]>, Rc<P!['src]>>(parser) };
         let parser = Rc::downgrade(&parser);
         return Ext(Shared::Weak(parser));
@@ -79,8 +79,8 @@ where
     CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
         let parser = parser.clone();
-        // SAFETY: The parser created by `cacher` is guaranteed to be valid for any lifetime,
-        // so we can safely transmute it to the desired lifetime.
+        // SAFETY: The parser created by `cacher` is guaranteed to be valid for any
+        // lifetime, so we can safely transmute it to the desired lifetime.
         let parser = unsafe { std::mem::transmute::<Rc<P!['src]>, Rc<P!['static]>>(parser) };
         cache.insert(key, parser as Rc<dyn Any>);
     });

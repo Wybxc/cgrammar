@@ -1,6 +1,8 @@
+#![cfg(feature = "dbg-pls")]
 //! Parse into custom attributes from a C source file.
 //!
-//! Usage: `cargo run --example custom_attribute --all-features -- path/to/source.c`
+//! Usage: `cargo run --example custom_attribute --all-features --
+//! path/to/source.c`
 
 use cgrammar::*;
 use chumsky::Parser;
