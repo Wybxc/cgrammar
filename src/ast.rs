@@ -5,6 +5,7 @@ use std::fmt;
 
 #[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
+use ordered_float::NotNan;
 
 use crate::span::{SourceRange, Spanned};
 
@@ -30,7 +31,7 @@ impl From<&str> for Identifier {
 }
 
 /// Constants (6.4.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Constant {
     Integer(IntegerConstant),
@@ -40,7 +41,7 @@ pub enum Constant {
 }
 
 /// Integer constants (6.4.4.1)
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct IntegerConstant {
     pub value: i128,
@@ -48,7 +49,7 @@ pub struct IntegerConstant {
 }
 
 /// Integer suffixes (6.4.4.1)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum IntegerSuffix {
     Unsigned,
@@ -61,15 +62,24 @@ pub enum IntegerSuffix {
 }
 
 /// Floating-point constants (6.4.4.2)
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct FloatingConstant {
-    pub value: f64,
+    pub value: NotNan<f64>,
     pub suffix: Option<FloatingSuffix>,
 }
 
+#[cfg(feature = "dbg-pls")]
+impl DebugPls for FloatingConstant {
+    fn fmt(&self, f: dbg_pls::Formatter<'_>) {
+        f.debug_struct("FloatingConstant")
+            .field("value", &self.value.into_inner())
+            .field("suffix", &self.suffix)
+            .finish()
+    }
+}
+
 /// Floating-point suffixes (6.4.4.2)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum FloatingSuffix {
     F,
@@ -80,7 +90,7 @@ pub enum FloatingSuffix {
 }
 
 /// Character constants (6.4.4.4)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CharacterConstant {
     pub encoding_prefix: Option<EncodingPrefix>,
@@ -88,7 +98,7 @@ pub struct CharacterConstant {
 }
 
 /// Encoding prefixes (6.4.4.4)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum EncodingPrefix {
     U8,
@@ -98,7 +108,7 @@ pub enum EncodingPrefix {
 }
 
 /// Predefined constants (6.4.4.5)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PredefinedConstant {
     False,
@@ -107,7 +117,7 @@ pub enum PredefinedConstant {
 }
 
 /// Concatenation of string literals (6.4.5)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct StringLiterals(pub Vec<StringLiteral>);
 
@@ -118,7 +128,7 @@ impl StringLiterals {
 }
 
 /// String literal (6.4.5)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct StringLiteral {
     pub encoding_prefix: Option<EncodingPrefix>,
@@ -126,7 +136,7 @@ pub struct StringLiteral {
 }
 
 /// Punctuators (6.4.6)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Punctuator {
     // Brackets
@@ -188,7 +198,7 @@ pub enum Punctuator {
 }
 
 /// Balanced token sequence (6.4.4.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BalancedTokenSequence {
     pub tokens: Vec<Spanned<BalancedToken>>,
     pub eoi: SourceRange,
@@ -202,7 +212,7 @@ impl DebugPls for BalancedTokenSequence {
 }
 
 /// Balanced tokens (6.4.4.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum BalancedToken {
     Parenthesized(BalancedTokenSequence),
@@ -214,6 +224,8 @@ pub enum BalancedToken {
     QuotedString(String),
     Constant(Constant),
     Punctuator(Punctuator),
+    #[cfg(feature = "quasi-quote")]
+    Interpolation(Box<dyn quasi_quote::Interpolate>),
     Unknown, // For any other tokens not explicitly defined
 }
 
@@ -222,7 +234,7 @@ pub enum BalancedToken {
 // =============================================================================
 
 /// Expression
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Expression {
     Postfix(PostfixExpression),
@@ -236,7 +248,7 @@ pub enum Expression {
 }
 
 /// Primary expressions (6.5.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PrimaryExpression {
     Identifier(Identifier),
@@ -250,7 +262,7 @@ pub enum PrimaryExpression {
 }
 
 /// Generic selection (6.5.1.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct GenericSelection {
     pub controlling_expression: Box<Expression>,
@@ -258,7 +270,7 @@ pub struct GenericSelection {
 }
 
 /// Generic association (6.5.1.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum GenericAssociation {
     Type {
@@ -271,7 +283,7 @@ pub enum GenericAssociation {
 }
 
 /// Postfix expressions (6.5.2)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PostfixExpression {
     Primary(PrimaryExpression),
@@ -297,7 +309,7 @@ pub enum PostfixExpression {
 }
 
 /// Compound literals (6.5.2.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CompoundLiteral {
     pub storage_class_specifiers: Vec<StorageClassSpecifier>,
@@ -306,7 +318,7 @@ pub struct CompoundLiteral {
 }
 
 /// Unary expressions (6.5.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum UnaryExpression {
     Postfix(PostfixExpression),
@@ -322,7 +334,7 @@ pub enum UnaryExpression {
 }
 
 /// Unary operators (6.5.3)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum UnaryOperator {
     Address,
@@ -334,7 +346,7 @@ pub enum UnaryOperator {
 }
 
 /// Cast expressions (6.5.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum CastExpression {
     Unary(UnaryExpression),
@@ -345,7 +357,7 @@ pub enum CastExpression {
 }
 
 /// Binary expressions (6.5.14)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct BinaryExpression {
     pub left: Box<Expression>,
@@ -354,7 +366,7 @@ pub struct BinaryExpression {
 }
 
 /// Binary operators (6.5.14)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum BinaryOperator {
     // Arithmetic
@@ -385,7 +397,7 @@ pub enum BinaryOperator {
 }
 
 /// Conditional expressions (6.5.15)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct ConditionalExpression {
     pub condition: Box<Expression>,
@@ -394,7 +406,7 @@ pub struct ConditionalExpression {
 }
 
 /// Assignment expressions (6.5.16)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct AssignmentExpression {
     pub left: Box<Expression>,
@@ -403,7 +415,7 @@ pub struct AssignmentExpression {
 }
 
 /// Assignment operators (6.5.16)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum AssignmentOperator {
     Assign,
@@ -420,14 +432,14 @@ pub enum AssignmentOperator {
 }
 
 /// Comma expressions (6.5.17)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CommaExpression {
     pub expressions: Vec<Expression>,
 }
 
 /// Constant expressions (6.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ConstantExpression {
     Expression(Box<Expression>),
@@ -439,7 +451,7 @@ pub enum ConstantExpression {
 // =============================================================================
 
 /// Declarations (6.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Declaration {
     Normal {
@@ -458,14 +470,14 @@ pub enum Declaration {
 }
 
 /// Declaration specifiers (6.7)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
 }
 
 /// Declaration specifiers (6.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DeclarationSpecifier {
     StorageClass(StorageClassSpecifier),
@@ -477,7 +489,7 @@ pub enum DeclarationSpecifier {
 }
 
 /// Init declarators (6.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct InitDeclarator {
     pub declarator: Declarator,
@@ -485,7 +497,7 @@ pub struct InitDeclarator {
 }
 
 /// Storage class specifiers (6.7.1)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum StorageClassSpecifier {
     Auto,
@@ -498,7 +510,7 @@ pub enum StorageClassSpecifier {
 }
 
 /// Type specifiers (6.7.2)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeSpecifier {
     Void,
@@ -524,7 +536,7 @@ pub enum TypeSpecifier {
 }
 
 /// Struct or union specifiers (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct StructOrUnionSpecifier {
     pub kind: StructOrUnion,
@@ -534,7 +546,7 @@ pub struct StructOrUnionSpecifier {
 }
 
 /// Struct or union (6.7.2.1)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum StructOrUnion {
     Struct,
@@ -542,7 +554,7 @@ pub enum StructOrUnion {
 }
 
 /// Member declarations (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum MemberDeclaration {
     Normal {
@@ -555,7 +567,7 @@ pub enum MemberDeclaration {
 }
 
 /// Specifier qualifier lists (6.7.2.1)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct SpecifierQualifierList {
     pub items: Vec<TypeSpecifierQualifier>,
@@ -563,7 +575,7 @@ pub struct SpecifierQualifierList {
 }
 
 /// Type specifier qualifiers (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeSpecifierQualifier {
     TypeSpecifier(TypeSpecifier),
@@ -572,7 +584,7 @@ pub enum TypeSpecifierQualifier {
 }
 
 /// Member declarators (6.7.2.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum MemberDeclarator {
     Declarator(Declarator),
@@ -583,7 +595,7 @@ pub enum MemberDeclarator {
 }
 
 /// Enum specifiers (6.7.2.2)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct EnumSpecifier {
     pub attributes: Vec<AttributeSpecifier>,
@@ -593,7 +605,7 @@ pub struct EnumSpecifier {
 }
 
 /// Enumerator (6.7.2.2)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Enumerator {
     pub name: Identifier,
@@ -602,21 +614,21 @@ pub struct Enumerator {
 }
 
 /// Atomic type specifiers (6.7.2.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct AtomicTypeSpecifier {
     pub type_name: TypeName,
 }
 
 /// typeof specifiers (6.7.2.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeofSpecifier {
     Typeof(TypeofSpecifierArgument),
     TypeofUnqual(TypeofSpecifierArgument),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeofSpecifierArgument {
     Expression(Box<Expression>),
@@ -625,7 +637,7 @@ pub enum TypeofSpecifierArgument {
 }
 
 /// Type qualifiers (6.7.3)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeQualifier {
     Const,
@@ -638,7 +650,7 @@ pub enum TypeQualifier {
 }
 
 /// Function specifiers (6.7.4)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum FunctionSpecifier {
     Inline,
@@ -646,7 +658,7 @@ pub enum FunctionSpecifier {
 }
 
 /// Alignment specifiers (6.7.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum AlignmentSpecifier {
     Type(TypeName),
@@ -654,7 +666,7 @@ pub enum AlignmentSpecifier {
 }
 
 /// Declarators (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Declarator {
     Direct(DirectDeclarator),
@@ -687,7 +699,7 @@ impl Declarator {
 }
 
 /// Direct declarators (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DirectDeclarator {
     Identifier {
@@ -731,7 +743,7 @@ impl DirectDeclarator {
 }
 
 /// Array declarators (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ArrayDeclarator {
     Normal {
@@ -749,7 +761,7 @@ pub enum ArrayDeclarator {
 }
 
 /// Pointers (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Pointer {
     pub pointer_or_block: PointerOrBlock,
@@ -758,7 +770,7 @@ pub struct Pointer {
 }
 
 /// Pointer or block (clang extension)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PointerOrBlock {
     Pointer,
@@ -766,7 +778,7 @@ pub enum PointerOrBlock {
 }
 
 /// Parameter type lists (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ParameterTypeList {
     Parameters(Vec<ParameterDeclaration>),
@@ -775,7 +787,7 @@ pub enum ParameterTypeList {
 }
 
 /// Parameter declarations (6.7.6)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct ParameterDeclaration {
     pub attributes: Vec<AttributeSpecifier>,
@@ -784,7 +796,7 @@ pub struct ParameterDeclaration {
 }
 
 /// Parameter declaration kinds (6.7.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ParameterDeclarationKind {
     Declarator(Declarator),
@@ -792,7 +804,7 @@ pub enum ParameterDeclarationKind {
 }
 
 /// Type names (6.7.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum TypeName {
     TypeName {
@@ -803,7 +815,7 @@ pub enum TypeName {
 }
 
 /// Abstract declarators (6.7.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum AbstractDeclarator {
     Direct(DirectAbstractDeclarator),
@@ -815,7 +827,7 @@ pub enum AbstractDeclarator {
 }
 
 /// Direct abstract declarators (6.7.7)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DirectAbstractDeclarator {
     Parenthesized(Box<AbstractDeclarator>),
@@ -832,7 +844,7 @@ pub enum DirectAbstractDeclarator {
 }
 
 /// Initializers (6.7.10)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Initializer {
     Expression(Box<Expression>),
@@ -840,14 +852,14 @@ pub enum Initializer {
 }
 
 /// Braced initializers (6.7.10)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct BracedInitializer {
     pub initializers: Vec<DesignatedInitializer>,
 }
 
 /// Designated initializers (6.7.10)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct DesignatedInitializer {
     pub designation: Option<Designation>,
@@ -855,7 +867,7 @@ pub struct DesignatedInitializer {
 }
 
 /// Designation (6.7.10)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Designation {
     pub designator: Designator,
@@ -863,7 +875,7 @@ pub struct Designation {
 }
 
 /// Designators (6.7.10)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Designator {
     Array(ConstantExpression),
@@ -871,7 +883,7 @@ pub enum Designator {
 }
 
 /// Static assert declarations (6.7.11)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct StaticAssertDeclaration {
     pub condition: ConstantExpression,
@@ -879,7 +891,7 @@ pub struct StaticAssertDeclaration {
 }
 
 /// Attribute specifiers (6.7.12.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum AttributeSpecifier {
     Attributes(Vec<Attribute>),
@@ -904,7 +916,7 @@ impl AttributeSpecifier {
 }
 
 /// Attribute (6.7.12.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Attribute {
     pub token: AttributeToken,
@@ -912,7 +924,7 @@ pub struct Attribute {
 }
 
 /// Attribute tokens (6.7.12.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum AttributeToken {
     Standard(Identifier),
@@ -965,7 +977,7 @@ impl AttributeToken {
 // =============================================================================
 
 /// Statements (6.8)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Statement {
     Labeled(LabeledStatement),
@@ -973,7 +985,7 @@ pub enum Statement {
 }
 
 /// Unlabeled statements (6.8)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum UnlabeledStatement {
     Expression(ExpressionStatement),
@@ -988,7 +1000,7 @@ pub enum UnlabeledStatement {
 }
 
 /// Primary blocks (6.8.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum PrimaryBlock {
     Compound(CompoundStatement),
@@ -997,7 +1009,7 @@ pub enum PrimaryBlock {
 }
 
 /// Labels (6.8.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum Label {
     Identifier {
@@ -1014,7 +1026,7 @@ pub enum Label {
 }
 
 /// Labeled statements (6.8.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct LabeledStatement {
     pub label: Label,
@@ -1022,14 +1034,14 @@ pub struct LabeledStatement {
 }
 
 /// Compound statements (6.8.2)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
 }
 
 /// Block items (6.8.2)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum BlockItem {
     Declaration(Declaration),
@@ -1038,7 +1050,7 @@ pub enum BlockItem {
 }
 
 /// Expression statements (6.8.3)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct ExpressionStatement {
     pub attributes: Vec<AttributeSpecifier>,
@@ -1046,7 +1058,7 @@ pub struct ExpressionStatement {
 }
 
 /// Selection statements (6.8.4)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum SelectionStatement {
     If {
@@ -1061,7 +1073,7 @@ pub enum SelectionStatement {
 }
 
 /// Iteration statements (6.8.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum IterationStatement {
     While {
@@ -1082,7 +1094,7 @@ pub enum IterationStatement {
 }
 
 /// For initialization subclause (6.8.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ForInit {
     Expression(Box<Expression>),
@@ -1090,7 +1102,7 @@ pub enum ForInit {
 }
 
 /// Jump statements (6.8.6)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum JumpStatement {
     Goto(Identifier),
@@ -1104,14 +1116,14 @@ pub enum JumpStatement {
 // =============================================================================
 
 /// Translation units (6.9)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct TranslationUnit {
     pub external_declarations: Vec<ExternalDeclaration>,
 }
 
 /// External declarations (6.9)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum ExternalDeclaration {
     Function(FunctionDefinition),
@@ -1119,11 +1131,37 @@ pub enum ExternalDeclaration {
 }
 
 /// Function definitions (6.9.1)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct FunctionDefinition {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
     pub declarator: Declarator,
     pub body: CompoundStatement,
+}
+
+#[cfg(feature = "quasi-quote")]
+pub mod quasi_quote {
+    use dyn_clone::DynClone;
+    use dyn_eq::DynEq;
+    use std::any::Any;
+
+    pub trait Interpolate: Any + DynClone + DynEq {}
+    impl<T: Any + DynClone + DynEq> Interpolate for T {}
+
+    dyn_clone::clone_trait_object!(Interpolate);
+    dyn_eq::eq_trait_object!(Interpolate);
+
+    impl std::fmt::Debug for dyn Interpolate {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("Interpolate").finish_non_exhaustive()
+        }
+    }
+
+    #[cfg(feature = "dbg-pls")]
+    impl dbg_pls::DebugPls for dyn Interpolate {
+        fn fmt(&self, f: dbg_pls::Formatter<'_>) {
+            f.debug_struct("Interpolate").finish_non_exhaustive();
+        }
+    }
 }

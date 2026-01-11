@@ -11,7 +11,7 @@ use dbg_pls::DebugPls;
 
 use crate::{BalancedToken, BalancedTokenSequence};
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 /// Source context information for error reporting.
 pub struct SourceContext {
@@ -26,7 +26,7 @@ pub struct SourceContext {
 /// A source range with context information.
 pub type SourceRange = SimpleSpan<usize, SourceContext>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// A value with an associated source range.
 pub struct Spanned<T> {
     /// The wrapped value.

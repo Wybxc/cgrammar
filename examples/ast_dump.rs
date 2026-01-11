@@ -1,12 +1,12 @@
-#![cfg(feature = "dbg-pls")]
 //! Dump the AST of a C source file.
 //!
 //! Usage: `cargo run --example ast_dump --all-features -- path/to/source.c`
 
-use cgrammar::*;
-use chumsky::Parser;
-
+#[cfg(feature = "dbg-pls")]
 fn main() {
+    use cgrammar::*;
+    use chumsky::Parser;
+
     let file = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file.as_str()).unwrap();
 
@@ -36,4 +36,9 @@ fn main() {
         }
         std::process::exit(1);
     }
+}
+
+#[cfg(not(feature = "dbg-pls"))]
+fn main() {
+    println!("Please run with --features dbg-pls");
 }

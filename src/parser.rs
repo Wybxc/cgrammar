@@ -36,6 +36,8 @@ use parser_utils::*;
 /// (6.5.1) primary expression
 pub fn primary_expression<'a>() -> impl Parser<'a, Tokens<'a>, PrimaryExpression, Extra<'a>> + Clone {
     choice((
+        #[cfg(feature = "quasi-quote")]
+        interpolation(),
         generic_selection().map(PrimaryExpression::Generic),
         constant().map(PrimaryExpression::Constant),
         enumeration_constant().map(PrimaryExpression::EnumerationConstant),
@@ -1518,6 +1520,19 @@ pub fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + C
     select! {
         Token::QuotedString(value) => value
     }
+}
+
+#[cfg(feature = "quasi-quote")]
+/// Parse an interpolation token.
+pub fn interpolation<'a, T: quasi_quote::Interpolate>() -> impl Parser<'a, Tokens<'a>, T, Extra<'a>> + Clone {
+    use std::any::Any;
+    select! {
+        Token::Interpolation(value) => value
+    }
+    .try_map(|value, span| match (value as Box<dyn Any>).downcast::<T>() {
+        Ok(value) => Ok(*value),
+        Err(_) => Err(Rich::custom(span, "unexpected interpolation value")),
+    })
 }
 
 /// Parse a specific keyword.

@@ -1,13 +1,13 @@
-#![cfg(feature = "dbg-pls")]
 //! Parse into custom attributes from a C source file.
 //!
 //! Usage: `cargo run --example custom_attribute --all-features --
 //! path/to/source.c`
 
-use cgrammar::*;
-use chumsky::Parser;
-
+#[cfg(feature = "dbg-pls")]
 fn main() {
+    use cgrammar::*;
+    use chumsky::Parser;
+
     let file = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file.as_str()).unwrap();
 
@@ -62,4 +62,9 @@ fn main() {
             };
             println!("{}", dbg_pls::pretty(&stmt));
         });
+}
+
+#[cfg(not(feature = "dbg-pls"))]
+fn main() {
+    println!("Please run with --features dbg-pls");
 }

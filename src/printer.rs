@@ -251,6 +251,8 @@ fn print_balanced_token_sequence<'a, R: Render>(
             BalancedToken::QuotedString(lit) => print_quoted_string(pp, lit)?,
             BalancedToken::Constant(constant) => print_constant(pp, constant)?,
             BalancedToken::Punctuator(punctuator) => print_punctuator(pp, punctuator)?,
+            #[cfg(feature = "quasi-quote")]
+            BalancedToken::Interpolation(_) => {}
             BalancedToken::Unknown => {}
         }
     }

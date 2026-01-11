@@ -46,7 +46,7 @@ fn main() {
     let tokens = balanced_token_sequence().parse(source_code).unwrap();
 
     // Parse into AST
-    let result = translation_unit().parse(tokens);
+    let result = translation_unit().parse(tokens.as_input());
 
     if let Some(ast) = result.output() {
         println!("Successfully parsed!");

@@ -17,6 +17,8 @@ impl fmt::Display for DiagnosticToken {
             BalancedToken::QuotedString(_) => write!(f, "quoted string"),
             BalancedToken::Constant(_) => write!(f, "constant"),
             BalancedToken::Punctuator(_) => write!(f, "punctuator"),
+            #[cfg(feature = "quasi-quote")]
+            BalancedToken::Interpolation(_) => write!(f, "interpolation"),
             BalancedToken::Unknown => write!(f, "unknown token"),
         }
     }

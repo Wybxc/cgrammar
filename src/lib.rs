@@ -13,6 +13,7 @@ mod utils;
 pub mod visitor;
 
 pub use ast::*;
+pub use chumsky::Parser;
 pub use context::State;
 pub use lexer::{balanced_token_sequence, lexer_utils::State as LexerState};
 pub use parser::*;

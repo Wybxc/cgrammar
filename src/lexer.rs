@@ -8,6 +8,7 @@ use chumsky::{
     prelude::*,
     text::Char,
 };
+use ordered_float::NotNan;
 use slab::Slab;
 
 use crate::{
@@ -201,18 +202,20 @@ pub fn floating_constant<'a>() -> impl Parser<'a, &'a str, FloatingConstant, Ext
 }
 
 /// (6.4.4.2) decimal floating constant
-pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64, Extra<'a>> + Clone {
+pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, NotNan<f64>, Extra<'a>> + Clone {
     regex(r"(?:(?:\d+(?:'?\d+)*)?\.(?:\d+(?:'?\d+)*)|(?:\d+(?:'?\d+)*)\.)(?:[eE][+-]?(?:\d+(?:'?\d+)*))?|(?:\d+(?:'?\d+)*)(?:[eE][+-]?(?:\d+(?:'?\d+)*))")
         .map(|s: &str| s.replace("'", ""))
-        .from_str::<f64>()
+        .from_str::<NotNan<f64>>()
         .unwrapped()
 }
 
 /// (6.4.4.2) hexadecimal floating constant
-pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, f64, Extra<'a>> + Clone {
+pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, NotNan<f64>, Extra<'a>> + Clone {
     regex(r"(?:0[xX])(?:(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)?\.(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)|(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)\.?)(?:[pP][+-]?(?:\d+(?:'?\d+)*))")
         .map(|s: &str| s.replace("'", ""))
         .map(|s| hexf_parse::parse_hexf64(&s, false))
+        .unwrapped()
+        .map(|v| v.try_into())
         .unwrapped()
 }
 
