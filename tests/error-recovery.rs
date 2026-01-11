@@ -1,5 +1,4 @@
 use cgrammar::*;
-use chumsky::prelude::*;
 use rstest::rstest;
 
 #[rstest]

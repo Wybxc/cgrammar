@@ -430,6 +430,8 @@ pub fn balanced_token<'a>(
     let quoted_string = quoted_string();
     let constant = constant();
     let punctuator = punctuator();
+    #[cfg(feature = "quasi-quote")]
+    let template = template();
     let unknown_token = unknown();
 
     choice((
@@ -441,6 +443,8 @@ pub fn balanced_token<'a>(
         constant.map(BalancedToken::Constant),
         identifier.map(BalancedToken::Identifier),
         punctuator.map(BalancedToken::Punctuator),
+        #[cfg(feature = "quasi-quote")]
+        template.map(BalancedToken::Interpolation),
         unknown_token.to(BalancedToken::Unknown),
     ))
 }
@@ -524,4 +528,11 @@ fn comment<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
             .ignore_then(any().and_is(just("*/").not()).ignored().repeated())
             .then_ignore(just("*/")),
     ))
+}
+
+#[cfg(feature = "quasi-quote")]
+fn template<'a>() -> impl Parser<'a, &'a str, Box<dyn quasi_quote::Interpolate + 'static>, Extra<'a>> + Clone {
+    just("@")
+        .ignore_then(identifier())
+        .map(|id| Box::new(quasi_quote::Template { name: id.0 }) as Box<dyn quasi_quote::Interpolate>)
 }

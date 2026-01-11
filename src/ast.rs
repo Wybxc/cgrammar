@@ -48,6 +48,12 @@ pub struct IntegerConstant {
     pub suffix: Option<IntegerSuffix>,
 }
 
+impl From<i128> for IntegerConstant {
+    fn from(value: i128) -> Self {
+        Self { value, suffix: None }
+    }
+}
+
 /// Integer suffixes (6.4.4.1)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
@@ -66,6 +72,15 @@ pub enum IntegerSuffix {
 pub struct FloatingConstant {
     pub value: NotNan<f64>,
     pub suffix: Option<FloatingSuffix>,
+}
+
+impl From<f64> for FloatingConstant {
+    fn from(value: f64) -> Self {
+        Self {
+            value: value.try_into().unwrap(),
+            suffix: None,
+        }
+    }
 }
 
 #[cfg(feature = "dbg-pls")]
@@ -97,6 +112,15 @@ pub struct CharacterConstant {
     pub value: String,
 }
 
+impl From<char> for CharacterConstant {
+    fn from(value: char) -> Self {
+        Self {
+            encoding_prefix: None,
+            value: value.to_string(),
+        }
+    }
+}
+
 /// Encoding prefixes (6.4.4.4)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
@@ -116,6 +140,12 @@ pub enum PredefinedConstant {
     Nullptr,
 }
 
+impl From<bool> for PredefinedConstant {
+    fn from(value: bool) -> Self {
+        if value { Self::True } else { Self::False }
+    }
+}
+
 /// Concatenation of string literals (6.4.5)
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
@@ -124,6 +154,12 @@ pub struct StringLiterals(pub Vec<StringLiteral>);
 impl StringLiterals {
     pub fn to_joined(&self) -> String {
         self.0.iter().map(|s| s.value.as_str()).collect::<Vec<_>>().join("")
+    }
+}
+
+impl From<String> for StringLiterals {
+    fn from(value: String) -> Self {
+        Self(vec![StringLiteral { encoding_prefix: None, value }])
     }
 }
 
@@ -225,7 +261,7 @@ pub enum BalancedToken {
     Constant(Constant),
     Punctuator(Punctuator),
     #[cfg(feature = "quasi-quote")]
-    Interpolation(Box<dyn quasi_quote::Interpolate>),
+    Interpolation(Box<dyn quasi_quote::Interpolate + 'static>),
     Unknown, // For any other tokens not explicitly defined
 }
 
@@ -1142,26 +1178,90 @@ pub struct FunctionDefinition {
 
 #[cfg(feature = "quasi-quote")]
 pub mod quasi_quote {
+    use std::{any::Any, collections::HashMap};
+
     use dyn_clone::DynClone;
     use dyn_eq::DynEq;
-    use std::any::Any;
 
-    pub trait Interpolate: Any + DynClone + DynEq {}
+    use super::*;
+
+    pub trait NamedAny: Any {
+        fn type_name(&self) -> &'static str;
+    }
+
+    impl<T: Any + Sized> NamedAny for T {
+        fn type_name(&self) -> &'static str {
+            std::any::type_name::<T>()
+        }
+    }
+
+    pub trait Interpolate: NamedAny + DynClone + DynEq {}
     impl<T: Any + DynClone + DynEq> Interpolate for T {}
 
     dyn_clone::clone_trait_object!(Interpolate);
     dyn_eq::eq_trait_object!(Interpolate);
 
-    impl std::fmt::Debug for dyn Interpolate {
+    impl std::fmt::Debug for Box<dyn Interpolate> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("Interpolate").finish_non_exhaustive()
+            if let Some(template) = (self.as_ref() as &dyn Any).downcast_ref::<Template>() {
+                write!(f, "{template:#?}")
+            } else {
+                f.debug_struct("Interpolate")
+                    .field("type_name", &self.as_ref().type_name())
+                    .finish()
+            }
         }
     }
 
     #[cfg(feature = "dbg-pls")]
-    impl dbg_pls::DebugPls for dyn Interpolate {
+    impl dbg_pls::DebugPls for Box<dyn Interpolate> {
         fn fmt(&self, f: dbg_pls::Formatter<'_>) {
-            f.debug_struct("Interpolate").finish_non_exhaustive();
+            if let Some(template) = (self.as_ref() as &dyn Any).downcast_ref::<Template>() {
+                dbg_pls::DebugPls::fmt(template, f);
+            } else {
+                f.debug_struct("Interpolate")
+                    .field("type_name", &self.as_ref().type_name())
+                    .finish();
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
+    pub struct Template {
+        pub name: String,
+    }
+
+    impl BalancedTokenSequence {
+        pub fn interpolate(&mut self, mapping: &HashMap<&'static str, Box<dyn Interpolate>>) -> Result<(), String> {
+            for token in &mut self.tokens {
+                match &mut token.value {
+                    BalancedToken::Interpolation(interpolate) => {
+                        if let Some(template) = (interpolate.as_ref() as &dyn Any).downcast_ref::<Template>() {
+                            let name = template.name.as_str();
+                            let value = mapping.get(&name).ok_or(format!("template slot `{name}` not given"))?;
+                            *interpolate = value.clone();
+                        }
+                    }
+                    BalancedToken::Parenthesized(tokens) => tokens.interpolate(mapping)?,
+                    BalancedToken::Bracketed(tokens) => tokens.interpolate(mapping)?,
+                    BalancedToken::Braced(tokens) => tokens.interpolate(mapping)?,
+                    _ => {}
+                }
+            }
+            Ok(())
+        }
+    }
+
+    #[macro_export]
+    macro_rules! interpolate {
+        ($($name:ident => $value:expr),* $(,)?) => {
+            [
+                $((
+                    stringify!($name),
+                    ::std::boxed::Box::new($value) as ::std::boxed::Box<dyn $crate::quasi_quote::Interpolate>,
+                ),)*
+            ].into_iter().collect::<::std::collections::HashMap<_, _>>()
         }
     }
 }

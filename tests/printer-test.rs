@@ -6,7 +6,6 @@ use cgrammar::{
     visitor::{Visitor, VisitorMut},
     *,
 };
-use chumsky::prelude::*;
 use elegance::Printer;
 use pretty_assertions::assert_eq;
 use rstest::rstest;
