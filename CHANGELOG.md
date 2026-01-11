@@ -13,28 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- fully quasi-quote support
-- add quasi-quote support
-- VisitorMut
-- add pretty_assertions and improve printer functionality
-- basic pretty printer
+- `printer` module (behind `printer` feature): Pretty printer for AST nodes via `Visitor` trait implementation for `elegance::Printer`. (Currently not "pretty" but functional yet.)
+- `quasi-quote` feature: Token interpolation support with `BalancedToken::Interpolation`, `BalancedTokenSequence::interpolate()`, and `interpolate!` macro.
+- `VisitorMut` trait: Mutable visitor pattern for in-place AST modification.
+- Re-export `chumsky::Parser` from crate root for convenience.
+- Re-export `Visitor` and `VisitorMut` from crate root.
+- `Eq` derive for most AST types (`Constant`, `IntegerConstant`, `FloatingConstant`, etc.).
+- `From` implementations for convenient AST construction: `i128` → `IntegerConstant`, `f64` → `FloatingConstant`, `char` → `CharacterConstant`, `bool` → `PredefinedConstant`, `String` → `StringLiterals`.
 
-### Fixed
+### Changed
 
-- printer and visitor
-
-### Other
-
-- clean printer.rs
-- ignore spans in testing printer
-- refactor code structure and improve documentation
-- test for pretty printer
+- `FloatingConstant::value` changed from `f64` to `ordered_float::NotNan<f64>` (enables `Eq`).
+- Visitor walk functions now accept `?Sized` visitors.
+- Removed digraph punctuator variants (`LeftBracketAlt`, etc.) from `Punctuator` enum.
 
 ## [0.4.0](https://github.com/Wybxc/cgrammar/compare/v0.3.0...v0.4.0) - 2025-12-26
 
-### Other
+### Added
 
-- update document
+- Documentation comments for public APIs in `lexer`, `parser`, `span`, and `context` modules.
+- `#[warn(missing_docs)]` lint enabled at crate level.
+
+### Changed
+
+- `cached` macro became hidden again.
+- `Copy` derive added to small enum/struct types: `IntegerConstant`, `FloatingConstant`, `IntegerSuffix`, `FloatingSuffix`, `EncodingPrefix`, `PredefinedConstant`, `Punctuator`, `UnaryOperator`, `StorageClassSpecifier`, `StructOrUnion`, `TypeQualifier`, `FunctionSpecifier`.
 
 ## [0.3.0](https://github.com/Wybxc/cgrammar/compare/v0.2.3...v0.3.0) - 2025-12-23
 
