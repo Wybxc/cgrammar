@@ -196,7 +196,7 @@ pub trait Visitor<'a> {
     /// Visits a struct or union member name identifier.
     ///
     /// This is called when accessing a struct/union member via `.` or `->`
-    /// operators.
+    /// operators, or in designators of initializers.
     ///
     /// # Examples
     /// - `x` in `point.x`
@@ -302,9 +302,49 @@ pub trait Visitor<'a> {
         walk_direct_declarator(self, d)
     }
 
+    /// Visits an initializer.
+    fn visit_initializer(&mut self, i: &'a Initializer) -> Self::Result {
+        walk_initializer(self, i)
+    }
+
+    /// Visits a braced initializer.
+    fn visit_braced_initializer(&mut self, b: &'a BracedInitializer) -> Self::Result {
+        walk_braced_initializer(self, b)
+    }
+
+    /// Visits a designated initializer.
+    fn visit_designated_initializer(&mut self, d: &'a DesignatedInitializer) -> Self::Result {
+        walk_designated_initializer(self, d)
+    }
+
+    /// Visits a designation.
+    fn visit_designation(&mut self, d: &'a Designation) -> Self::Result {
+        walk_designation(self, d)
+    }
+
+    /// Visits a designator.
+    fn visit_designator(&mut self, d: &'a Designator) -> Self::Result {
+        walk_designator(self, d)
+    }
+
+    /// Visits a constant expression.
+    fn visit_constant_expression(&mut self, c: &'a ConstantExpression) -> Self::Result {
+        walk_constant_expression(self, c)
+    }
+
     /// Visits a postfix expression.
     fn visit_postfix_expression(&mut self, p: &'a PostfixExpression) -> Self::Result {
         walk_postfix_expression(self, p)
+    }
+
+    /// Visits a primary expression.
+    fn visit_primary_expression(&mut self, p: &'a PrimaryExpression) -> Self::Result {
+        walk_primary_expression(self, p)
+    }
+
+    /// Visits a generic selection.
+    fn visit_generic_selection(&mut self, g: &'a GenericSelection) -> Self::Result {
+        walk_generic_selection(self, g)
     }
 
     /// Visits a unary expression.
@@ -366,33 +406,206 @@ pub trait Visitor<'a> {
     fn visit_direct_abstract_declarator(&mut self, d: &'a DirectAbstractDeclarator) -> Self::Result {
         walk_direct_abstract_declarator(self, d)
     }
+
+    /// Visits a labeled statement.
+    fn visit_labeled_statement(&mut self, ls: &'a LabeledStatement) -> Self::Result {
+        walk_labeled_statement(self, ls)
+    }
+
+    /// Visits a label.
+    fn visit_label(&mut self, l: &'a Label) -> Self::Result {
+        walk_label(self, l)
+    }
+
+    /// Visits an expression statement.
+    fn visit_expression_statement(&mut self, e: &'a ExpressionStatement) -> Self::Result {
+        walk_expression_statement(self, e)
+    }
+
+    /// Visits a primary block.
+    fn visit_primary_block(&mut self, pb: &'a PrimaryBlock) -> Self::Result {
+        walk_primary_block(self, pb)
+    }
+
+    /// Visits a jump statement.
+    fn visit_jump_statement(&mut self, j: &'a JumpStatement) -> Self::Result {
+        walk_jump_statement(self, j)
+    }
+
+    /// Visits a selection statement.
+    fn visit_selection_statement(&mut self, s: &'a SelectionStatement) -> Self::Result {
+        walk_selection_statement(self, s)
+    }
+
+    /// Visits an iteration statement.
+    fn visit_iteration_statement(&mut self, i: &'a IterationStatement) -> Self::Result {
+        walk_iteration_statement(self, i)
+    }
+
+    /// Visits a for init clause.
+    fn visit_for_init(&mut self, fi: &'a ForInit) -> Self::Result {
+        walk_for_init(self, fi)
+    }
+
+    /// Visits a binary expression.
+    fn visit_binary_expression(&mut self, b: &'a BinaryExpression) -> Self::Result {
+        walk_binary_expression(self, b)
+    }
+
+    /// Visits a conditional expression.
+    fn visit_conditional_expression(&mut self, c: &'a ConditionalExpression) -> Self::Result {
+        walk_conditional_expression(self, c)
+    }
+
+    /// Visits an assignment expression.
+    fn visit_assignment_expression(&mut self, a: &'a AssignmentExpression) -> Self::Result {
+        walk_assignment_expression(self, a)
+    }
+
+    /// Visits a comma expression.
+    fn visit_comma_expression(&mut self, c: &'a CommaExpression) -> Self::Result {
+        walk_comma_expression(self, c)
+    }
+
+    /// Visits a binary operator.
+    fn visit_binary_operator(&mut self, _: &'a BinaryOperator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an assignment operator.
+    fn visit_assignment_operator(&mut self, _: &'a AssignmentOperator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a compound literal.
+    fn visit_compound_literal(&mut self, cl: &'a CompoundLiteral) -> Self::Result {
+        walk_compound_literal(self, cl)
+    }
+
+    /// Visits a storage class specifier.
+    fn visit_storage_class_specifier(&mut self, _: &'a StorageClassSpecifier) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a unary operator.
+    fn visit_unary_operator(&mut self, _: &'a UnaryOperator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an init declarator.
+    fn visit_init_declarator(&mut self, id: &'a InitDeclarator) -> Self::Result {
+        walk_init_declarator(self, id)
+    }
+
+    /// Visits a static assert declaration.
+    fn visit_static_assert_declaration(&mut self, sa: &'a StaticAssertDeclaration) -> Self::Result {
+        walk_static_assert_declaration(self, sa)
+    }
+
+    /// Visits a static assert message.
+    fn visit_static_assert_message(&mut self, _: &'a StringLiterals) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a declaration specifier.
+    fn visit_declaration_specifier(&mut self, ds: &'a DeclarationSpecifier) -> Self::Result {
+        walk_declaration_specifier(self, ds)
+    }
+
+    /// Visits a function specifier.
+    fn visit_function_specifier(&mut self, _: &'a FunctionSpecifier) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a type qualifier.
+    fn visit_type_qualifier(&mut self, _: &'a TypeQualifier) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an alignment specifier.
+    fn visit_alignment_specifier(&mut self, a: &'a AlignmentSpecifier) -> Self::Result {
+        walk_alignment_specifier(self, a)
+    }
+
+    /// Visits a struct or union specifier.
+    fn visit_struct_union_specifier(&mut self, s: &'a StructOrUnionSpecifier) -> Self::Result {
+        walk_struct_union_specifier(self, s)
+    }
+
+    /// Visits an enum specifier.
+    fn visit_enum_specifier(&mut self, e: &'a EnumSpecifier) -> Self::Result {
+        walk_enum_specifier(self, e)
+    }
+
+    /// Visits a struct or union keyword.
+    fn visit_struct_or_union(&mut self, _: &'a StructOrUnion) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a member declaration.
+    fn visit_member_declaration(&mut self, md: &'a MemberDeclaration) -> Self::Result {
+        walk_member_declaration(self, md)
+    }
+
+    /// Visits a member declarator.
+    fn visit_member_declarator(&mut self, md: &'a MemberDeclarator) -> Self::Result {
+        walk_member_declarator(self, md)
+    }
+
+    /// Visits an enumerator.
+    fn visit_enumerator(&mut self, e: &'a Enumerator) -> Self::Result {
+        walk_enumerator(self, e)
+    }
+
+    /// Visits a pointer.
+    fn visit_pointer(&mut self, p: &'a Pointer) -> Self::Result {
+        walk_pointer(self, p)
+    }
+
+    /// Visits a pointer or block indicator.
+    fn visit_pointer_or_block(&mut self, _: &'a PointerOrBlock) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an array declarator.
+    fn visit_array_declarator(&mut self, _: &'a ArrayDeclarator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a parameter type list.
+    fn visit_parameter_type_list(&mut self, ptl: &'a ParameterTypeList) -> Self::Result {
+        walk_parameter_type_list(self, ptl)
+    }
+
+    /// Visits a parameter declaration.
+    fn visit_parameter_declaration(&mut self, pd: &'a ParameterDeclaration) -> Self::Result {
+        walk_parameter_declaration(self, pd)
+    }
+
+    /// Visits a parameter declaration kind.
+    fn visit_parameter_declaration_kind(&mut self, pdk: &'a ParameterDeclarationKind) -> Self::Result {
+        walk_parameter_declaration_kind(self, pdk)
+    }
 }
 
-// ============================================================================
-// Default Walker Functions
-// ============================================================================
-//
-// The functions in this section implement the default recursive traversal
-// of the AST. They dispatch to the corresponding visitor methods for each
-// node type. Most visitor implementations can use these default walkers
-// by simply calling them from their visit methods.
-//
-// These functions perform depth-first traversal and support early termination
-// via the ControlFlow type. When a visitor method returns ControlFlow::Break,
-// the traversal stops and the value is propagated back to the caller.
-
-/// Walks a translation unit, visiting each external declaration.
-pub fn walk_translation_unit<'a, V: Visitor<'a> + ?Sized>(v: &mut V, tu: &'a TranslationUnit) -> V::Result {
-    for ed in &tu.external_declarations {
-        let br = v.visit_external_declaration(ed).branch();
+macro_rules! tr {
+    ($e:expr) => {{
+        let br = $e.branch();
         if let ControlFlow::Break(res) = br {
             return V::Result::from_residual(res);
         }
+    }};
+}
+
+/// Walk a translation unit.
+pub fn walk_translation_unit<'a, V: Visitor<'a> + ?Sized>(v: &mut V, tu: &'a TranslationUnit) -> V::Result {
+    for ed in &tu.external_declarations {
+        tr!(v.visit_external_declaration(ed));
     }
     V::Result::output()
 }
 
-/// Walks an external declaration (function or declaration).
+/// Walk an external declaration.
 pub fn walk_external_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a ExternalDeclaration) -> V::Result {
     match d {
         ExternalDeclaration::Function(f) => v.visit_function_definition(f),
@@ -400,393 +613,329 @@ pub fn walk_external_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a 
     }
 }
 
-/// Walks a function definition, visiting declaration specifiers, declarator,
-/// and body.
+/// Walk a function definition.
 pub fn walk_function_definition<'a, V: Visitor<'a> + ?Sized>(v: &mut V, f: &'a FunctionDefinition) -> V::Result {
-    // walk attributes
     for attr in &f.attributes {
-        let br = v.visit_attribute_specifier(attr).branch();
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
-        }
+        tr!(v.visit_attribute_specifier(attr));
     }
-    // walk specifiers
-    let br = v.visit_declaration_specifiers(&f.specifiers).branch();
-    if let ControlFlow::Break(res) = br {
-        return V::Result::from_residual(res);
-    }
-    // walk declarator
-    let br = v.visit_declarator(&f.declarator).branch();
-    if let ControlFlow::Break(res) = br {
-        return V::Result::from_residual(res);
-    }
-    // walk body
+    tr!(v.visit_declaration_specifiers(&f.specifiers));
+    tr!(v.visit_declarator(&f.declarator));
     v.visit_compound_statement(&f.body)
 }
 
-/// Walks a statement, handling both labeled and unlabeled statements.
-///
-/// For labeled statements, calls `visit_label_name` for the label identifier
-/// before walking the associated statement.
+/// Walk a statement.
 pub fn walk_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a Statement) -> V::Result {
     match s {
-        Statement::Labeled(ls) => {
-            // visit label identifiers if any
-            match &ls.label {
-                Label::Identifier { identifier, .. } => {
-                    let br = v.visit_label_name(identifier).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-                Label::Case { .. } | Label::Default { .. } => {}
-            }
-            v.visit_statement(&ls.statement)
-        }
+        Statement::Labeled(ls) => v.visit_labeled_statement(ls),
         Statement::Unlabeled(u) => v.visit_unlabeled_statement(u),
     }
 }
 
-/// Walks an unlabeled statement.
-///
-/// This handles expression statements, compound statements, selection
-/// statements, iteration statements, and jump statements. For each type, visits
-/// relevant sub-expressions, declarations, and statements.
-pub fn walk_unlabeled_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a UnlabeledStatement) -> V::Result {
-    match s {
-        UnlabeledStatement::Expression(es) => {
-            if let Some(expr) = &es.expression {
-                v.visit_expression(expr)
-            } else {
-                V::Result::output()
+/// Walk a labeled statement.
+pub fn walk_labeled_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, ls: &'a LabeledStatement) -> V::Result {
+    tr!(v.visit_label(&ls.label));
+    v.visit_statement(&ls.statement)
+}
+
+/// Walk a label.
+pub fn walk_label<'a, V: Visitor<'a> + ?Sized>(v: &mut V, l: &'a Label) -> V::Result {
+    match l {
+        Label::Identifier { attributes, identifier } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier(attribute));
             }
+            v.visit_label_name(identifier)
         }
-        UnlabeledStatement::Primary { block, .. } => match block {
-            PrimaryBlock::Compound(c) => {
-                for item in &c.items {
-                    let br = match item {
-                        BlockItem::Declaration(d) => v.visit_declaration(d).branch(),
-                        BlockItem::Statement(u) => v.visit_unlabeled_statement(u).branch(),
-                        BlockItem::Label(l) => match l {
-                            Label::Identifier { identifier, .. } => v.visit_label_name(identifier).branch(),
-                            Label::Case { .. } | Label::Default { .. } => ControlFlow::Continue(()),
-                        },
-                    };
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-                V::Result::output()
+        Label::Case { attributes, expression } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier(attribute));
             }
-            PrimaryBlock::Selection(sel) => match sel {
-                SelectionStatement::If { condition, then_stmt, else_stmt } => {
-                    let br = v.visit_expression(condition).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    let br = v.visit_statement(then_stmt).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    if let Some(e) = else_stmt {
-                        v.visit_statement(e)
-                    } else {
-                        V::Result::output()
-                    }
-                }
-                SelectionStatement::Switch { expression, statement } => {
-                    let br = v.visit_expression(expression).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    v.visit_statement(statement)
-                }
-            },
-            PrimaryBlock::Iteration(iter) => match iter {
-                IterationStatement::While { condition, body } => {
-                    let br = v.visit_expression(condition).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    v.visit_statement(body)
-                }
-                IterationStatement::DoWhile { body, condition } => {
-                    let br = v.visit_statement(body).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    v.visit_expression(condition)
-                }
-                IterationStatement::For { init, condition, update, body } => {
-                    if let Some(i) = init {
-                        let br = match i {
-                            ForInit::Expression(e) => v.visit_expression(e).branch(),
-                            ForInit::Declaration(d) => v.visit_declaration(d).branch(),
-                        };
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                    }
-                    if let Some(c) = condition {
-                        let br = v.visit_expression(c).branch();
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                    }
-                    if let Some(u) = update {
-                        let br = v.visit_expression(u).branch();
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                    }
-                    v.visit_statement(body)
-                }
-                IterationStatement::Error => V::Result::output(),
-            },
-        },
-        UnlabeledStatement::Jump { statement, .. } => match statement {
-            JumpStatement::Goto(id) => v.visit_label_name(id),
-            JumpStatement::Continue | JumpStatement::Break => V::Result::output(),
-            JumpStatement::Return(expr) => {
-                if let Some(e) = expr {
-                    v.visit_expression(e)
-                } else {
-                    V::Result::output()
-                }
+            v.visit_constant_expression(expression)
+        }
+        Label::Default { attributes } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier(attribute));
             }
-        },
+            V::Result::output()
+        }
     }
 }
 
-/// Walks a compound statement (block), visiting declarations, statements, and
-/// labels.
-///
-/// Iterates through all block items, dispatching to appropriate visitor
-/// methods. For label identifiers within the block, calls `visit_label_name`.
+/// Walk an unlabeled statement.
+pub fn walk_unlabeled_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a UnlabeledStatement) -> V::Result {
+    match s {
+        UnlabeledStatement::Expression(es) => v.visit_expression_statement(es),
+        UnlabeledStatement::Primary { attributes, block } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier(attribute));
+            }
+            v.visit_primary_block(block)
+        }
+        UnlabeledStatement::Jump { attributes, statement } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier(attribute));
+            }
+            v.visit_jump_statement(statement)
+        }
+    }
+}
+
+/// Walk an expression statement.
+pub fn walk_expression_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a ExpressionStatement) -> V::Result {
+    if let Some(expr) = &e.expression {
+        tr!(v.visit_expression(expr));
+    }
+    V::Result::output()
+}
+
+/// Walk a primary block.
+pub fn walk_primary_block<'a, V: Visitor<'a> + ?Sized>(v: &mut V, pb: &'a PrimaryBlock) -> V::Result {
+    match pb {
+        PrimaryBlock::Compound(c) => v.visit_compound_statement(c),
+        PrimaryBlock::Selection(sel) => v.visit_selection_statement(sel),
+        PrimaryBlock::Iteration(iter) => v.visit_iteration_statement(iter),
+    }
+}
+
+/// Walk a compound statement.
 pub fn walk_compound_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CompoundStatement) -> V::Result {
     for item in &c.items {
-        let br = match item {
-            BlockItem::Declaration(d) => v.visit_declaration(d).branch(),
-            BlockItem::Statement(u) => v.visit_unlabeled_statement(u).branch(),
-            BlockItem::Label(l) => match l {
-                Label::Identifier { identifier, .. } => v.visit_label_name(identifier).branch(),
-                Label::Case { .. } | Label::Default { .. } => ControlFlow::Continue(()),
-            },
-        };
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
+        match item {
+            BlockItem::Declaration(d) => tr!(v.visit_declaration(d)),
+            BlockItem::Statement(u) => tr!(v.visit_unlabeled_statement(u)),
+            BlockItem::Label(l) => tr!(v.visit_label(l)),
         }
     }
     V::Result::output()
 }
 
-/// Walks an expression, visiting all sub-expressions in depth-first order.
-///
-/// This includes handling of binary operators, conditional expressions,
-/// assignments, comma expressions, and more.
+/// Walk a selection statement.
+pub fn walk_selection_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a SelectionStatement) -> V::Result {
+    match s {
+        SelectionStatement::If { condition, then_stmt, else_stmt } => {
+            tr!(v.visit_expression(condition));
+            tr!(v.visit_statement(then_stmt));
+            if let Some(e) = else_stmt {
+                tr!(v.visit_statement(e));
+            }
+            V::Result::output()
+        }
+        SelectionStatement::Switch { expression, statement } => {
+            tr!(v.visit_expression(expression));
+            v.visit_statement(statement)
+        }
+    }
+}
+
+/// Walk an iteration statement.
+pub fn walk_iteration_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, i: &'a IterationStatement) -> V::Result {
+    match i {
+        IterationStatement::While { condition, body } => {
+            tr!(v.visit_expression(condition));
+            v.visit_statement(body)
+        }
+        IterationStatement::DoWhile { body, condition } => {
+            tr!(v.visit_statement(body));
+            v.visit_expression(condition)
+        }
+        IterationStatement::For { init, condition, update, body } => {
+            if let Some(i) = init {
+                v.visit_for_init(i);
+            }
+            if let Some(c) = condition {
+                tr!(v.visit_expression(c));
+            }
+            if let Some(u) = update {
+                tr!(v.visit_expression(u));
+            }
+            v.visit_statement(body)
+        }
+        IterationStatement::Error => V::Result::output(),
+    }
+}
+
+/// Walk a for init.
+pub fn walk_for_init<'a, V: Visitor<'a> + ?Sized>(v: &mut V, fi: &'a ForInit) -> V::Result {
+    match fi {
+        ForInit::Expression(e) => v.visit_expression(e),
+        ForInit::Declaration(d) => v.visit_declaration(d),
+    }
+}
+
+/// Walk a jump statement.
+pub fn walk_jump_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, j: &'a JumpStatement) -> V::Result {
+    match j {
+        JumpStatement::Goto(id) => v.visit_label_name(id),
+        JumpStatement::Continue | JumpStatement::Break => V::Result::output(),
+        JumpStatement::Return(expr) => {
+            if let Some(e) = expr {
+                tr!(v.visit_expression(e));
+            }
+            V::Result::output()
+        }
+    }
+}
+
+/// Walk an expression.
 pub fn walk_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a Expression) -> V::Result {
     match e {
         Expression::Postfix(p) => v.visit_postfix_expression(p),
         Expression::Unary(u) => v.visit_unary_expression(u),
         Expression::Cast(c) => v.visit_cast_expression(c),
-        Expression::Binary(b) => {
-            let br = v.visit_expression(&b.left).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            v.visit_expression(&b.right)
-        }
-        Expression::Conditional(c) => {
-            let br = v.visit_expression(&c.condition).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            let br = v.visit_expression(&c.then_expr).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            v.visit_expression(&c.else_expr)
-        }
-        Expression::Assignment(a) => {
-            let br = v.visit_expression(&a.left).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            v.visit_expression(&a.right)
-        }
-        Expression::Comma(c) => {
-            for e in &c.expressions {
-                let br = v.visit_expression(e).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-            }
-            V::Result::output()
-        }
+        Expression::Binary(b) => v.visit_binary_expression(b),
+        Expression::Conditional(c) => v.visit_conditional_expression(c),
+        Expression::Assignment(a) => v.visit_assignment_expression(a),
+        Expression::Comma(c) => v.visit_comma_expression(c),
         Expression::Error => V::Result::output(),
     }
 }
 
-/// Walks a postfix expression.
-///
-/// Handles primary expressions (identifiers, enum constants, literals, etc.),
-/// array access, function calls, member access, and increment/decrement
-/// operators. Calls `visit_variable_name` for identifiers and
-/// `visit_enum_constant` for enumeration constants. Calls `visit_member_name`
-/// for member access operations.
+/// Walk a binary expression.
+pub fn walk_binary_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, b: &'a BinaryExpression) -> V::Result {
+    tr!(v.visit_expression(&b.left));
+    tr!(v.visit_binary_operator(&b.operator));
+    v.visit_expression(&b.right)
+}
+
+/// Walk a conditional expression.
+pub fn walk_conditional_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a ConditionalExpression) -> V::Result {
+    tr!(v.visit_expression(&c.condition));
+    tr!(v.visit_expression(&c.then_expr));
+    v.visit_expression(&c.else_expr)
+}
+
+/// Walk an assignment expression.
+pub fn walk_assignment_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AssignmentExpression) -> V::Result {
+    tr!(v.visit_expression(&a.left));
+    tr!(v.visit_assignment_operator(&a.operator));
+    v.visit_expression(&a.right)
+}
+
+/// Walk a comma expression.
+pub fn walk_comma_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CommaExpression) -> V::Result {
+    for e in &c.expressions {
+        tr!(v.visit_expression(e));
+    }
+    V::Result::output()
+}
+
+/// Walk a postfix expression.
 pub fn walk_postfix_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, p: &'a PostfixExpression) -> V::Result {
     match p {
-        PostfixExpression::Primary(pr) => match pr {
-            PrimaryExpression::Identifier(id) => v.visit_variable_name(id),
-            PrimaryExpression::EnumerationConstant(id) => v.visit_enum_constant(id),
-            PrimaryExpression::Parenthesized(e) => v.visit_expression(e),
-            PrimaryExpression::Generic(g) => {
-                let br = v.visit_expression(&g.controlling_expression).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-                for assoc in &g.associations {
-                    let br = match assoc {
-                        GenericAssociation::Type { expression, .. } => v.visit_expression(expression).branch(),
-                        GenericAssociation::Default { expression } => v.visit_expression(expression).branch(),
-                    };
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-                V::Result::output()
-            }
-            _ => V::Result::output(),
-        },
+        PostfixExpression::Primary(pr) => v.visit_primary_expression(pr),
         PostfixExpression::ArrayAccess { array, index } => {
-            let br = v.visit_postfix_expression(array).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression(array));
             v.visit_expression(index)
         }
         PostfixExpression::FunctionCall { function, arguments } => {
-            let br = v.visit_postfix_expression(function).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression(function));
             for a in arguments {
-                let br = v.visit_expression(a).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_expression(a));
             }
             V::Result::output()
         }
         PostfixExpression::MemberAccess { object, member } => {
-            let br = v.visit_postfix_expression(object).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression(object));
             v.visit_member_name(member)
         }
         PostfixExpression::MemberAccessPtr { object, member } => {
-            let br = v.visit_postfix_expression(object).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression(object));
             v.visit_member_name(member)
         }
         PostfixExpression::PostIncrement(inner) | PostfixExpression::PostDecrement(inner) => {
             v.visit_postfix_expression(inner)
         }
-        PostfixExpression::CompoundLiteral(cl) => {
-            // walk type name and initializer
-            v.visit_type_name(&cl.type_name)
-        }
+        PostfixExpression::CompoundLiteral(cl) => v.visit_compound_literal(cl),
     }
 }
 
-/// Walks a unary expression.
-///
-/// Handles pre/post increment/decrement, unary operators (address-of,
-/// dereference, etc.), sizeof, and alignof operations.
+/// Walk a compound literal.
+pub fn walk_compound_literal<'a, V: Visitor<'a> + ?Sized>(v: &mut V, cl: &'a CompoundLiteral) -> V::Result {
+    for specifier in &cl.storage_class_specifiers {
+        tr!(v.visit_storage_class_specifier(specifier));
+    }
+    tr!(v.visit_type_name(&cl.type_name));
+    v.visit_braced_initializer(&cl.initializer)
+}
+
+/// Walk a primary expression.
+fn walk_primary_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, pr: &'a PrimaryExpression) -> V::Result {
+    match pr {
+        PrimaryExpression::Identifier(id) => v.visit_variable_name(id),
+        PrimaryExpression::EnumerationConstant(id) => v.visit_enum_constant(id),
+        PrimaryExpression::Parenthesized(e) => v.visit_expression(e),
+        PrimaryExpression::Generic(g) => v.visit_generic_selection(g),
+        _ => V::Result::output(),
+    }
+}
+
+/// Walk a generic selection.
+fn walk_generic_selection<'a, V: Visitor<'a> + ?Sized>(v: &mut V, g: &'a GenericSelection) -> V::Result {
+    tr!(v.visit_expression(&g.controlling_expression));
+    for assoc in &g.associations {
+        match assoc {
+            GenericAssociation::Type { type_name, expression } => {
+                tr!(v.visit_type_name(type_name));
+                tr!(v.visit_expression(expression))
+            }
+            GenericAssociation::Default { expression } => tr!(v.visit_expression(expression)),
+        };
+    }
+    V::Result::output()
+}
+
+/// Walk a unary expression.
 pub fn walk_unary_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, u: &'a UnaryExpression) -> V::Result {
     match u {
         UnaryExpression::Postfix(p) => v.visit_postfix_expression(p),
         UnaryExpression::PreIncrement(inner) | UnaryExpression::PreDecrement(inner) => v.visit_unary_expression(inner),
-        UnaryExpression::Unary { operand, .. } => v.visit_cast_expression(operand),
+        UnaryExpression::Unary { operator, operand } => {
+            tr!(v.visit_unary_operator(operator));
+            v.visit_cast_expression(operand)
+        }
         UnaryExpression::Sizeof(inner) => v.visit_unary_expression(inner),
         UnaryExpression::SizeofType(tn) | UnaryExpression::Alignof(tn) => v.visit_type_name(tn),
     }
 }
 
-/// Walks a cast expression.
-///
-/// Handles unary expressions and explicit type casts.
+/// Walk a cast expression.
 pub fn walk_cast_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CastExpression) -> V::Result {
     match c {
         CastExpression::Unary(u) => v.visit_unary_expression(u),
         CastExpression::Cast { type_name, expression } => {
-            let br = v.visit_type_name(type_name).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_type_name(type_name));
             v.visit_cast_expression(expression)
         }
     }
 }
 
-/// Walks a declaration.
-///
-/// Handles normal declarations, typedef declarations, static assertions, and
-/// attributes. Visits declaration specifiers and declarators for each
-/// declaration.
+/// Walk a declaration.
 pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declaration) -> V::Result {
     match d {
         Declaration::Normal { attributes, specifiers, declarators } => {
             for attr in attributes {
-                let br = v.visit_attribute_specifier(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier(attr));
             }
-            let br = v.visit_declaration_specifiers(specifiers).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_declaration_specifiers(specifiers));
             for init in declarators {
-                let br = v.visit_declarator(&init.declarator).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_init_declarator(init));
             }
             V::Result::output()
         }
         Declaration::Typedef { attributes, specifiers, declarators } => {
             for attr in attributes {
-                let br = v.visit_attribute_specifier(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier(attr));
             }
-            let br = v.visit_declaration_specifiers(specifiers).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_declaration_specifiers(specifiers));
             for d in declarators {
-                let br = v.visit_declarator(d).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_declarator(d));
             }
             V::Result::output()
         }
-        Declaration::StaticAssert(sa) => {
-            if let Some(_m) = &sa.message { /* no-op walk for message */ }
-            V::Result::output()
-        }
+        Declaration::StaticAssert(sa) => v.visit_static_assert_declaration(sa),
         Declaration::Attribute(attrs) => {
             for attr in attrs {
-                let br = v.visit_attribute_specifier(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier(attr));
             }
             V::Result::output()
         }
@@ -794,111 +943,77 @@ pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarati
     }
 }
 
-/// Walks declaration specifiers (storage class, type specifiers, qualifiers,
-/// etc.).
-pub fn walk_declaration_specifiers<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a DeclarationSpecifiers) -> V::Result {
-    for it in &s.specifiers {
-        let br = match it {
-            DeclarationSpecifier::StorageClass(_) => ControlFlow::Continue(()),
-            DeclarationSpecifier::TypeSpecifierQualifier(tsq) => v.visit_type_specifier_qualifier(tsq).branch(),
-            DeclarationSpecifier::Function { .. } => ControlFlow::Continue(()),
-        };
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
-        }
+/// Walk an init declarator.
+pub fn walk_init_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, id: &'a InitDeclarator) -> V::Result {
+    tr!(v.visit_declarator(&id.declarator));
+    if let Some(init) = &id.initializer {
+        tr!(v.visit_initializer(init));
     }
     V::Result::output()
 }
 
-/// Walks a type specifier or qualifier.
-///
-/// Dispatches to type specifiers or ignores qualifiers.
+/// Walk a static assert declaration.
+pub fn walk_static_assert_declaration<'a, V: Visitor<'a> + ?Sized>(
+    v: &mut V,
+    sa: &'a StaticAssertDeclaration,
+) -> V::Result {
+    tr!(v.visit_constant_expression(&sa.condition));
+    if let Some(msg) = &sa.message {
+        tr!(v.visit_static_assert_message(msg));
+    }
+    V::Result::output()
+}
+
+/// Walk declaration specifiers.
+pub fn walk_declaration_specifiers<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a DeclarationSpecifiers) -> V::Result {
+    for it in &s.specifiers {
+        tr!(v.visit_declaration_specifier(it));
+    }
+    for attr in &s.attributes {
+        tr!(v.visit_attribute_specifier(attr));
+    }
+    V::Result::output()
+}
+
+/// Walk a declaration specifier.
+pub fn walk_declaration_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, ds: &'a DeclarationSpecifier) -> V::Result {
+    match ds {
+        DeclarationSpecifier::StorageClass(scs) => v.visit_storage_class_specifier(scs),
+        DeclarationSpecifier::TypeSpecifierQualifier(tsq) => v.visit_type_specifier_qualifier(tsq),
+        DeclarationSpecifier::Function(fs) => v.visit_function_specifier(fs),
+    }
+}
+
+/// Walk a type specifier or qualifier.
 pub fn walk_type_specifier_qualifier<'a, V: Visitor<'a> + ?Sized>(
     v: &mut V,
     x: &'a TypeSpecifierQualifier,
 ) -> V::Result {
     match x {
         TypeSpecifierQualifier::TypeSpecifier(ts) => v.visit_type_specifier(ts),
-        TypeSpecifierQualifier::TypeQualifier(_) => V::Result::output(),
-        TypeSpecifierQualifier::AlignmentSpecifier(a) => match a {
-            AlignmentSpecifier::Type(tn) => v.visit_type_name(tn),
-            AlignmentSpecifier::Expression(_) => V::Result::output(),
-        },
+        TypeSpecifierQualifier::TypeQualifier(tq) => v.visit_type_qualifier(tq),
+        TypeSpecifierQualifier::AlignmentSpecifier(a) => v.visit_alignment_specifier(a),
     }
 }
 
-/// Walks a type specifier.
-///
-/// Handles struct, union, enum, typedef names, atomic types, and typeof
-/// specifiers. Calls `visit_struct_name` for struct identifiers,
-/// `visit_enum_name` for enum identifiers, `visit_enumerator_name` for
-/// enumerators, and `visit_type_name_identifier` for typedef names.
+/// Walk an alignment specifier.
+pub fn walk_alignment_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AlignmentSpecifier) -> V::Result {
+    match a {
+        AlignmentSpecifier::Type(tn) => v.visit_type_name(tn),
+        AlignmentSpecifier::Expression(e) => v.visit_constant_expression(e),
+    }
+}
+
+/// Walk a type specifier.
 pub fn walk_type_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, ts: &'a TypeSpecifier) -> V::Result {
     match ts {
-        TypeSpecifier::Struct(s) => {
-            if let Some(id) = &s.identifier {
-                let br = v.visit_struct_name(id).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-            }
-            if let Some(members) = &s.members {
-                for m in members {
-                    let br = match m {
-                        MemberDeclaration::Normal { specifiers, declarators, .. } => {
-                            let br2 = v.visit_specifier_qualifier_list(specifiers).branch();
-                            if let ControlFlow::Break(res) = br2 {
-                                return V::Result::from_residual(res);
-                            }
-                            for d in declarators {
-                                let br3 = match d {
-                                    MemberDeclarator::Declarator(dd) => v.visit_declarator(dd).branch(),
-                                    MemberDeclarator::BitField { declarator, .. } => {
-                                        if let Some(dd) = declarator {
-                                            v.visit_declarator(dd).branch()
-                                        } else {
-                                            ControlFlow::Continue(())
-                                        }
-                                    }
-                                };
-                                if let ControlFlow::Break(res) = br3 {
-                                    return V::Result::from_residual(res);
-                                }
-                            }
-                            ControlFlow::Continue(())
-                        }
-                        MemberDeclaration::StaticAssert(_) => ControlFlow::Continue(()),
-                        MemberDeclaration::Error => ControlFlow::Continue(()),
-                    };
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-            }
-            V::Result::output()
-        }
-        TypeSpecifier::Enum(e) => {
-            if let Some(id) = &e.identifier {
-                let br = v.visit_enum_name(id).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-            }
-            if let Some(enumerators) = &e.enumerators {
-                for en in enumerators {
-                    let br = v.visit_enumerator_name(&en.name).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-            }
-            V::Result::output()
-        }
+        TypeSpecifier::Struct(s) => v.visit_struct_union_specifier(s),
+        TypeSpecifier::Enum(e) => v.visit_enum_specifier(e),
         TypeSpecifier::TypedefName(id) => v.visit_type_name_identifier(id),
         TypeSpecifier::Atomic(a) => v.visit_atomic_type_specifier(a),
         TypeSpecifier::Typeof(t) => v.visit_typeof(t),
-        TypeSpecifier::BitInt(_)
-        | TypeSpecifier::Void
+        TypeSpecifier::BitInt(c) => v.visit_constant_expression(c),
+        TypeSpecifier::Void
         | TypeSpecifier::Char
         | TypeSpecifier::Short
         | TypeSpecifier::Int
@@ -915,14 +1030,91 @@ pub fn walk_type_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, ts: &'a TypeS
     }
 }
 
-/// Walks an atomic type specifier.
+/// Walk a struct or union specifier.
+pub fn walk_struct_union_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a StructOrUnionSpecifier) -> V::Result {
+    tr!(v.visit_struct_or_union(&s.kind));
+    for attr in &s.attributes {
+        tr!(v.visit_attribute_specifier(attr));
+    }
+    if let Some(id) = &s.identifier {
+        tr!(v.visit_struct_name(id));
+    }
+    if let Some(members) = &s.members {
+        for m in members {
+            tr!(v.visit_member_declaration(m));
+        }
+    }
+    V::Result::output()
+}
+
+/// Walk a member declaration.
+pub fn walk_member_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, md: &'a MemberDeclaration) -> V::Result {
+    match md {
+        MemberDeclaration::Normal { attributes, specifiers, declarators } => {
+            for attr in attributes {
+                tr!(v.visit_attribute_specifier(attr));
+            }
+            tr!(v.visit_specifier_qualifier_list(specifiers));
+            for d in declarators {
+                tr!(v.visit_member_declarator(d));
+            }
+            V::Result::output()
+        }
+        MemberDeclaration::StaticAssert(sa) => v.visit_static_assert_declaration(sa),
+        MemberDeclaration::Error => V::Result::output(),
+    }
+}
+
+/// Walk a member declarator.
+pub fn walk_member_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, md: &'a MemberDeclarator) -> V::Result {
+    match md {
+        MemberDeclarator::Declarator(d) => v.visit_declarator(d),
+        MemberDeclarator::BitField { declarator, width } => {
+            if let Some(d) = declarator {
+                tr!(v.visit_declarator(d));
+            }
+            v.visit_constant_expression(width)
+        }
+    }
+}
+
+/// Walk an enum specifier.
+pub fn walk_enum_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a EnumSpecifier) -> V::Result {
+    for attr in &e.attributes {
+        tr!(v.visit_attribute_specifier(attr));
+    }
+    if let Some(id) = &e.identifier {
+        tr!(v.visit_enum_name(id));
+    }
+    if let Some(sql) = &e.type_specifier {
+        tr!(v.visit_specifier_qualifier_list(sql));
+    }
+    if let Some(enumerators) = &e.enumerators {
+        for en in enumerators {
+            tr!(v.visit_enumerator(en));
+        }
+    }
+    V::Result::output()
+}
+
+/// Walk an enumerator.
+pub fn walk_enumerator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a Enumerator) -> V::Result {
+    tr!(v.visit_enumerator_name(&e.name));
+    for attr in &e.attributes {
+        tr!(v.visit_attribute_specifier(attr));
+    }
+    if let Some(value) = &e.value {
+        tr!(v.visit_constant_expression(value));
+    }
+    V::Result::output()
+}
+
+/// Walk an atomic type specifier.
 pub fn walk_atomic_type_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AtomicTypeSpecifier) -> V::Result {
     v.visit_type_name(&a.type_name)
 }
 
-/// Walks a typeof specifier.
-///
-/// The argument can be an expression or a type name.
+/// Walk a typeof specifier.
 pub fn walk_typeof<'a, V: Visitor<'a> + ?Sized>(v: &mut V, t: &'a TypeofSpecifier) -> V::Result {
     match t {
         TypeofSpecifier::Typeof(arg) | TypeofSpecifier::TypeofUnqual(arg) => match arg {
@@ -933,185 +1125,224 @@ pub fn walk_typeof<'a, V: Visitor<'a> + ?Sized>(v: &mut V, t: &'a TypeofSpecifie
     }
 }
 
-/// Walks a specifier qualifier list.
-///
-/// This is used for type names in casts, sizeof/alignof expressions, etc.
+/// Walk a specifier qualifier list.
 pub fn walk_specifier_qualifier_list<'a, V: Visitor<'a> + ?Sized>(
     v: &mut V,
     s: &'a SpecifierQualifierList,
 ) -> V::Result {
     for item in &s.items {
-        let br = v.visit_type_specifier_qualifier(item).branch();
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
-        }
+        tr!(v.visit_type_specifier_qualifier(item));
+    }
+    for attr in &s.attributes {
+        tr!(v.visit_attribute_specifier(attr));
     }
     V::Result::output()
 }
 
-/// Walks a declarator.
-///
-/// Recursively handles pointer, direct, and error declarators.
+/// Walk a declarator.
 pub fn walk_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarator) -> V::Result {
     match d {
         Declarator::Direct(dd) => v.visit_direct_declarator(dd),
-        Declarator::Pointer { declarator, .. } => v.visit_declarator(declarator),
+        Declarator::Pointer { pointer, declarator } => {
+            tr!(v.visit_pointer(pointer));
+            v.visit_declarator(declarator)
+        }
         Declarator::Error => V::Result::output(),
     }
 }
 
-/// Walks a direct declarator.
-///
-/// Handles identifier declarators (where `visit_variable_name` is called),
-/// parenthesized declarators, array declarators, and function declarators.
-/// For function declarators, visits parameter declarations.
+/// Walk a pointer.
+pub fn walk_pointer<'a, V: Visitor<'a> + ?Sized>(v: &mut V, p: &'a Pointer) -> V::Result {
+    tr!(v.visit_pointer_or_block(&p.pointer_or_block));
+    for attr in &p.attributes {
+        tr!(v.visit_attribute_specifier(attr));
+    }
+    for tq in &p.type_qualifiers {
+        tr!(v.visit_type_qualifier(tq));
+    }
+    V::Result::output()
+}
+
+/// Walk a direct declarator.
 pub fn walk_direct_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a DirectDeclarator) -> V::Result {
     match d {
         DirectDeclarator::Identifier { identifier, attributes } => {
-            let br = v.visit_variable_name(identifier).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_variable_name(identifier));
             for attr in attributes {
-                let br = v.visit_attribute_specifier(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier(attr));
             }
             V::Result::output()
         }
         DirectDeclarator::Parenthesized(inner) => v.visit_declarator(inner),
-        DirectDeclarator::Array { declarator, attributes, .. } => {
-            let br = v.visit_direct_declarator(declarator).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+        DirectDeclarator::Array { declarator, attributes, array_declarator } => {
+            tr!(v.visit_direct_declarator(declarator));
             for attr in attributes {
-                let br = v.visit_attribute_specifier(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier(attr));
             }
-            V::Result::output()
+            v.visit_array_declarator(array_declarator)
         }
         DirectDeclarator::Function { declarator, attributes, parameters } => {
-            let br = v.visit_direct_declarator(declarator).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_direct_declarator(declarator));
             for attr in attributes {
-                let br = v.visit_attribute_specifier(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier(attr));
             }
-            match parameters {
-                ParameterTypeList::Parameters(params) | ParameterTypeList::Variadic(params) => {
-                    for p in params {
-                        let br = v.visit_declaration_specifiers(&p.specifiers).branch();
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                        if let Some(kind) = &p.declarator {
-                            let br = match kind {
-                                ParameterDeclarationKind::Declarator(d) => v.visit_declarator(d).branch(),
-                                ParameterDeclarationKind::Abstract(a) => v.visit_abstract_declarator(a).branch(),
-                            };
-                            if let ControlFlow::Break(res) = br {
-                                return V::Result::from_residual(res);
-                            }
-                        }
-                    }
-                }
-                ParameterTypeList::OnlyVariadic => {}
-            }
-            V::Result::output()
+            v.visit_parameter_type_list(parameters)
         }
     }
 }
 
-/// Walks a type name (used in casts, sizeof, alignof, etc.).
+/// Walk a parameter type list.
+pub fn walk_parameter_type_list<'a, V: Visitor<'a> + ?Sized>(v: &mut V, ptl: &'a ParameterTypeList) -> V::Result {
+    match ptl {
+        ParameterTypeList::Parameters(params) | ParameterTypeList::Variadic(params) => {
+            for p in params {
+                tr!(v.visit_parameter_declaration(p));
+            }
+            V::Result::output()
+        }
+        ParameterTypeList::OnlyVariadic => V::Result::output(),
+    }
+}
+
+/// Walk a parameter declaration.
+pub fn walk_parameter_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, pd: &'a ParameterDeclaration) -> V::Result {
+    for attr in &pd.attributes {
+        tr!(v.visit_attribute_specifier(attr));
+    }
+    tr!(v.visit_declaration_specifiers(&pd.specifiers));
+    if let Some(kind) = &pd.declarator {
+        tr!(v.visit_parameter_declaration_kind(kind));
+    }
+    V::Result::output()
+}
+
+/// Walk a parameter declaration kind.
+pub fn walk_parameter_declaration_kind<'a, V: Visitor<'a> + ?Sized>(
+    v: &mut V,
+    pdk: &'a ParameterDeclarationKind,
+) -> V::Result {
+    match pdk {
+        ParameterDeclarationKind::Declarator(d) => v.visit_declarator(d),
+        ParameterDeclarationKind::Abstract(a) => v.visit_abstract_declarator(a),
+    }
+}
+
+/// Walk an initializer.
+pub fn walk_initializer<'a, V: Visitor<'a> + ?Sized>(v: &mut V, i: &'a Initializer) -> V::Result {
+    match i {
+        Initializer::Expression(e) => v.visit_expression(e),
+        Initializer::Braced(b) => v.visit_braced_initializer(b),
+    }
+}
+
+/// Walk a braced initializer.
+fn walk_braced_initializer<'a, V: Visitor<'a> + ?Sized>(v: &mut V, b: &'a BracedInitializer) -> V::Result {
+    for init in &b.initializers {
+        tr!(v.visit_designated_initializer(init));
+    }
+    V::Result::output()
+}
+
+/// Walk a designated initializer.
+pub fn walk_designated_initializer<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a DesignatedInitializer) -> V::Result {
+    if let Some(designation) = &d.designation {
+        tr!(v.visit_designation(designation));
+    }
+    v.visit_initializer(&d.initializer)
+}
+
+/// Walk a designation.
+pub fn walk_designation<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Designation) -> V::Result {
+    tr!(v.visit_designator(&d.designator));
+    if let Some(designation) = &d.designation {
+        tr!(v.visit_designation(designation));
+    }
+    V::Result::output()
+}
+
+/// Walk a designator.
+pub fn walk_designator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Designator) -> V::Result {
+    match d {
+        Designator::Array(expr) => v.visit_constant_expression(expr),
+        Designator::Member(identifier) => v.visit_member_name(identifier),
+    }
+}
+
+/// Walk a constant expression.
+pub fn walk_constant_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a ConstantExpression) -> V::Result {
+    match e {
+        ConstantExpression::Expression(expr) => v.visit_expression(expr),
+        ConstantExpression::Error => V::Result::output(),
+    }
+}
+
+/// Walk a type name (used in casts, sizeof, alignof, etc.).
 pub fn walk_type_name<'a, V: Visitor<'a> + ?Sized>(v: &mut V, tn: &'a TypeName) -> V::Result {
     match tn {
         TypeName::TypeName { specifiers, abstract_declarator } => {
-            let br = v.visit_specifier_qualifier_list(specifiers).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_specifier_qualifier_list(specifiers));
             if let Some(ad) = abstract_declarator {
-                v.visit_abstract_declarator(ad)
-            } else {
-                V::Result::output()
+                tr!(v.visit_abstract_declarator(ad));
             }
+            V::Result::output()
         }
         TypeName::Error => V::Result::output(),
     }
 }
 
-/// Walks an abstract declarator.
-///
-/// Used in type names where declarators can omit names.
-/// Recursively handles pointers and direct abstract declarators.
+/// Walk an abstract declarator.
 pub fn walk_abstract_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AbstractDeclarator) -> V::Result {
     match a {
         AbstractDeclarator::Direct(d) => v.visit_direct_abstract_declarator(d),
-        AbstractDeclarator::Pointer { abstract_declarator, .. } => {
+        AbstractDeclarator::Pointer { pointer, abstract_declarator } => {
+            tr!(v.visit_pointer(pointer));
             if let Some(ad) = abstract_declarator {
-                v.visit_abstract_declarator(ad)
-            } else {
-                V::Result::output()
+                tr!(v.visit_abstract_declarator(ad));
             }
+            V::Result::output()
         }
         AbstractDeclarator::Error => V::Result::output(),
     }
 }
 
-/// Walks a direct abstract declarator.
-///
-/// Handles array and function declarators without identifiers,
-/// used in type names and abstract declarators.
+/// Walk a direct abstract declarator.
 pub fn walk_direct_abstract_declarator<'a, V: Visitor<'a> + ?Sized>(
     v: &mut V,
     d: &'a DirectAbstractDeclarator,
 ) -> V::Result {
     match d {
         DirectAbstractDeclarator::Parenthesized(ad) => v.visit_abstract_declarator(ad),
-        DirectAbstractDeclarator::Array { declarator, .. } => {
+        DirectAbstractDeclarator::Array { declarator, attributes, array_declarator } => {
             if let Some(dd) = declarator {
-                v.visit_direct_abstract_declarator(dd)
-            } else {
-                V::Result::output()
+                tr!(v.visit_direct_abstract_declarator(dd));
             }
+            for attr in attributes {
+                tr!(v.visit_attribute_specifier(attr));
+            }
+            v.visit_array_declarator(array_declarator)
         }
-        DirectAbstractDeclarator::Function { declarator, .. } => {
+        DirectAbstractDeclarator::Function { declarator, attributes, parameters } => {
             if let Some(dd) = declarator {
-                v.visit_direct_abstract_declarator(dd)
-            } else {
-                V::Result::output()
+                tr!(v.visit_direct_abstract_declarator(dd))
             }
+            for attr in attributes {
+                tr!(v.visit_attribute_specifier(attr));
+            }
+            v.visit_parameter_type_list(parameters)
         }
     }
 }
 
-/// Walks an attribute specifier.
-///
-/// This is called when encountering an attribute specifier in a function
-/// definition.
+/// Walk an attribute specifier.
 pub fn walk_attribute_specifier<'a, V: Visitor<'a> + ?Sized>(v: &mut V, a: &'a AttributeSpecifier) -> V::Result {
     match a {
         AttributeSpecifier::Attributes(attributes) => {
             for attr in attributes {
-                let br = v.visit_attribute(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute(attr));
             }
         }
         AttributeSpecifier::Asm(string_literals) => {
-            let br = v.visit_asm_attribute_specifier(string_literals).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_asm_attribute_specifier(string_literals));
         }
         AttributeSpecifier::Error => {}
     }
@@ -1250,9 +1481,49 @@ pub trait VisitorMut<'a> {
         walk_direct_declarator_mut(self, d)
     }
 
+    /// Visits an initializer with mutable access.
+    fn visit_initializer_mut(&mut self, i: &'a mut Initializer) -> Self::Result {
+        walk_initializer_mut(self, i)
+    }
+
+    /// Visits a braced initializer with mutable access.
+    fn visit_braced_initializer_mut(&mut self, b: &'a mut BracedInitializer) -> Self::Result {
+        walk_braced_initializer_mut(self, b)
+    }
+
+    /// Visits a designated initializer with mutable access.
+    fn visit_designated_initializer_mut(&mut self, d: &'a mut DesignatedInitializer) -> Self::Result {
+        walk_designated_initializer_mut(self, d)
+    }
+
+    /// Visits a designation with mutable access.
+    fn visit_designation_mut(&mut self, d: &'a mut Designation) -> Self::Result {
+        walk_designation_mut(self, d)
+    }
+
+    /// Visits a designator with mutable access.
+    fn visit_designator_mut(&mut self, d: &'a mut Designator) -> Self::Result {
+        walk_designator_mut(self, d)
+    }
+
+    /// Visits a constant expression with mutable access.
+    fn visit_constant_expression_mut(&mut self, c: &'a mut ConstantExpression) -> Self::Result {
+        walk_constant_expression_mut(self, c)
+    }
+
     /// Visits a postfix expression with mutable access.
     fn visit_postfix_expression_mut(&mut self, p: &'a mut PostfixExpression) -> Self::Result {
         walk_postfix_expression_mut(self, p)
+    }
+
+    /// Visits a primary expression with mutable access.
+    fn visit_primary_expression_mut(&mut self, p: &'a mut PrimaryExpression) -> Self::Result {
+        walk_primary_expression_mut(self, p)
+    }
+
+    /// Visits a generic selection with mutable access.
+    fn visit_generic_selection_mut(&mut self, g: &'a mut GenericSelection) -> Self::Result {
+        walk_generic_selection_mut(self, g)
     }
 
     /// Visits a unary expression with mutable access.
@@ -1314,24 +1585,201 @@ pub trait VisitorMut<'a> {
     fn visit_direct_abstract_declarator_mut(&mut self, d: &'a mut DirectAbstractDeclarator) -> Self::Result {
         walk_direct_abstract_declarator_mut(self, d)
     }
+
+    /// Visits a labeled statement with mutable access.
+    fn visit_labeled_statement_mut(&mut self, ls: &'a mut LabeledStatement) -> Self::Result {
+        walk_labeled_statement_mut(self, ls)
+    }
+
+    /// Visits a label with mutable access.
+    fn visit_label_mut(&mut self, l: &'a mut Label) -> Self::Result {
+        walk_label_mut(self, l)
+    }
+
+    /// Visits an expression statement with mutable access.
+    fn visit_expression_statement_mut(&mut self, e: &'a mut ExpressionStatement) -> Self::Result {
+        walk_expression_statement_mut(self, e)
+    }
+
+    /// Visits a primary block with mutable access.
+    fn visit_primary_block_mut(&mut self, pb: &'a mut PrimaryBlock) -> Self::Result {
+        walk_primary_block_mut(self, pb)
+    }
+
+    /// Visits a jump statement with mutable access.
+    fn visit_jump_statement_mut(&mut self, j: &'a mut JumpStatement) -> Self::Result {
+        walk_jump_statement_mut(self, j)
+    }
+
+    /// Visits a selection statement with mutable access.
+    fn visit_selection_statement_mut(&mut self, s: &'a mut SelectionStatement) -> Self::Result {
+        walk_selection_statement_mut(self, s)
+    }
+
+    /// Visits an iteration statement with mutable access.
+    fn visit_iteration_statement_mut(&mut self, i: &'a mut IterationStatement) -> Self::Result {
+        walk_iteration_statement_mut(self, i)
+    }
+
+    /// Visits a for init clause with mutable access.
+    fn visit_for_init_mut(&mut self, fi: &'a mut ForInit) -> Self::Result {
+        walk_for_init_mut(self, fi)
+    }
+
+    /// Visits a binary expression with mutable access.
+    fn visit_binary_expression_mut(&mut self, b: &'a mut BinaryExpression) -> Self::Result {
+        walk_binary_expression_mut(self, b)
+    }
+
+    /// Visits a conditional expression with mutable access.
+    fn visit_conditional_expression_mut(&mut self, c: &'a mut ConditionalExpression) -> Self::Result {
+        walk_conditional_expression_mut(self, c)
+    }
+
+    /// Visits an assignment expression with mutable access.
+    fn visit_assignment_expression_mut(&mut self, a: &'a mut AssignmentExpression) -> Self::Result {
+        walk_assignment_expression_mut(self, a)
+    }
+
+    /// Visits a comma expression with mutable access.
+    fn visit_comma_expression_mut(&mut self, c: &'a mut CommaExpression) -> Self::Result {
+        walk_comma_expression_mut(self, c)
+    }
+
+    /// Visits a binary operator with mutable access.
+    fn visit_binary_operator_mut(&mut self, _: &'a mut BinaryOperator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an assignment operator with mutable access.
+    fn visit_assignment_operator_mut(&mut self, _: &'a mut AssignmentOperator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a compound literal with mutable access.
+    fn visit_compound_literal_mut(&mut self, cl: &'a mut CompoundLiteral) -> Self::Result {
+        walk_compound_literal_mut(self, cl)
+    }
+
+    /// Visits a storage class specifier with mutable access.
+    fn visit_storage_class_specifier_mut(&mut self, _: &'a mut StorageClassSpecifier) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a unary operator with mutable access.
+    fn visit_unary_operator_mut(&mut self, _: &'a mut UnaryOperator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an init declarator with mutable access.
+    fn visit_init_declarator_mut(&mut self, id: &'a mut InitDeclarator) -> Self::Result {
+        walk_init_declarator_mut(self, id)
+    }
+
+    /// Visits a static assert declaration with mutable access.
+    fn visit_static_assert_declaration_mut(&mut self, sa: &'a mut StaticAssertDeclaration) -> Self::Result {
+        walk_static_assert_declaration_mut(self, sa)
+    }
+
+    /// Visits a static assert message with mutable access.
+    fn visit_static_assert_message_mut(&mut self, _: &'a mut StringLiterals) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a declaration specifier with mutable access.
+    fn visit_declaration_specifier_mut(&mut self, ds: &'a mut DeclarationSpecifier) -> Self::Result {
+        walk_declaration_specifier_mut(self, ds)
+    }
+
+    /// Visits a function specifier with mutable access.
+    fn visit_function_specifier_mut(&mut self, _: &'a mut FunctionSpecifier) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a type qualifier with mutable access.
+    fn visit_type_qualifier_mut(&mut self, _: &'a mut TypeQualifier) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an alignment specifier with mutable access.
+    fn visit_alignment_specifier_mut(&mut self, a: &'a mut AlignmentSpecifier) -> Self::Result {
+        walk_alignment_specifier_mut(self, a)
+    }
+
+    /// Visits a struct or union specifier with mutable access.
+    fn visit_struct_union_specifier_mut(&mut self, s: &'a mut StructOrUnionSpecifier) -> Self::Result {
+        walk_struct_union_specifier_mut(self, s)
+    }
+
+    /// Visits an enum specifier with mutable access.
+    fn visit_enum_specifier_mut(&mut self, e: &'a mut EnumSpecifier) -> Self::Result {
+        walk_enum_specifier_mut(self, e)
+    }
+
+    /// Visits a struct or union keyword with mutable access.
+    fn visit_struct_or_union_mut(&mut self, _: &'a mut StructOrUnion) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a member declaration with mutable access.
+    fn visit_member_declaration_mut(&mut self, md: &'a mut MemberDeclaration) -> Self::Result {
+        walk_member_declaration_mut(self, md)
+    }
+
+    /// Visits a member declarator with mutable access.
+    fn visit_member_declarator_mut(&mut self, md: &'a mut MemberDeclarator) -> Self::Result {
+        walk_member_declarator_mut(self, md)
+    }
+
+    /// Visits an enumerator with mutable access.
+    fn visit_enumerator_mut(&mut self, e: &'a mut Enumerator) -> Self::Result {
+        walk_enumerator_mut(self, e)
+    }
+
+    /// Visits a pointer with mutable access.
+    fn visit_pointer_mut(&mut self, p: &'a mut Pointer) -> Self::Result {
+        walk_pointer_mut(self, p)
+    }
+
+    /// Visits a pointer or block indicator with mutable access.
+    fn visit_pointer_or_block_mut(&mut self, _: &'a mut PointerOrBlock) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits an array declarator with mutable access.
+    fn visit_array_declarator_mut(&mut self, _: &'a mut ArrayDeclarator) -> Self::Result {
+        Self::Result::output()
+    }
+
+    /// Visits a parameter type list with mutable access.
+    fn visit_parameter_type_list_mut(&mut self, ptl: &'a mut ParameterTypeList) -> Self::Result {
+        walk_parameter_type_list_mut(self, ptl)
+    }
+
+    /// Visits a parameter declaration with mutable access.
+    fn visit_parameter_declaration_mut(&mut self, pd: &'a mut ParameterDeclaration) -> Self::Result {
+        walk_parameter_declaration_mut(self, pd)
+    }
+
+    /// Visits a parameter declaration kind with mutable access.
+    fn visit_parameter_declaration_kind_mut(&mut self, pdk: &'a mut ParameterDeclarationKind) -> Self::Result {
+        walk_parameter_declaration_kind_mut(self, pdk)
+    }
 }
 
 // ============================================================================
 // Mutable Walker Functions
 // ============================================================================
 
-/// Walks a translation unit with mutable access.
+/// Walk a translation unit with mutable access.
 pub fn walk_translation_unit_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, tu: &'a mut TranslationUnit) -> V::Result {
     for ed in &mut tu.external_declarations {
-        let br = v.visit_external_declaration_mut(ed).branch();
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
-        }
+        tr!(v.visit_external_declaration_mut(ed));
     }
     V::Result::output()
 }
 
-/// Walks an external declaration with mutable access.
+/// Walk an external declaration with mutable access.
 pub fn walk_external_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     d: &'a mut ExternalDeclaration,
@@ -1342,472 +1790,451 @@ pub fn walk_external_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(
     }
 }
 
-/// Walks a function definition with mutable access.
+/// Walk a function definition with mutable access.
 pub fn walk_function_definition_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     f: &'a mut FunctionDefinition,
 ) -> V::Result {
     for attr in &mut f.attributes {
-        let br = v.visit_attribute_specifier_mut(attr).branch();
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
-        }
+        tr!(v.visit_attribute_specifier_mut(attr));
     }
-    let br = v.visit_declaration_specifiers_mut(&mut f.specifiers).branch();
-    if let ControlFlow::Break(res) = br {
-        return V::Result::from_residual(res);
-    }
-    let br = v.visit_declarator_mut(&mut f.declarator).branch();
-    if let ControlFlow::Break(res) = br {
-        return V::Result::from_residual(res);
-    }
+    tr!(v.visit_declaration_specifiers_mut(&mut f.specifiers));
+    tr!(v.visit_declarator_mut(&mut f.declarator));
     v.visit_compound_statement_mut(&mut f.body)
 }
 
-/// Walks a statement with mutable access.
+/// Walk a statement with mutable access.
 pub fn walk_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, s: &'a mut Statement) -> V::Result {
     match s {
-        Statement::Labeled(ls) => {
-            match &mut ls.label {
-                Label::Identifier { identifier, .. } => {
-                    let br = v.visit_label_name_mut(identifier).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-                Label::Case { .. } | Label::Default { .. } => {}
-            }
-            v.visit_statement_mut(&mut ls.statement)
-        }
+        Statement::Labeled(ls) => v.visit_labeled_statement_mut(ls),
         Statement::Unlabeled(u) => v.visit_unlabeled_statement_mut(u),
     }
 }
 
-/// Walks an unlabeled statement with mutable access.
+/// Walk a labeled statement with mutable access.
+pub fn walk_labeled_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    ls: &'a mut LabeledStatement,
+) -> V::Result {
+    tr!(v.visit_label_mut(&mut ls.label));
+    v.visit_statement_mut(&mut ls.statement)
+}
+
+/// Walk a label with mutable access.
+pub fn walk_label_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, l: &'a mut Label) -> V::Result {
+    match l {
+        Label::Identifier { attributes, identifier } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier_mut(attribute));
+            }
+            v.visit_label_name_mut(identifier)
+        }
+        Label::Case { attributes, expression } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier_mut(attribute));
+            }
+            v.visit_constant_expression_mut(expression)
+        }
+        Label::Default { attributes } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier_mut(attribute));
+            }
+            V::Result::output()
+        }
+    }
+}
+
+/// Walk an unlabeled statement with mutable access.
 pub fn walk_unlabeled_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     s: &'a mut UnlabeledStatement,
 ) -> V::Result {
     match s {
-        UnlabeledStatement::Expression(es) => {
-            if let Some(expr) = &mut es.expression {
-                v.visit_expression_mut(expr)
-            } else {
-                V::Result::output()
+        UnlabeledStatement::Expression(es) => v.visit_expression_statement_mut(es),
+        UnlabeledStatement::Primary { attributes, block } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier_mut(attribute));
             }
+            v.visit_primary_block_mut(block)
         }
-        UnlabeledStatement::Primary { block, .. } => match block {
-            PrimaryBlock::Compound(c) => {
-                for item in &mut c.items {
-                    let br = match item {
-                        BlockItem::Declaration(d) => v.visit_declaration_mut(d).branch(),
-                        BlockItem::Statement(u) => v.visit_unlabeled_statement_mut(u).branch(),
-                        BlockItem::Label(l) => match l {
-                            Label::Identifier { identifier, .. } => v.visit_label_name_mut(identifier).branch(),
-                            Label::Case { .. } | Label::Default { .. } => ControlFlow::Continue(()),
-                        },
-                    };
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-                V::Result::output()
+        UnlabeledStatement::Jump { attributes, statement } => {
+            for attribute in attributes {
+                tr!(v.visit_attribute_specifier_mut(attribute));
             }
-            PrimaryBlock::Selection(sel) => match sel {
-                SelectionStatement::If { condition, then_stmt, else_stmt } => {
-                    let br = v.visit_expression_mut(condition).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    let br = v.visit_statement_mut(then_stmt).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    if let Some(else_stmt) = else_stmt {
-                        v.visit_statement_mut(else_stmt)
-                    } else {
-                        V::Result::output()
-                    }
-                }
-                SelectionStatement::Switch { expression, statement } => {
-                    let br = v.visit_expression_mut(expression).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    v.visit_statement_mut(statement)
-                }
-            },
-            PrimaryBlock::Iteration(iter) => match iter {
-                IterationStatement::While { condition, body } => {
-                    let br = v.visit_expression_mut(condition).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    v.visit_statement_mut(body)
-                }
-                IterationStatement::DoWhile { body, condition } => {
-                    let br = v.visit_statement_mut(body).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                    v.visit_expression_mut(condition)
-                }
-                IterationStatement::For { init, condition, update, body } => {
-                    if let Some(init) = init {
-                        let br = match init {
-                            ForInit::Expression(e) => v.visit_expression_mut(e).branch(),
-                            ForInit::Declaration(d) => v.visit_declaration_mut(d).branch(),
-                        };
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                    }
-                    if let Some(condition) = condition {
-                        let br = v.visit_expression_mut(condition).branch();
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                    }
-                    if let Some(update) = update {
-                        let br = v.visit_expression_mut(update).branch();
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                    }
-                    v.visit_statement_mut(body)
-                }
-                IterationStatement::Error => V::Result::output(),
-            },
-        },
-        UnlabeledStatement::Jump { statement, .. } => match statement {
-            JumpStatement::Goto(id) => v.visit_label_name_mut(id),
-            JumpStatement::Continue | JumpStatement::Break => V::Result::output(),
-            JumpStatement::Return(expr) => {
-                if let Some(e) = expr {
-                    v.visit_expression_mut(e)
-                } else {
-                    V::Result::output()
-                }
-            }
-        },
+            v.visit_jump_statement_mut(statement)
+        }
     }
 }
 
-/// Walks a compound statement with mutable access.
+/// Walk an expression statement with mutable access.
+pub fn walk_expression_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    e: &'a mut ExpressionStatement,
+) -> V::Result {
+    if let Some(expr) = &mut e.expression {
+        tr!(v.visit_expression_mut(expr));
+    }
+    V::Result::output()
+}
+
+/// Walk a primary block with mutable access.
+pub fn walk_primary_block_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, pb: &'a mut PrimaryBlock) -> V::Result {
+    match pb {
+        PrimaryBlock::Compound(c) => v.visit_compound_statement_mut(c),
+        PrimaryBlock::Selection(sel) => v.visit_selection_statement_mut(sel),
+        PrimaryBlock::Iteration(iter) => v.visit_iteration_statement_mut(iter),
+    }
+}
+
+/// Walk a compound statement with mutable access.
 pub fn walk_compound_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     c: &'a mut CompoundStatement,
 ) -> V::Result {
     for item in &mut c.items {
-        let br = match item {
-            BlockItem::Declaration(d) => v.visit_declaration_mut(d).branch(),
-            BlockItem::Statement(u) => v.visit_unlabeled_statement_mut(u).branch(),
-            BlockItem::Label(l) => match l {
-                Label::Identifier { identifier, .. } => v.visit_label_name_mut(identifier).branch(),
-                Label::Case { .. } | Label::Default { .. } => ControlFlow::Continue(()),
-            },
-        };
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
+        match item {
+            BlockItem::Declaration(d) => tr!(v.visit_declaration_mut(d)),
+            BlockItem::Statement(u) => tr!(v.visit_unlabeled_statement_mut(u)),
+            BlockItem::Label(l) => tr!(v.visit_label_mut(l)),
         }
     }
     V::Result::output()
 }
 
-/// Walks an expression with mutable access.
+/// Walk a selection statement with mutable access.
+pub fn walk_selection_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    s: &'a mut SelectionStatement,
+) -> V::Result {
+    match s {
+        SelectionStatement::If { condition, then_stmt, else_stmt } => {
+            tr!(v.visit_expression_mut(condition));
+            tr!(v.visit_statement_mut(then_stmt));
+            if let Some(e) = else_stmt {
+                tr!(v.visit_statement_mut(e));
+            }
+            V::Result::output()
+        }
+        SelectionStatement::Switch { expression, statement } => {
+            tr!(v.visit_expression_mut(expression));
+            v.visit_statement_mut(statement)
+        }
+    }
+}
+
+/// Walk an iteration statement with mutable access.
+pub fn walk_iteration_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    i: &'a mut IterationStatement,
+) -> V::Result {
+    match i {
+        IterationStatement::While { condition, body } => {
+            tr!(v.visit_expression_mut(condition));
+            v.visit_statement_mut(body)
+        }
+        IterationStatement::DoWhile { body, condition } => {
+            tr!(v.visit_statement_mut(body));
+            v.visit_expression_mut(condition)
+        }
+        IterationStatement::For { init, condition, update, body } => {
+            if let Some(i) = init {
+                v.visit_for_init_mut(i);
+            }
+            if let Some(c) = condition {
+                tr!(v.visit_expression_mut(c));
+            }
+            if let Some(u) = update {
+                tr!(v.visit_expression_mut(u));
+            }
+            v.visit_statement_mut(body)
+        }
+        IterationStatement::Error => V::Result::output(),
+    }
+}
+
+/// Walk a for init with mutable access.
+pub fn walk_for_init_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, fi: &'a mut ForInit) -> V::Result {
+    match fi {
+        ForInit::Expression(e) => v.visit_expression_mut(e),
+        ForInit::Declaration(d) => v.visit_declaration_mut(d),
+    }
+}
+
+/// Walk a jump statement with mutable access.
+pub fn walk_jump_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, j: &'a mut JumpStatement) -> V::Result {
+    match j {
+        JumpStatement::Goto(id) => v.visit_label_name_mut(id),
+        JumpStatement::Continue | JumpStatement::Break => V::Result::output(),
+        JumpStatement::Return(expr) => {
+            if let Some(e) = expr {
+                tr!(v.visit_expression_mut(e));
+            }
+            V::Result::output()
+        }
+    }
+}
+
+/// Walk an expression with mutable access.
 pub fn walk_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, e: &'a mut Expression) -> V::Result {
     match e {
         Expression::Postfix(p) => v.visit_postfix_expression_mut(p),
         Expression::Unary(u) => v.visit_unary_expression_mut(u),
         Expression::Cast(c) => v.visit_cast_expression_mut(c),
-        Expression::Binary(b) => {
-            let br = v.visit_expression_mut(&mut b.left).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            v.visit_expression_mut(&mut b.right)
-        }
-        Expression::Conditional(c) => {
-            let br = v.visit_expression_mut(&mut c.condition).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            let br = v.visit_expression_mut(&mut c.then_expr).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            v.visit_expression_mut(&mut c.else_expr)
-        }
-        Expression::Assignment(a) => {
-            let br = v.visit_expression_mut(&mut a.left).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
-            v.visit_expression_mut(&mut a.right)
-        }
-        Expression::Comma(c) => {
-            for e in &mut c.expressions {
-                let br = v.visit_expression_mut(e).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-            }
-            V::Result::output()
-        }
+        Expression::Binary(b) => v.visit_binary_expression_mut(b),
+        Expression::Conditional(c) => v.visit_conditional_expression_mut(c),
+        Expression::Assignment(a) => v.visit_assignment_expression_mut(a),
+        Expression::Comma(c) => v.visit_comma_expression_mut(c),
         Expression::Error => V::Result::output(),
     }
 }
 
-/// Walks a postfix expression with mutable access.
+/// Walk a binary expression with mutable access.
+pub fn walk_binary_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, b: &'a mut BinaryExpression) -> V::Result {
+    tr!(v.visit_expression_mut(&mut b.left));
+    tr!(v.visit_binary_operator_mut(&mut b.operator));
+    v.visit_expression_mut(&mut b.right)
+}
+
+/// Walk a conditional expression with mutable access.
+pub fn walk_conditional_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    c: &'a mut ConditionalExpression,
+) -> V::Result {
+    tr!(v.visit_expression_mut(&mut c.condition));
+    tr!(v.visit_expression_mut(&mut c.then_expr));
+    v.visit_expression_mut(&mut c.else_expr)
+}
+
+/// Walk an assignment expression with mutable access.
+pub fn walk_assignment_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    a: &'a mut AssignmentExpression,
+) -> V::Result {
+    tr!(v.visit_expression_mut(&mut a.left));
+    tr!(v.visit_assignment_operator_mut(&mut a.operator));
+    v.visit_expression_mut(&mut a.right)
+}
+
+/// Walk a comma expression with mutable access.
+pub fn walk_comma_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, c: &'a mut CommaExpression) -> V::Result {
+    for e in &mut c.expressions {
+        tr!(v.visit_expression_mut(e));
+    }
+    V::Result::output()
+}
+
+/// Walk a postfix expression with mutable access.
 pub fn walk_postfix_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     p: &'a mut PostfixExpression,
 ) -> V::Result {
     match p {
-        PostfixExpression::Primary(pr) => match pr {
-            PrimaryExpression::Identifier(id) => v.visit_variable_name_mut(id),
-            PrimaryExpression::EnumerationConstant(id) => v.visit_enum_constant_mut(id),
-            PrimaryExpression::Parenthesized(e) => v.visit_expression_mut(e),
-            PrimaryExpression::Generic(g) => {
-                let br = v.visit_expression_mut(&mut g.controlling_expression).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-                for assoc in &mut g.associations {
-                    let br = match assoc {
-                        GenericAssociation::Type { expression, .. } => v.visit_expression_mut(expression).branch(),
-                        GenericAssociation::Default { expression } => v.visit_expression_mut(expression).branch(),
-                    };
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-                V::Result::output()
-            }
-            _ => V::Result::output(),
-        },
+        PostfixExpression::Primary(pr) => v.visit_primary_expression_mut(pr),
         PostfixExpression::ArrayAccess { array, index } => {
-            let br = v.visit_postfix_expression_mut(array).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression_mut(array));
             v.visit_expression_mut(index)
         }
         PostfixExpression::FunctionCall { function, arguments } => {
-            let br = v.visit_postfix_expression_mut(function).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression_mut(function));
             for a in arguments {
-                let br = v.visit_expression_mut(a).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_expression_mut(a));
             }
             V::Result::output()
         }
         PostfixExpression::MemberAccess { object, member } => {
-            let br = v.visit_postfix_expression_mut(object).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression_mut(object));
             v.visit_member_name_mut(member)
         }
         PostfixExpression::MemberAccessPtr { object, member } => {
-            let br = v.visit_postfix_expression_mut(object).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_postfix_expression_mut(object));
             v.visit_member_name_mut(member)
         }
         PostfixExpression::PostIncrement(inner) | PostfixExpression::PostDecrement(inner) => {
             v.visit_postfix_expression_mut(inner)
         }
-        PostfixExpression::CompoundLiteral(cl) => v.visit_type_name_mut(&mut cl.type_name),
+        PostfixExpression::CompoundLiteral(cl) => v.visit_compound_literal_mut(cl),
     }
 }
 
-/// Walks a unary expression with mutable access.
+/// Walk a compound literal with mutable access.
+pub fn walk_compound_literal_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, cl: &'a mut CompoundLiteral) -> V::Result {
+    for specifier in &mut cl.storage_class_specifiers {
+        tr!(v.visit_storage_class_specifier_mut(specifier));
+    }
+    tr!(v.visit_type_name_mut(&mut cl.type_name));
+    v.visit_braced_initializer_mut(&mut cl.initializer)
+}
+
+/// Walk a primary expression with mutable access.
+pub fn walk_primary_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    pr: &'a mut PrimaryExpression,
+) -> V::Result {
+    match pr {
+        PrimaryExpression::Identifier(id) => v.visit_variable_name_mut(id),
+        PrimaryExpression::EnumerationConstant(id) => v.visit_enum_constant_mut(id),
+        PrimaryExpression::Parenthesized(e) => v.visit_expression_mut(e),
+        PrimaryExpression::Generic(g) => v.visit_generic_selection_mut(g),
+        _ => V::Result::output(),
+    }
+}
+
+/// Walk a generic selection with mutable access.
+pub fn walk_generic_selection_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, g: &'a mut GenericSelection) -> V::Result {
+    tr!(v.visit_expression_mut(&mut g.controlling_expression));
+    for assoc in &mut g.associations {
+        match assoc {
+            GenericAssociation::Type { type_name, expression } => {
+                tr!(v.visit_type_name_mut(type_name));
+                tr!(v.visit_expression_mut(expression))
+            }
+            GenericAssociation::Default { expression } => tr!(v.visit_expression_mut(expression)),
+        };
+    }
+    V::Result::output()
+}
+
+/// Walk a unary expression with mutable access.
 pub fn walk_unary_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, u: &'a mut UnaryExpression) -> V::Result {
     match u {
         UnaryExpression::Postfix(p) => v.visit_postfix_expression_mut(p),
         UnaryExpression::PreIncrement(inner) | UnaryExpression::PreDecrement(inner) => {
             v.visit_unary_expression_mut(inner)
         }
-        UnaryExpression::Unary { operand, .. } => v.visit_cast_expression_mut(operand),
+        UnaryExpression::Unary { operator, operand } => {
+            tr!(v.visit_unary_operator_mut(operator));
+            v.visit_cast_expression_mut(operand)
+        }
         UnaryExpression::Sizeof(inner) => v.visit_unary_expression_mut(inner),
         UnaryExpression::SizeofType(tn) | UnaryExpression::Alignof(tn) => v.visit_type_name_mut(tn),
     }
 }
 
-/// Walks a cast expression with mutable access.
+/// Walk a cast expression with mutable access.
 pub fn walk_cast_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, c: &'a mut CastExpression) -> V::Result {
     match c {
         CastExpression::Unary(u) => v.visit_unary_expression_mut(u),
         CastExpression::Cast { type_name, expression } => {
-            let br = v.visit_type_name_mut(type_name).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_type_name_mut(type_name));
             v.visit_cast_expression_mut(expression)
         }
     }
 }
 
-/// Walks a declaration with mutable access.
+/// Walk a declaration with mutable access.
 pub fn walk_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut Declaration) -> V::Result {
     match d {
         Declaration::Normal { attributes, specifiers, declarators } => {
             for attr in attributes {
-                let br = v.visit_attribute_specifier_mut(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier_mut(attr));
             }
-            let br = v.visit_declaration_specifiers_mut(specifiers).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_declaration_specifiers_mut(specifiers));
             for init in declarators {
-                let br = v.visit_declarator_mut(&mut init.declarator).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_init_declarator_mut(init));
             }
             V::Result::output()
         }
         Declaration::Typedef { attributes, specifiers, declarators } => {
             for attr in attributes {
-                let br = v.visit_attribute_specifier_mut(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier_mut(attr));
             }
-            let br = v.visit_declaration_specifiers_mut(specifiers).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_declaration_specifiers_mut(specifiers));
             for d in declarators {
-                let br = v.visit_declarator_mut(d).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_declarator_mut(d));
             }
             V::Result::output()
         }
+        Declaration::StaticAssert(sa) => v.visit_static_assert_declaration_mut(sa),
         Declaration::Attribute(attrs) => {
             for attr in attrs {
-                let br = v.visit_attribute_specifier_mut(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier_mut(attr));
             }
             V::Result::output()
         }
-        Declaration::StaticAssert(_) | Declaration::Error => V::Result::output(),
+        Declaration::Error => V::Result::output(),
     }
 }
 
-/// Walks declaration specifiers with mutable access.
+/// Walk an init declarator with mutable access.
+pub fn walk_init_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, id: &'a mut InitDeclarator) -> V::Result {
+    tr!(v.visit_declarator_mut(&mut id.declarator));
+    if let Some(init) = &mut id.initializer {
+        tr!(v.visit_initializer_mut(init));
+    }
+    V::Result::output()
+}
+
+/// Walk a static assert declaration with mutable access.
+pub fn walk_static_assert_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    sa: &'a mut StaticAssertDeclaration,
+) -> V::Result {
+    tr!(v.visit_constant_expression_mut(&mut sa.condition));
+    if let Some(msg) = &mut sa.message {
+        tr!(v.visit_static_assert_message_mut(msg));
+    }
+    V::Result::output()
+}
+
+/// Walk declaration specifiers with mutable access.
 pub fn walk_declaration_specifiers_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     s: &'a mut DeclarationSpecifiers,
 ) -> V::Result {
     for it in &mut s.specifiers {
-        let br = match it {
-            DeclarationSpecifier::StorageClass(_) => ControlFlow::Continue(()),
-            DeclarationSpecifier::TypeSpecifierQualifier(tsq) => v.visit_type_specifier_qualifier_mut(tsq).branch(),
-            DeclarationSpecifier::Function { .. } => ControlFlow::Continue(()),
-        };
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
-        }
+        tr!(v.visit_declaration_specifier_mut(it));
+    }
+    for attr in &mut s.attributes {
+        tr!(v.visit_attribute_specifier_mut(attr));
     }
     V::Result::output()
 }
 
-/// Walks a type specifier or qualifier with mutable access.
+/// Walk a declaration specifier with mutable access.
+pub fn walk_declaration_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    ds: &'a mut DeclarationSpecifier,
+) -> V::Result {
+    match ds {
+        DeclarationSpecifier::StorageClass(scs) => v.visit_storage_class_specifier_mut(scs),
+        DeclarationSpecifier::TypeSpecifierQualifier(tsq) => v.visit_type_specifier_qualifier_mut(tsq),
+        DeclarationSpecifier::Function(fs) => v.visit_function_specifier_mut(fs),
+    }
+}
+
+/// Walk a type specifier or qualifier with mutable access.
 pub fn walk_type_specifier_qualifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     x: &'a mut TypeSpecifierQualifier,
 ) -> V::Result {
     match x {
         TypeSpecifierQualifier::TypeSpecifier(ts) => v.visit_type_specifier_mut(ts),
-        TypeSpecifierQualifier::TypeQualifier(_) => V::Result::output(),
-        TypeSpecifierQualifier::AlignmentSpecifier(a) => match a {
-            AlignmentSpecifier::Type(tn) => v.visit_type_name_mut(tn),
-            AlignmentSpecifier::Expression(_) => V::Result::output(),
-        },
+        TypeSpecifierQualifier::TypeQualifier(tq) => v.visit_type_qualifier_mut(tq),
+        TypeSpecifierQualifier::AlignmentSpecifier(a) => v.visit_alignment_specifier_mut(a),
     }
 }
 
-/// Walks a type specifier with mutable access.
+/// Walk an alignment specifier with mutable access.
+pub fn walk_alignment_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    a: &'a mut AlignmentSpecifier,
+) -> V::Result {
+    match a {
+        AlignmentSpecifier::Type(tn) => v.visit_type_name_mut(tn),
+        AlignmentSpecifier::Expression(e) => v.visit_constant_expression_mut(e),
+    }
+}
+
+/// Walk a type specifier with mutable access.
 pub fn walk_type_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, ts: &'a mut TypeSpecifier) -> V::Result {
     match ts {
-        TypeSpecifier::Struct(s) => {
-            if let Some(id) = &mut s.identifier {
-                let br = v.visit_struct_name_mut(id).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-            }
-            if let Some(members) = &mut s.members {
-                for member in members {
-                    let br = match member {
-                        MemberDeclaration::Normal { specifiers, declarators, .. } => {
-                            let br = v.visit_specifier_qualifier_list_mut(specifiers).branch();
-                            if let ControlFlow::Break(res) = br {
-                                return V::Result::from_residual(res);
-                            }
-                            for d in declarators {
-                                let br = match d {
-                                    MemberDeclarator::Declarator(dd) => v.visit_declarator_mut(dd).branch(),
-                                    MemberDeclarator::BitField { declarator, .. } => {
-                                        if let Some(dd) = declarator {
-                                            v.visit_declarator_mut(dd).branch()
-                                        } else {
-                                            ControlFlow::Continue(())
-                                        }
-                                    }
-                                };
-                                if let ControlFlow::Break(res) = br {
-                                    return V::Result::from_residual(res);
-                                }
-                            }
-                            ControlFlow::Continue(())
-                        }
-                        MemberDeclaration::StaticAssert(_) => ControlFlow::Continue(()),
-                        MemberDeclaration::Error => ControlFlow::Continue(()),
-                    };
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-            }
-            V::Result::output()
-        }
-        TypeSpecifier::Enum(e) => {
-            if let Some(id) = &mut e.identifier {
-                let br = v.visit_enum_name_mut(id).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
-            }
-            if let Some(enumerators) = &mut e.enumerators {
-                for enumerator in enumerators {
-                    let br = v.visit_enumerator_name_mut(&mut enumerator.name).branch();
-                    if let ControlFlow::Break(res) = br {
-                        return V::Result::from_residual(res);
-                    }
-                }
-            }
-            V::Result::output()
-        }
+        TypeSpecifier::Struct(s) => v.visit_struct_union_specifier_mut(s),
+        TypeSpecifier::Enum(e) => v.visit_enum_specifier_mut(e),
         TypeSpecifier::TypedefName(id) => v.visit_type_name_identifier_mut(id),
         TypeSpecifier::Atomic(a) => v.visit_atomic_type_specifier_mut(a),
         TypeSpecifier::Typeof(t) => v.visit_typeof_mut(t),
-        TypeSpecifier::BitInt(_)
-        | TypeSpecifier::Void
+        TypeSpecifier::BitInt(c) => v.visit_constant_expression_mut(c),
+        TypeSpecifier::Void
         | TypeSpecifier::Char
         | TypeSpecifier::Short
         | TypeSpecifier::Int
@@ -1824,7 +2251,95 @@ pub fn walk_type_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, ts: &'
     }
 }
 
-/// Walks an atomic type specifier with mutable access.
+/// Walk a struct or union specifier with mutable access.
+pub fn walk_struct_union_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    s: &'a mut StructOrUnionSpecifier,
+) -> V::Result {
+    tr!(v.visit_struct_or_union_mut(&mut s.kind));
+    for attr in &mut s.attributes {
+        tr!(v.visit_attribute_specifier_mut(attr));
+    }
+    if let Some(id) = &mut s.identifier {
+        tr!(v.visit_struct_name_mut(id));
+    }
+    if let Some(members) = &mut s.members {
+        for m in members {
+            tr!(v.visit_member_declaration_mut(m));
+        }
+    }
+    V::Result::output()
+}
+
+/// Walk a member declaration with mutable access.
+pub fn walk_member_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    md: &'a mut MemberDeclaration,
+) -> V::Result {
+    match md {
+        MemberDeclaration::Normal { attributes, specifiers, declarators } => {
+            for attr in attributes {
+                tr!(v.visit_attribute_specifier_mut(attr));
+            }
+            tr!(v.visit_specifier_qualifier_list_mut(specifiers));
+            for d in declarators {
+                tr!(v.visit_member_declarator_mut(d));
+            }
+            V::Result::output()
+        }
+        MemberDeclaration::StaticAssert(sa) => v.visit_static_assert_declaration_mut(sa),
+        MemberDeclaration::Error => V::Result::output(),
+    }
+}
+
+/// Walk a member declarator with mutable access.
+pub fn walk_member_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    md: &'a mut MemberDeclarator,
+) -> V::Result {
+    match md {
+        MemberDeclarator::Declarator(d) => v.visit_declarator_mut(d),
+        MemberDeclarator::BitField { declarator, width } => {
+            if let Some(d) = declarator {
+                tr!(v.visit_declarator_mut(d));
+            }
+            v.visit_constant_expression_mut(width)
+        }
+    }
+}
+
+/// Walk an enum specifier with mutable access.
+pub fn walk_enum_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, e: &'a mut EnumSpecifier) -> V::Result {
+    for attr in &mut e.attributes {
+        tr!(v.visit_attribute_specifier_mut(attr));
+    }
+    if let Some(id) = &mut e.identifier {
+        tr!(v.visit_enum_name_mut(id));
+    }
+    if let Some(sql) = &mut e.type_specifier {
+        tr!(v.visit_specifier_qualifier_list_mut(sql));
+    }
+    if let Some(enumerators) = &mut e.enumerators {
+        for en in enumerators {
+            tr!(v.visit_enumerator_mut(en));
+        }
+    }
+    V::Result::output()
+}
+
+/// Walk an enumerator with mutable access.
+pub fn walk_enumerator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, e: &'a mut Enumerator) -> V::Result {
+    tr!(v.visit_enumerator_name_mut(&mut e.name));
+    for attr in &mut e.attributes {
+        tr!(v.visit_attribute_specifier_mut(attr));
+    }
+    if let Some(value) = &mut e.value {
+        tr!(v.visit_constant_expression_mut(value));
+    }
+    V::Result::output()
+}
+
+/// Walk an atomic type specifier with mutable access.
 pub fn walk_atomic_type_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     a: &'a mut AtomicTypeSpecifier,
@@ -1832,7 +2347,7 @@ pub fn walk_atomic_type_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v.visit_type_name_mut(&mut a.type_name)
 }
 
-/// Walks a typeof specifier with mutable access.
+/// Walk a typeof specifier with mutable access.
 pub fn walk_typeof_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, t: &'a mut TypeofSpecifier) -> V::Result {
     match t {
         TypeofSpecifier::Typeof(arg) | TypeofSpecifier::TypeofUnqual(arg) => match arg {
@@ -1843,156 +2358,233 @@ pub fn walk_typeof_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, t: &'a mut Typ
     }
 }
 
-/// Walks a specifier qualifier list with mutable access.
+/// Walk a specifier qualifier list with mutable access.
 pub fn walk_specifier_qualifier_list_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     s: &'a mut SpecifierQualifierList,
 ) -> V::Result {
     for item in &mut s.items {
-        let br = v.visit_type_specifier_qualifier_mut(item).branch();
-        if let ControlFlow::Break(res) = br {
-            return V::Result::from_residual(res);
-        }
+        tr!(v.visit_type_specifier_qualifier_mut(item));
+    }
+    for attr in &mut s.attributes {
+        tr!(v.visit_attribute_specifier_mut(attr));
     }
     V::Result::output()
 }
 
-/// Walks a declarator with mutable access.
+/// Walk a declarator with mutable access.
 pub fn walk_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut Declarator) -> V::Result {
     match d {
         Declarator::Direct(dd) => v.visit_direct_declarator_mut(dd),
-        Declarator::Pointer { declarator, .. } => v.visit_declarator_mut(declarator),
+        Declarator::Pointer { pointer, declarator } => {
+            tr!(v.visit_pointer_mut(pointer));
+            v.visit_declarator_mut(declarator)
+        }
         Declarator::Error => V::Result::output(),
     }
 }
 
-/// Walks a direct declarator with mutable access.
+/// Walk a pointer with mutable access.
+pub fn walk_pointer_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, p: &'a mut Pointer) -> V::Result {
+    tr!(v.visit_pointer_or_block_mut(&mut p.pointer_or_block));
+    for attr in &mut p.attributes {
+        tr!(v.visit_attribute_specifier_mut(attr));
+    }
+    for tq in &mut p.type_qualifiers {
+        tr!(v.visit_type_qualifier_mut(tq));
+    }
+    V::Result::output()
+}
+
+/// Walk a direct declarator with mutable access.
 pub fn walk_direct_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut DirectDeclarator) -> V::Result {
     match d {
         DirectDeclarator::Identifier { identifier, attributes } => {
-            let br = v.visit_variable_name_mut(identifier).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_variable_name_mut(identifier));
             for attr in attributes {
-                let br = v.visit_attribute_specifier_mut(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier_mut(attr));
             }
             V::Result::output()
         }
         DirectDeclarator::Parenthesized(inner) => v.visit_declarator_mut(inner),
-        DirectDeclarator::Array { declarator, attributes, .. } => {
-            let br = v.visit_direct_declarator_mut(declarator).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+        DirectDeclarator::Array { declarator, attributes, array_declarator } => {
+            tr!(v.visit_direct_declarator_mut(declarator));
             for attr in attributes {
-                let br = v.visit_attribute_specifier_mut(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier_mut(attr));
             }
-            V::Result::output()
+            v.visit_array_declarator_mut(array_declarator)
         }
         DirectDeclarator::Function { declarator, attributes, parameters } => {
-            let br = v.visit_direct_declarator_mut(declarator).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_direct_declarator_mut(declarator));
             for attr in attributes {
-                let br = v.visit_attribute_specifier_mut(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_specifier_mut(attr));
             }
-            match parameters {
-                ParameterTypeList::Parameters(params) | ParameterTypeList::Variadic(params) => {
-                    for param in params {
-                        let br = v.visit_declaration_specifiers_mut(&mut param.specifiers).branch();
-                        if let ControlFlow::Break(res) = br {
-                            return V::Result::from_residual(res);
-                        }
-                        if let Some(kind) = &mut param.declarator {
-                            let br = match kind {
-                                ParameterDeclarationKind::Declarator(d) => v.visit_declarator_mut(d).branch(),
-                                ParameterDeclarationKind::Abstract(a) => v.visit_abstract_declarator_mut(a).branch(),
-                            };
-                            if let ControlFlow::Break(res) = br {
-                                return V::Result::from_residual(res);
-                            }
-                        }
-                    }
-                }
-                ParameterTypeList::OnlyVariadic => {}
-            }
-            V::Result::output()
+            v.visit_parameter_type_list_mut(parameters)
         }
     }
 }
 
-/// Walks a type name with mutable access.
+/// Walk a parameter type list with mutable access.
+pub fn walk_parameter_type_list_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    ptl: &'a mut ParameterTypeList,
+) -> V::Result {
+    match ptl {
+        ParameterTypeList::Parameters(params) | ParameterTypeList::Variadic(params) => {
+            for p in params {
+                tr!(v.visit_parameter_declaration_mut(p));
+            }
+            V::Result::output()
+        }
+        ParameterTypeList::OnlyVariadic => V::Result::output(),
+    }
+}
+
+/// Walk a parameter declaration with mutable access.
+pub fn walk_parameter_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    pd: &'a mut ParameterDeclaration,
+) -> V::Result {
+    for attr in &mut pd.attributes {
+        tr!(v.visit_attribute_specifier_mut(attr));
+    }
+    tr!(v.visit_declaration_specifiers_mut(&mut pd.specifiers));
+    if let Some(kind) = &mut pd.declarator {
+        tr!(v.visit_parameter_declaration_kind_mut(kind));
+    }
+    V::Result::output()
+}
+
+/// Walk a parameter declaration kind with mutable access.
+pub fn walk_parameter_declaration_kind_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    pdk: &'a mut ParameterDeclarationKind,
+) -> V::Result {
+    match pdk {
+        ParameterDeclarationKind::Declarator(d) => v.visit_declarator_mut(d),
+        ParameterDeclarationKind::Abstract(a) => v.visit_abstract_declarator_mut(a),
+    }
+}
+
+/// Walk an initializer with mutable access.
+pub fn walk_initializer_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, i: &'a mut Initializer) -> V::Result {
+    match i {
+        Initializer::Expression(e) => v.visit_expression_mut(e),
+        Initializer::Braced(b) => v.visit_braced_initializer_mut(b),
+    }
+}
+
+/// Walk a braced initializer with mutable access.
+pub fn walk_braced_initializer_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    b: &'a mut BracedInitializer,
+) -> V::Result {
+    for init in &mut b.initializers {
+        tr!(v.visit_designated_initializer_mut(init));
+    }
+    V::Result::output()
+}
+
+/// Walk a designated initializer with mutable access.
+pub fn walk_designated_initializer_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    d: &'a mut DesignatedInitializer,
+) -> V::Result {
+    if let Some(designation) = &mut d.designation {
+        tr!(v.visit_designation_mut(designation));
+    }
+    v.visit_initializer_mut(&mut d.initializer)
+}
+
+/// Walk a designation with mutable access.
+pub fn walk_designation_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut Designation) -> V::Result {
+    tr!(v.visit_designator_mut(&mut d.designator));
+    if let Some(designation) = &mut d.designation {
+        tr!(v.visit_designation_mut(designation));
+    }
+    V::Result::output()
+}
+
+/// Walk a designator with mutable access.
+pub fn walk_designator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut Designator) -> V::Result {
+    match d {
+        Designator::Array(expr) => v.visit_constant_expression_mut(expr),
+        Designator::Member(identifier) => v.visit_member_name_mut(identifier),
+    }
+}
+
+/// Walk a constant expression with mutable access.
+pub fn walk_constant_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(
+    v: &mut V,
+    e: &'a mut ConstantExpression,
+) -> V::Result {
+    match e {
+        ConstantExpression::Expression(expr) => v.visit_expression_mut(expr),
+        ConstantExpression::Error => V::Result::output(),
+    }
+}
+
+/// Walk a type name with mutable access.
 pub fn walk_type_name_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, tn: &'a mut TypeName) -> V::Result {
     match tn {
         TypeName::TypeName { specifiers, abstract_declarator } => {
-            let br = v.visit_specifier_qualifier_list_mut(specifiers).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_specifier_qualifier_list_mut(specifiers));
             if let Some(ad) = abstract_declarator {
-                v.visit_abstract_declarator_mut(ad)
-            } else {
-                V::Result::output()
+                tr!(v.visit_abstract_declarator_mut(ad));
             }
+            V::Result::output()
         }
         TypeName::Error => V::Result::output(),
     }
 }
 
-/// Walks an abstract declarator with mutable access.
+/// Walk an abstract declarator with mutable access.
 pub fn walk_abstract_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     a: &'a mut AbstractDeclarator,
 ) -> V::Result {
     match a {
         AbstractDeclarator::Direct(d) => v.visit_direct_abstract_declarator_mut(d),
-        AbstractDeclarator::Pointer { abstract_declarator, .. } => {
+        AbstractDeclarator::Pointer { pointer, abstract_declarator } => {
+            tr!(v.visit_pointer_mut(pointer));
             if let Some(ad) = abstract_declarator {
-                v.visit_abstract_declarator_mut(ad)
-            } else {
-                V::Result::output()
+                tr!(v.visit_abstract_declarator_mut(ad));
             }
+            V::Result::output()
         }
         AbstractDeclarator::Error => V::Result::output(),
     }
 }
 
-/// Walks a direct abstract declarator with mutable access.
+/// Walk a direct abstract declarator with mutable access.
 pub fn walk_direct_abstract_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     d: &'a mut DirectAbstractDeclarator,
 ) -> V::Result {
     match d {
         DirectAbstractDeclarator::Parenthesized(ad) => v.visit_abstract_declarator_mut(ad),
-        DirectAbstractDeclarator::Array { declarator, .. } => {
+        DirectAbstractDeclarator::Array { declarator, attributes, array_declarator } => {
             if let Some(dd) = declarator {
-                v.visit_direct_abstract_declarator_mut(dd)
-            } else {
-                V::Result::output()
+                tr!(v.visit_direct_abstract_declarator_mut(dd));
             }
+            for attr in attributes {
+                tr!(v.visit_attribute_specifier_mut(attr));
+            }
+            v.visit_array_declarator_mut(array_declarator)
         }
-        DirectAbstractDeclarator::Function { declarator, .. } => {
+        DirectAbstractDeclarator::Function { declarator, attributes, parameters } => {
             if let Some(dd) = declarator {
-                v.visit_direct_abstract_declarator_mut(dd)
-            } else {
-                V::Result::output()
+                tr!(v.visit_direct_abstract_declarator_mut(dd))
             }
+            for attr in attributes {
+                tr!(v.visit_attribute_specifier_mut(attr));
+            }
+            v.visit_parameter_type_list_mut(parameters)
         }
     }
 }
 
-/// Walks an attribute specifier with mutable access.
+/// Walk an attribute specifier with mutable access.
 pub fn walk_attribute_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
     v: &mut V,
     a: &'a mut AttributeSpecifier,
@@ -2000,17 +2592,11 @@ pub fn walk_attribute_specifier_mut<'a, V: VisitorMut<'a> + ?Sized>(
     match a {
         AttributeSpecifier::Attributes(attributes) => {
             for attr in attributes {
-                let br = v.visit_attribute_mut(attr).branch();
-                if let ControlFlow::Break(res) = br {
-                    return V::Result::from_residual(res);
-                }
+                tr!(v.visit_attribute_mut(attr));
             }
         }
         AttributeSpecifier::Asm(string_literals) => {
-            let br = v.visit_asm_attribute_specifier_mut(string_literals).branch();
-            if let ControlFlow::Break(res) = br {
-                return V::Result::from_residual(res);
-            }
+            tr!(v.visit_asm_attribute_specifier_mut(string_literals));
         }
         AttributeSpecifier::Error => {}
     }

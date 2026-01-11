@@ -510,6 +510,7 @@ pub enum Declaration {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct DeclarationSpecifiers {
     pub specifiers: Vec<DeclarationSpecifier>,
+    pub attributes: Vec<AttributeSpecifier>,
 }
 
 /// Declaration specifiers (6.7)
@@ -518,10 +519,7 @@ pub struct DeclarationSpecifiers {
 pub enum DeclarationSpecifier {
     StorageClass(StorageClassSpecifier),
     TypeSpecifierQualifier(TypeSpecifierQualifier),
-    Function {
-        specifier: FunctionSpecifier,
-        attributes: Vec<AttributeSpecifier>,
-    },
+    Function(FunctionSpecifier),
 }
 
 /// Init declarators (6.7)

@@ -8,207 +8,1238 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
     type Result = Result<(), R::Error>;
 
     fn visit_variable_name(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_type_name_identifier(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_enum_constant(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_label_name(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_member_name(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_struct_name(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_enum_name(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_enumerator_name(&mut self, id: &'a Identifier) -> Self::Result {
-        print_identifier(self, id)
+        self.text(&id.0)
     }
 
     fn visit_translation_unit(&mut self, tu: &'a TranslationUnit) -> Self::Result {
-        print_translation_unit(self, tu)
+        for external in &tu.external_declarations {
+            self.visit_external_declaration(external)?;
+            self.hard_break()?;
+        }
+        Ok(())
     }
 
     fn visit_function_definition(&mut self, f: &'a FunctionDefinition) -> Self::Result {
-        print_function_definition(self, f)
+        self.igroup(0, |pp| {
+            for a in &f.attributes {
+                pp.visit_attribute_specifier(a)?;
+                pp.space()?;
+            }
+            pp.visit_declaration_specifiers(&f.specifiers)?;
+            pp.space()?;
+            pp.visit_declarator(&f.declarator)?;
+            pp.space()?;
+            pp.visit_compound_statement(&f.body)?;
+            Ok(())
+        })
     }
 
     fn visit_attribute_specifier(&mut self, a: &'a AttributeSpecifier) -> Self::Result {
-        print_attribute_specfier(self, a)
+        match a {
+            AttributeSpecifier::Attributes(attributes) => self.igroup(2, |pp| {
+                pp.text("[[")?;
+                for (i, attr) in attributes.iter().enumerate() {
+                    if i > 0 {
+                        pp.text(",")?;
+                        pp.space()?;
+                    }
+                    pp.visit_attribute(attr)?;
+                }
+                pp.scan_break(0, -2)?;
+                pp.text("]]")?;
+                Ok(())
+            }),
+            AttributeSpecifier::Asm(string_literals) => self.visit_asm_attribute_specifier(string_literals),
+            AttributeSpecifier::Error => Ok(()),
+        }
     }
 
     fn visit_attribute(&mut self, a: &'a Attribute) -> Self::Result {
-        print_attribute(self, a)
+        self.igroup(2, |pp| {
+            match &a.token {
+                AttributeToken::Standard(identifier) => pp.text(&identifier.0)?,
+                AttributeToken::Prefixed { prefix, identifier } => {
+                    pp.text(&prefix.0)?;
+                    pp.text("::")?;
+                    pp.text(&identifier.0)?;
+                }
+            }
+            if let Some(args) = &a.arguments {
+                pp.igroup(2, |pp| {
+                    pp.text("(")?;
+                    print_balanced_token_sequence(pp, args)?;
+                    pp.scan_break(0, -2)?;
+                    pp.text(")")
+                })?;
+            }
+            Ok(())
+        })
     }
 
     fn visit_statement(&mut self, s: &'a Statement) -> Self::Result {
-        print_statement(self, s)
+        match s {
+            Statement::Labeled(ls) => {
+                // Print label
+                match &ls.label {
+                    Label::Identifier { attributes, identifier } => {
+                        for a in attributes {
+                            self.visit_attribute_specifier(a)?;
+                            self.space()?;
+                        }
+                        self.visit_label_name(identifier)?;
+                        self.text(":")?;
+                    }
+                    Label::Case { attributes, expression } => {
+                        for a in attributes {
+                            self.visit_attribute_specifier(a)?;
+                            self.space()?;
+                        }
+                        self.text("case")?;
+                        self.space()?;
+                        self.visit_constant_expression(expression)?;
+                        self.text(":")?;
+                    }
+                    Label::Default { attributes } => {
+                        for a in attributes {
+                            self.visit_attribute_specifier(a)?;
+                            self.space()?;
+                        }
+                        self.text("default:")?;
+                    }
+                }
+                self.space()?;
+                self.visit_statement(&ls.statement)
+            }
+            Statement::Unlabeled(u) => self.visit_unlabeled_statement(u),
+        }
     }
 
     fn visit_unlabeled_statement(&mut self, s: &'a UnlabeledStatement) -> Self::Result {
-        print_unlabeled_statement(self, s)
+        match s {
+            UnlabeledStatement::Expression(es) => {
+                for a in &es.attributes {
+                    self.visit_attribute_specifier(a)?;
+                    self.space()?;
+                }
+                if let Some(expr) = &es.expression {
+                    self.visit_expression(expr)?;
+                }
+                self.text(";")
+            }
+            UnlabeledStatement::Primary { attributes, block } => {
+                for a in attributes {
+                    self.visit_attribute_specifier(a)?;
+                    self.space()?;
+                }
+                match block {
+                    PrimaryBlock::Compound(c) => self.visit_compound_statement(c),
+                    PrimaryBlock::Selection(sel) => self.visit_selection_statement(sel),
+                    PrimaryBlock::Iteration(iter) => self.visit_iteration_statement(iter),
+                }
+            }
+            UnlabeledStatement::Jump { attributes, statement } => {
+                for a in attributes {
+                    self.visit_attribute_specifier(a)?;
+                    self.space()?;
+                }
+                match statement {
+                    JumpStatement::Goto(id) => {
+                        self.text("goto")?;
+                        self.space()?;
+                        self.visit_label_name(id)?;
+                        self.text(";")
+                    }
+                    JumpStatement::Continue => self.text("continue;"),
+                    JumpStatement::Break => self.text("break;"),
+                    JumpStatement::Return(expr) => {
+                        self.text("return")?;
+                        if let Some(e) = expr {
+                            self.space()?;
+                            self.visit_expression(e)?;
+                        }
+                        self.text(";")
+                    }
+                }
+            }
+        }
+    }
+
+    fn visit_selection_statement(&mut self, sel: &'a SelectionStatement) -> Self::Result {
+        match sel {
+            SelectionStatement::If { condition, then_stmt, else_stmt } => {
+                self.text("if")?;
+                self.space()?;
+                self.text("(")?;
+                self.visit_expression(condition)?;
+                self.text(")")?;
+                self.space()?;
+                self.visit_statement(then_stmt)?;
+                if let Some(e) = else_stmt {
+                    self.space()?;
+                    self.text("else")?;
+                    self.space()?;
+                    self.visit_statement(e)?;
+                }
+                Ok(())
+            }
+            SelectionStatement::Switch { expression, statement } => {
+                self.text("switch")?;
+                self.space()?;
+                self.text("(")?;
+                self.visit_expression(expression)?;
+                self.text(")")?;
+                self.space()?;
+                self.visit_statement(statement)
+            }
+        }
+    }
+
+    fn visit_iteration_statement(&mut self, iter: &'a IterationStatement) -> Self::Result {
+        match iter {
+            IterationStatement::While { condition, body } => {
+                self.text("while")?;
+                self.space()?;
+                self.text("(")?;
+                self.visit_expression(condition)?;
+                self.text(")")?;
+                self.space()?;
+                self.visit_statement(body)
+            }
+            IterationStatement::DoWhile { body, condition } => {
+                self.text("do")?;
+                self.space()?;
+                self.visit_statement(body)?;
+                self.space()?;
+                self.text("while")?;
+                self.space()?;
+                self.text("(")?;
+                self.visit_expression(condition)?;
+                self.text(");")
+            }
+            IterationStatement::For { init, condition, update, body } => {
+                self.text("for")?;
+                self.space()?;
+                self.text("(")?;
+                if let Some(i) = init {
+                    match i {
+                        ForInit::Expression(e) => {
+                            self.visit_expression(e)?;
+                            self.text(";")?;
+                        }
+                        ForInit::Declaration(d) => {
+                            self.visit_declaration(d)?;
+                            // Declaration already includes the semicolon
+                        }
+                    }
+                } else {
+                    self.text(";")?;
+                }
+                if let Some(c) = condition {
+                    self.space()?;
+                    self.visit_expression(c)?;
+                }
+                self.text(";")?;
+                if let Some(u) = update {
+                    self.space()?;
+                    self.visit_expression(u)?;
+                }
+                self.text(")")?;
+                self.space()?;
+                self.visit_statement(body)
+            }
+            IterationStatement::Error => Ok(()),
+        }
     }
 
     fn visit_expression(&mut self, e: &'a Expression) -> Self::Result {
-        print_expression(self, e)
+        match e {
+            Expression::Postfix(p) => self.visit_postfix_expression(p),
+            Expression::Unary(u) => self.visit_unary_expression(u),
+            Expression::Cast(c) => self.visit_cast_expression(c),
+            Expression::Binary(b) => {
+                self.visit_expression(&b.left)?;
+                self.space()?;
+                self.visit_binary_operator(&b.operator)?;
+                self.space()?;
+                self.visit_expression(&b.right)
+            }
+            Expression::Conditional(cond) => {
+                self.visit_expression(&cond.condition)?;
+                self.space()?;
+                self.text("?")?;
+                self.space()?;
+                self.visit_expression(&cond.then_expr)?;
+                self.space()?;
+                self.text(":")?;
+                self.space()?;
+                self.visit_expression(&cond.else_expr)
+            }
+            Expression::Assignment(a) => {
+                self.visit_expression(&a.left)?;
+                self.space()?;
+                self.visit_assignment_operator(&a.operator)?;
+                self.space()?;
+                self.visit_expression(&a.right)
+            }
+            Expression::Comma(c) => {
+                for (i, expr) in c.expressions.iter().enumerate() {
+                    if i > 0 {
+                        self.text(",")?;
+                        self.space()?;
+                    }
+                    self.visit_expression(expr)?;
+                }
+                Ok(())
+            }
+            Expression::Error => Ok(()),
+        }
+    }
+
+    fn visit_binary_operator(&mut self, op: &'a BinaryOperator) -> Self::Result {
+        let text = match op {
+            BinaryOperator::Multiply => "*",
+            BinaryOperator::Divide => "/",
+            BinaryOperator::Modulo => "%",
+            BinaryOperator::Add => "+",
+            BinaryOperator::Subtract => "-",
+            BinaryOperator::LeftShift => "<<",
+            BinaryOperator::RightShift => ">>",
+            BinaryOperator::BitwiseAnd => "&",
+            BinaryOperator::BitwiseXor => "^",
+            BinaryOperator::BitwiseOr => "|",
+            BinaryOperator::Less => "<",
+            BinaryOperator::Greater => ">",
+            BinaryOperator::LessEqual => "<=",
+            BinaryOperator::GreaterEqual => ">=",
+            BinaryOperator::Equal => "==",
+            BinaryOperator::NotEqual => "!=",
+            BinaryOperator::LogicalAnd => "&&",
+            BinaryOperator::LogicalOr => "||",
+        };
+        self.text(text)
+    }
+
+    fn visit_assignment_operator(&mut self, op: &'a AssignmentOperator) -> Self::Result {
+        let text = match op {
+            AssignmentOperator::Assign => "=",
+            AssignmentOperator::MulAssign => "*=",
+            AssignmentOperator::DivAssign => "/=",
+            AssignmentOperator::ModAssign => "%=",
+            AssignmentOperator::AddAssign => "+=",
+            AssignmentOperator::SubAssign => "-=",
+            AssignmentOperator::LeftShiftAssign => "<<=",
+            AssignmentOperator::RightShiftAssign => ">>=",
+            AssignmentOperator::AndAssign => "&=",
+            AssignmentOperator::XorAssign => "^=",
+            AssignmentOperator::OrAssign => "|=",
+        };
+        self.text(text)
     }
 
     fn visit_declaration(&mut self, d: &'a Declaration) -> Self::Result {
-        print_declaration(self, d)
+        self.igroup(2, |pp| {
+            match d {
+                Declaration::Normal { attributes, specifiers, declarators } => {
+                    for a in attributes {
+                        pp.visit_attribute_specifier(a)?;
+                        pp.space()?;
+                    }
+                    pp.visit_declaration_specifiers(specifiers)?;
+                    if !declarators.is_empty() {
+                        pp.space()?;
+                        for (i, init_decl) in declarators.iter().enumerate() {
+                            if i > 0 {
+                                pp.text(",")?;
+                                pp.space()?;
+                            }
+                            pp.visit_declarator(&init_decl.declarator)?;
+                            if let Some(initializer) = &init_decl.initializer {
+                                pp.space()?;
+                                pp.text("=")?;
+                                pp.space()?;
+                                pp.visit_initializer(initializer)?;
+                            }
+                        }
+                    }
+                    pp.text(";")
+                }
+                Declaration::Typedef { attributes, specifiers, declarators } => {
+                    for a in attributes {
+                        pp.visit_attribute_specifier(a)?;
+                        pp.space()?;
+                    }
+                    pp.text("typedef")?;
+                    pp.space()?;
+                    // Print declaration specifiers, but skip Typedef storage class
+                    // since we already printed "typedef"
+                    let mut first = true;
+                    for spec in specifiers.specifiers.iter() {
+                        match spec {
+                            DeclarationSpecifier::StorageClass(StorageClassSpecifier::Typedef) => {
+                                // Skip the Typedef storage class, we already printed it
+                                continue;
+                            }
+                            _ => {
+                                if !first {
+                                    pp.space()?;
+                                }
+                                first = false;
+                                pp.visit_declaration_specifier(spec)?;
+                            }
+                        }
+                    }
+                    if !declarators.is_empty() {
+                        pp.space()?;
+                        for (i, decl) in declarators.iter().enumerate() {
+                            if i > 0 {
+                                pp.text(",")?;
+                                pp.space()?;
+                            }
+                            pp.visit_declarator(decl)?;
+                        }
+                    }
+                    pp.text(";")
+                }
+                Declaration::StaticAssert(sa) => {
+                    pp.text("_Static_assert")?;
+                    pp.text("(")?;
+                    pp.visit_constant_expression(&sa.condition)?;
+                    if let Some(msg) = &sa.message {
+                        pp.text(",")?;
+                        pp.space()?;
+                        for (i, lit) in msg.0.iter().enumerate() {
+                            if i > 0 {
+                                pp.space()?;
+                            }
+                            print_string_literal(pp, lit)?;
+                        }
+                    }
+                    pp.text(");")?;
+                    Ok(())
+                }
+                Declaration::Attribute(attrs) => {
+                    for (i, a) in attrs.iter().enumerate() {
+                        if i > 0 {
+                            pp.space()?;
+                        }
+                        pp.visit_attribute_specifier(a)?;
+                    }
+                    pp.text(";")
+                }
+                Declaration::Error => Ok(()),
+            }
+        })
     }
 
     fn visit_declarator(&mut self, d: &'a Declarator) -> Self::Result {
-        print_declarator(self, d)
+        match d {
+            Declarator::Direct(dd) => self.visit_direct_declarator(dd),
+            Declarator::Pointer { pointer, declarator } => {
+                self.visit_pointer(pointer)?;
+                self.space()?;
+                self.visit_declarator(declarator)
+            }
+            Declarator::Error => Ok(()),
+        }
     }
 
     fn visit_direct_declarator(&mut self, d: &'a DirectDeclarator) -> Self::Result {
-        print_direct_declarator(self, d)
+        match d {
+            DirectDeclarator::Identifier { identifier, attributes } => {
+                self.visit_variable_name(identifier)?;
+                for a in attributes {
+                    self.space()?;
+                    self.visit_attribute_specifier(a)?;
+                }
+                Ok(())
+            }
+            DirectDeclarator::Parenthesized(inner) => {
+                self.text("(")?;
+                self.visit_declarator(inner)?;
+                self.text(")")
+            }
+            DirectDeclarator::Array { declarator, attributes, array_declarator } => {
+                self.visit_direct_declarator(declarator)?;
+                for a in attributes {
+                    self.space()?;
+                    self.visit_attribute_specifier(a)?;
+                }
+                self.text("[")?;
+                self.visit_array_declarator(array_declarator)?;
+                self.text("]")
+            }
+            DirectDeclarator::Function { declarator, attributes, parameters } => {
+                self.visit_direct_declarator(declarator)?;
+                self.igroup(2, |pp| {
+                    pp.text("(")?;
+                    pp.visit_parameter_type_list(parameters)?;
+                    pp.scan_break(0, -2)?;
+                    pp.text(")")
+                })?;
+                for a in attributes {
+                    self.space()?;
+                    self.visit_attribute_specifier(a)?;
+                }
+                Ok(())
+            }
+        }
     }
 
     fn visit_postfix_expression(&mut self, p: &'a PostfixExpression) -> Self::Result {
-        print_postfix_expression(self, p)
+        match p {
+            PostfixExpression::Primary(pr) => self.visit_primary_expression(pr),
+            PostfixExpression::ArrayAccess { array, index } => {
+                self.visit_postfix_expression(array)?;
+                self.text("[")?;
+                self.visit_expression(index)?;
+                self.text("]")
+            }
+            PostfixExpression::FunctionCall { function, arguments } => {
+                self.visit_postfix_expression(function)?;
+                self.igroup(2, |pp| {
+                    pp.text("(")?;
+                    for (i, arg) in arguments.iter().enumerate() {
+                        if i > 0 {
+                            pp.text(",")?;
+                            pp.space()?;
+                        }
+                        pp.visit_expression(arg)?;
+                    }
+                    pp.scan_break(0, -2)?;
+                    pp.text(")")
+                })
+            }
+            PostfixExpression::MemberAccess { object, member } => {
+                self.visit_postfix_expression(object)?;
+                self.text(".")?;
+                self.visit_member_name(member)
+            }
+            PostfixExpression::MemberAccessPtr { object, member } => {
+                self.visit_postfix_expression(object)?;
+                self.text("->")?;
+                self.visit_member_name(member)
+            }
+            PostfixExpression::PostIncrement(inner) => {
+                self.visit_postfix_expression(inner)?;
+                self.text("++")
+            }
+            PostfixExpression::PostDecrement(inner) => {
+                self.visit_postfix_expression(inner)?;
+                self.text("--")
+            }
+            PostfixExpression::CompoundLiteral(cl) => {
+                self.text("(")?;
+                for scs in &cl.storage_class_specifiers {
+                    self.visit_storage_class_specifier(scs)?;
+                    self.space()?;
+                }
+                self.visit_type_name(&cl.type_name)?;
+                self.text(")")?;
+                self.visit_braced_initializer(&cl.initializer)
+            }
+        }
+    }
+
+    fn visit_primary_expression(&mut self, pr: &'a PrimaryExpression) -> Self::Result {
+        match pr {
+            PrimaryExpression::Identifier(id) => self.visit_variable_name(id),
+            PrimaryExpression::Constant(c) => print_constant(self, c),
+            PrimaryExpression::EnumerationConstant(id) => self.visit_enum_constant(id),
+            PrimaryExpression::StringLiteral(lits) => {
+                for (i, lit) in lits.0.iter().enumerate() {
+                    if i > 0 {
+                        self.space()?;
+                    }
+                    print_string_literal(self, lit)?;
+                }
+                Ok(())
+            }
+            PrimaryExpression::QuotedString(s) => {
+                self.text("`")?;
+                self.text(s)?;
+                self.text("`")
+            }
+            PrimaryExpression::Parenthesized(e) => {
+                self.text("(")?;
+                self.visit_expression(e)?;
+                self.text(")")
+            }
+            PrimaryExpression::Generic(g) => {
+                self.text("_Generic")?;
+                self.igroup(2, |pp| {
+                    pp.text("(")?;
+                    pp.visit_expression(&g.controlling_expression)?;
+                    pp.text(",")?;
+                    pp.space()?;
+                    for (i, assoc) in g.associations.iter().enumerate() {
+                        if i > 0 {
+                            pp.text(",")?;
+                            pp.space()?;
+                        }
+                        match assoc {
+                            GenericAssociation::Type { type_name, expression } => {
+                                pp.visit_type_name(type_name)?;
+                                pp.text(":")?;
+                                pp.space()?;
+                                pp.visit_expression(expression)?;
+                            }
+                            GenericAssociation::Default { expression } => {
+                                pp.text("default:")?;
+                                pp.space()?;
+                                pp.visit_expression(expression)?;
+                            }
+                        }
+                    }
+                    pp.scan_break(0, -2)?;
+                    pp.text(")")
+                })
+            }
+            PrimaryExpression::Error => Ok(()),
+        }
     }
 
     fn visit_unary_expression(&mut self, u: &'a UnaryExpression) -> Self::Result {
-        print_unary_expression(self, u)
+        match u {
+            UnaryExpression::Postfix(p) => self.visit_postfix_expression(p),
+            UnaryExpression::PreIncrement(inner) => {
+                self.text("++")?;
+                self.visit_unary_expression(inner)
+            }
+            UnaryExpression::PreDecrement(inner) => {
+                self.text("--")?;
+                self.visit_unary_expression(inner)
+            }
+            UnaryExpression::Unary { operator, operand } => {
+                self.visit_unary_operator(operator)?;
+                self.visit_cast_expression(operand)
+            }
+            UnaryExpression::Sizeof(inner) => {
+                self.text("sizeof")?;
+                self.space()?;
+                self.visit_unary_expression(inner)
+            }
+            UnaryExpression::SizeofType(tn) => {
+                self.text("sizeof")?;
+                self.text("(")?;
+                self.visit_type_name(tn)?;
+                self.text(")")
+            }
+            UnaryExpression::Alignof(tn) => {
+                self.text("_Alignof")?;
+                self.text("(")?;
+                self.visit_type_name(tn)?;
+                self.text(")")
+            }
+        }
+    }
+
+    fn visit_unary_operator(&mut self, op: &'a UnaryOperator) -> Self::Result {
+        let text = match op {
+            UnaryOperator::Address => "&",
+            UnaryOperator::Dereference => "*",
+            UnaryOperator::Plus => "+",
+            UnaryOperator::Minus => "-",
+            UnaryOperator::BitwiseNot => "~",
+            UnaryOperator::LogicalNot => "!",
+        };
+        self.text(text)
     }
 
     fn visit_cast_expression(&mut self, c: &'a CastExpression) -> Self::Result {
-        print_cast_expression(self, c)
+        match c {
+            CastExpression::Unary(u) => self.visit_unary_expression(u),
+            CastExpression::Cast { type_name, expression } => {
+                self.text("(")?;
+                self.visit_type_name(type_name)?;
+                self.text(")")?;
+                self.visit_cast_expression(expression)
+            }
+        }
     }
 
     fn visit_compound_statement(&mut self, c: &'a CompoundStatement) -> Self::Result {
-        print_compound_statement(self, c)
+        self.cgroup(2, |pp| {
+            pp.text("{")?;
+            for item in &c.items {
+                pp.space()?;
+                match item {
+                    BlockItem::Declaration(d) => {
+                        pp.visit_declaration(d)?;
+                    }
+                    BlockItem::Statement(s) => {
+                        pp.visit_unlabeled_statement(s)?;
+                    }
+                    BlockItem::Label(l) => match l {
+                        Label::Identifier { attributes, identifier } => {
+                            for a in attributes {
+                                pp.visit_attribute_specifier(a)?;
+                                pp.space()?;
+                            }
+                            pp.visit_label_name(identifier)?;
+                            pp.text(":")?;
+                        }
+                        Label::Case { attributes, expression } => {
+                            for a in attributes {
+                                pp.visit_attribute_specifier(a)?;
+                                pp.space()?;
+                            }
+                            pp.text("case")?;
+                            pp.space()?;
+                            pp.visit_constant_expression(expression)?;
+                            pp.text(":")?;
+                        }
+                        Label::Default { attributes } => {
+                            for a in attributes {
+                                pp.visit_attribute_specifier(a)?;
+                                pp.space()?;
+                            }
+                            pp.text("default:")?;
+                        }
+                    },
+                }
+            }
+            pp.scan_break(1, -2)?;
+            pp.text("}")
+        })
     }
 
     fn visit_declaration_specifiers(&mut self, s: &'a DeclarationSpecifiers) -> Self::Result {
-        print_declaration_specifiers(self, s)
+        for (i, spec) in s.specifiers.iter().enumerate() {
+            if i > 0 {
+                self.space()?;
+            }
+            self.visit_declaration_specifier(spec)?;
+        }
+        Ok(())
+    }
+
+    fn visit_declaration_specifier(&mut self, spec: &'a DeclarationSpecifier) -> Self::Result {
+        match spec {
+            DeclarationSpecifier::StorageClass(scs) => self.visit_storage_class_specifier(scs),
+            DeclarationSpecifier::TypeSpecifierQualifier(tsq) => self.visit_type_specifier_qualifier(tsq),
+            DeclarationSpecifier::Function(fs) => self.visit_function_specifier(fs),
+        }
+    }
+
+    fn visit_storage_class_specifier(&mut self, scs: &'a StorageClassSpecifier) -> Self::Result {
+        let text = match scs {
+            StorageClassSpecifier::Auto => "auto",
+            StorageClassSpecifier::Constexpr => "constexpr",
+            StorageClassSpecifier::Extern => "extern",
+            StorageClassSpecifier::Register => "register",
+            StorageClassSpecifier::Static => "static",
+            StorageClassSpecifier::ThreadLocal => "_Thread_local",
+            StorageClassSpecifier::Typedef => "typedef",
+        };
+        self.text(text)
+    }
+
+    fn visit_function_specifier(&mut self, fs: &'a FunctionSpecifier) -> Self::Result {
+        let text = match fs {
+            FunctionSpecifier::Inline => "inline",
+            FunctionSpecifier::Noreturn => "_Noreturn",
+        };
+        self.text(text)
     }
 
     fn visit_type_specifier_qualifier(&mut self, x: &'a TypeSpecifierQualifier) -> Self::Result {
-        print_type_specifier_qualifier(self, x)
+        match x {
+            TypeSpecifierQualifier::TypeSpecifier(ts) => self.visit_type_specifier(ts),
+            TypeSpecifierQualifier::TypeQualifier(tq) => self.visit_type_qualifier(tq),
+            TypeSpecifierQualifier::AlignmentSpecifier(a) => self.visit_alignment_specifier(a),
+        }
+    }
+
+    fn visit_type_qualifier(&mut self, tq: &'a TypeQualifier) -> Self::Result {
+        let text = match tq {
+            TypeQualifier::Const => "const",
+            TypeQualifier::Restrict => "restrict",
+            TypeQualifier::Volatile => "volatile",
+            TypeQualifier::Atomic => "_Atomic",
+            TypeQualifier::Nonnull => "_Nonnull",
+            TypeQualifier::Nullable => "_Nullable",
+            TypeQualifier::ThreadLocal => "_Thread_local",
+        };
+        self.text(text)
+    }
+
+    fn visit_alignment_specifier(&mut self, a: &'a AlignmentSpecifier) -> Self::Result {
+        self.text("_Alignas")?;
+        self.text("(")?;
+        match a {
+            AlignmentSpecifier::Type(tn) => self.visit_type_name(tn)?,
+            AlignmentSpecifier::Expression(e) => self.visit_constant_expression(e)?,
+        }
+        self.text(")")
     }
 
     fn visit_type_specifier(&mut self, ts: &'a TypeSpecifier) -> Self::Result {
-        print_type_specifier(self, ts)
+        match ts {
+            TypeSpecifier::Void => self.text("void"),
+            TypeSpecifier::Char => self.text("char"),
+            TypeSpecifier::Short => self.text("short"),
+            TypeSpecifier::Int => self.text("int"),
+            TypeSpecifier::Long => self.text("long"),
+            TypeSpecifier::Float => self.text("float"),
+            TypeSpecifier::Double => self.text("double"),
+            TypeSpecifier::Signed => self.text("signed"),
+            TypeSpecifier::Unsigned => self.text("unsigned"),
+            TypeSpecifier::BitInt(e) => {
+                self.text("_BitInt")?;
+                self.text("(")?;
+                self.visit_constant_expression(e)?;
+                self.text(")")
+            }
+            TypeSpecifier::Bool => self.text("_Bool"),
+            TypeSpecifier::Complex => self.text("_Complex"),
+            TypeSpecifier::Decimal32 => self.text("_Decimal32"),
+            TypeSpecifier::Decimal64 => self.text("_Decimal64"),
+            TypeSpecifier::Decimal128 => self.text("_Decimal128"),
+            TypeSpecifier::Atomic(a) => self.visit_atomic_type_specifier(a),
+            TypeSpecifier::Struct(s) => self.visit_struct_union_specifier(s),
+            TypeSpecifier::Enum(e) => self.visit_enum_specifier(e),
+            TypeSpecifier::TypedefName(id) => self.visit_type_name_identifier(id),
+            TypeSpecifier::Typeof(t) => self.visit_typeof(t),
+        }
+    }
+
+    fn visit_struct_union_specifier(&mut self, s: &'a StructOrUnionSpecifier) -> Self::Result {
+        let keyword = match s.kind {
+            StructOrUnion::Struct => "struct",
+            StructOrUnion::Union => "union",
+        };
+        self.text(keyword)?;
+
+        for a in &s.attributes {
+            self.space()?;
+            self.visit_attribute_specifier(a)?;
+        }
+
+        if let Some(id) = &s.identifier {
+            self.space()?;
+            self.visit_struct_name(id)?;
+        }
+
+        if let Some(members) = &s.members {
+            self.space()?;
+            self.igroup(2, |pp| {
+                pp.text("{")?;
+                pp.hard_break()?;
+                for member in members {
+                    pp.visit_member_declaration(member)?;
+                    pp.hard_break()?;
+                }
+                pp.scan_break(0, -2)?;
+                pp.text("}")
+            })?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_member_declaration(&mut self, m: &'a MemberDeclaration) -> Self::Result {
+        match m {
+            MemberDeclaration::Normal { attributes, specifiers, declarators } => {
+                for a in attributes {
+                    self.visit_attribute_specifier(a)?;
+                    self.space()?;
+                }
+                self.visit_specifier_qualifier_list(specifiers)?;
+                if !declarators.is_empty() {
+                    self.space()?;
+                    for (i, decl) in declarators.iter().enumerate() {
+                        if i > 0 {
+                            self.text(",")?;
+                            self.space()?;
+                        }
+                        match decl {
+                            MemberDeclarator::Declarator(d) => self.visit_declarator(d)?,
+                            MemberDeclarator::BitField { declarator, width } => {
+                                if let Some(d) = declarator {
+                                    self.visit_declarator(d)?;
+                                }
+                                self.text(":")?;
+                                self.space()?;
+                                self.visit_constant_expression(width)?;
+                            }
+                        }
+                    }
+                }
+                self.text(";")
+            }
+            MemberDeclaration::StaticAssert(sa) => {
+                self.text("_Static_assert")?;
+                self.text("(")?;
+                self.visit_constant_expression(&sa.condition)?;
+                if let Some(msg) = &sa.message {
+                    self.text(",")?;
+                    self.space()?;
+                    for (i, lit) in msg.0.iter().enumerate() {
+                        if i > 0 {
+                            self.space()?;
+                        }
+                        print_string_literal(self, lit)?;
+                    }
+                }
+                self.text(");")
+            }
+            MemberDeclaration::Error => Ok(()),
+        }
+    }
+
+    fn visit_enum_specifier(&mut self, e: &'a EnumSpecifier) -> Self::Result {
+        self.text("enum")?;
+
+        for a in &e.attributes {
+            self.space()?;
+            self.visit_attribute_specifier(a)?;
+        }
+
+        if let Some(id) = &e.identifier {
+            self.space()?;
+            self.visit_enum_name(id)?;
+        }
+
+        if let Some(type_spec) = &e.type_specifier {
+            self.space()?;
+            self.text(":")?;
+            self.space()?;
+            self.visit_specifier_qualifier_list(type_spec)?;
+        }
+
+        if let Some(enumerators) = &e.enumerators {
+            self.space()?;
+            self.igroup(2, |pp| {
+                pp.text("{")?;
+                pp.space()?;
+                for (i, enumerator) in enumerators.iter().enumerate() {
+                    if i > 0 {
+                        pp.text(",")?;
+                        pp.space()?;
+                    }
+                    for a in &enumerator.attributes {
+                        pp.visit_attribute_specifier(a)?;
+                        pp.space()?;
+                    }
+                    pp.visit_enumerator_name(&enumerator.name)?;
+                    if let Some(value) = &enumerator.value {
+                        pp.space()?;
+                        pp.text("=")?;
+                        pp.space()?;
+                        pp.visit_constant_expression(value)?;
+                    }
+                }
+                pp.scan_break(0, -2)?;
+                pp.text("}")
+            })?;
+        }
+
+        Ok(())
     }
 
     fn visit_atomic_type_specifier(&mut self, a: &'a AtomicTypeSpecifier) -> Self::Result {
-        print_atomic_type_specifier(self, a)
+        self.text("_Atomic")?;
+        self.text("(")?;
+        self.visit_type_name(&a.type_name)?;
+        self.text(")")
     }
 
     fn visit_typeof(&mut self, t: &'a TypeofSpecifier) -> Self::Result {
-        print_typeof(self, t)
+        match t {
+            TypeofSpecifier::Typeof(arg) => {
+                self.text("typeof")?;
+                self.text("(")?;
+                match arg {
+                    TypeofSpecifierArgument::Expression(e) => self.visit_expression(e)?,
+                    TypeofSpecifierArgument::TypeName(tn) => self.visit_type_name(tn)?,
+                    TypeofSpecifierArgument::Error => {}
+                }
+                self.text(")")
+            }
+            TypeofSpecifier::TypeofUnqual(arg) => {
+                self.text("typeof_unqual")?;
+                self.text("(")?;
+                match arg {
+                    TypeofSpecifierArgument::Expression(e) => self.visit_expression(e)?,
+                    TypeofSpecifierArgument::TypeName(tn) => self.visit_type_name(tn)?,
+                    TypeofSpecifierArgument::Error => {}
+                }
+                self.text(")")
+            }
+        }
     }
 
     fn visit_specifier_qualifier_list(&mut self, s: &'a SpecifierQualifierList) -> Self::Result {
-        print_specifier_qualifier_list(self, s)
+        for (i, item) in s.items.iter().enumerate() {
+            if i > 0 {
+                self.space()?;
+            }
+            self.visit_type_specifier_qualifier(item)?;
+        }
+        for a in &s.attributes {
+            self.space()?;
+            self.visit_attribute_specifier(a)?;
+        }
+        Ok(())
     }
 
     fn visit_type_name(&mut self, tn: &'a TypeName) -> Self::Result {
-        print_type_name(self, tn)
+        match tn {
+            TypeName::TypeName { specifiers, abstract_declarator } => {
+                self.visit_specifier_qualifier_list(specifiers)?;
+                if let Some(ad) = abstract_declarator {
+                    self.space()?;
+                    self.visit_abstract_declarator(ad)?;
+                }
+                Ok(())
+            }
+            TypeName::Error => Ok(()),
+        }
     }
 
     fn visit_abstract_declarator(&mut self, a: &'a AbstractDeclarator) -> Self::Result {
-        print_abstract_declarator(self, a)
+        match a {
+            AbstractDeclarator::Direct(d) => self.visit_direct_abstract_declarator(d),
+            AbstractDeclarator::Pointer { pointer, abstract_declarator } => {
+                self.visit_pointer(pointer)?;
+                if let Some(ad) = abstract_declarator {
+                    self.space()?;
+                    self.visit_abstract_declarator(ad)?;
+                }
+                Ok(())
+            }
+            AbstractDeclarator::Error => Ok(()),
+        }
     }
 
     fn visit_direct_abstract_declarator(&mut self, d: &'a DirectAbstractDeclarator) -> Self::Result {
-        print_direct_abstract_declarator(self, d)
+        match d {
+            DirectAbstractDeclarator::Parenthesized(ad) => {
+                self.text("(")?;
+                self.visit_abstract_declarator(ad)?;
+                self.text(")")
+            }
+            DirectAbstractDeclarator::Array { declarator, attributes, array_declarator } => {
+                if let Some(dd) = declarator {
+                    self.visit_direct_abstract_declarator(dd)?;
+                }
+                for a in attributes {
+                    self.space()?;
+                    self.visit_attribute_specifier(a)?;
+                }
+                self.text("[")?;
+                self.visit_array_declarator(array_declarator)?;
+                self.text("]")
+            }
+            DirectAbstractDeclarator::Function { declarator, attributes, parameters } => {
+                if let Some(dd) = declarator {
+                    self.visit_direct_abstract_declarator(dd)?;
+                }
+                self.igroup(2, |pp| {
+                    pp.text("(")?;
+                    pp.visit_parameter_type_list(parameters)?;
+                    pp.scan_break(0, -2)?;
+                    pp.text(")")
+                })?;
+                for a in attributes {
+                    self.space()?;
+                    self.visit_attribute_specifier(a)?;
+                }
+                Ok(())
+            }
+        }
     }
 
     fn visit_external_declaration(&mut self, d: &'a ExternalDeclaration) -> Self::Result {
-        print_external_declaration(self, d)
-    }
-}
-
-fn print_identifier<'a, R: Render>(pp: &mut Printer<'a, R>, id: &'a Identifier) -> Result<(), R::Error> {
-    pp.text(&id.0)
-}
-
-fn print_translation_unit<'a, R: Render>(pp: &mut Printer<'a, R>, tu: &'a TranslationUnit) -> Result<(), R::Error> {
-    for external in &tu.external_declarations {
-        pp.visit_external_declaration(external)?;
-        pp.hard_break()?;
-    }
-    Ok(())
-}
-
-fn print_function_definition<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    f: &'a FunctionDefinition,
-) -> Result<(), R::Error> {
-    pp.igroup(0, |pp| {
-        for a in &f.attributes {
-            pp.visit_attribute_specifier(a)?;
-            pp.space()?;
+        match d {
+            ExternalDeclaration::Function(f) => self.visit_function_definition(f),
+            ExternalDeclaration::Declaration(d) => self.visit_declaration(d),
         }
-        pp.visit_declaration_specifiers(&f.specifiers)?;
-        pp.space()?;
-        pp.visit_declarator(&f.declarator)?;
-        pp.space()?;
-        pp.visit_compound_statement(&f.body)?;
-        Ok(())
-    })
-}
+    }
 
-fn print_attribute_specfier<'a, R: Render>(pp: &mut Printer<'a, R>, a: &'a AttributeSpecifier) -> Result<(), R::Error> {
-    match a {
-        AttributeSpecifier::Attributes(attributes) => pp.igroup(2, |pp| {
-            pp.text("[[")?;
-            for (i, attr) in attributes.iter().enumerate() {
+    fn visit_initializer(&mut self, i: &'a Initializer) -> Self::Result {
+        match i {
+            Initializer::Expression(e) => self.visit_expression(e),
+            Initializer::Braced(b) => self.visit_braced_initializer(b),
+        }
+    }
+
+    fn visit_braced_initializer(&mut self, b: &'a BracedInitializer) -> Self::Result {
+        self.igroup(2, |pp| {
+            pp.text("{")?;
+            for (i, init) in b.initializers.iter().enumerate() {
                 if i > 0 {
                     pp.text(",")?;
+                }
+                pp.space()?;
+                if let Some(designation) = &init.designation {
+                    pp.visit_designation(designation)?;
+                    pp.space()?;
+                    pp.text("=")?;
                     pp.space()?;
                 }
-                pp.visit_attribute(attr)?;
+                pp.visit_initializer(&init.initializer)?;
             }
             pp.scan_break(0, -2)?;
-            pp.text("]]")?;
-            Ok(())
-        }),
-        AttributeSpecifier::Asm(string_literals) => pp.visit_asm_attribute_specifier(string_literals),
-        AttributeSpecifier::Error => Ok(()),
+            pp.text("}")
+        })
     }
-}
 
-fn print_attribute<'a, R: Render>(pp: &mut Printer<'a, R>, a: &'a Attribute) -> Result<(), R::Error> {
-    pp.igroup(2, |pp| {
-        print_attribute_token(pp, &a.token)?;
-        if let Some(args) = &a.arguments {
-            pp.igroup(2, |pp| {
-                pp.text("(")?;
-                print_balanced_token_sequence(pp, args)?;
-                pp.scan_break(0, -2)?;
-                pp.text(")")
-            })?;
+    fn visit_designation(&mut self, d: &'a Designation) -> Self::Result {
+        if let Some(next) = &d.designation {
+            self.visit_designation(next)?;
+        }
+        match &d.designator {
+            Designator::Array(e) => {
+                self.text("[")?;
+                self.visit_constant_expression(e)?;
+                self.text("]")
+            }
+            Designator::Member(id) => {
+                self.text(".")?;
+                self.visit_member_name(id)
+            }
+        }
+    }
+
+    fn visit_constant_expression(&mut self, e: &'a ConstantExpression) -> Self::Result {
+        match e {
+            ConstantExpression::Expression(expr) => self.visit_expression(expr),
+            ConstantExpression::Error => Ok(()),
+        }
+    }
+
+    fn visit_pointer(&mut self, p: &'a Pointer) -> Self::Result {
+        match p.pointer_or_block {
+            PointerOrBlock::Pointer => self.text("*")?,
+            PointerOrBlock::Block => self.text("^")?,
+        }
+
+        for a in &p.attributes {
+            self.space()?;
+            self.visit_attribute_specifier(a)?;
+        }
+
+        for tq in &p.type_qualifiers {
+            self.space()?;
+            self.visit_type_qualifier(tq)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_array_declarator(&mut self, a: &'a ArrayDeclarator) -> Self::Result {
+        match a {
+            ArrayDeclarator::Normal { type_qualifiers, size } => {
+                for (i, tq) in type_qualifiers.iter().enumerate() {
+                    if i > 0 {
+                        self.space()?;
+                    }
+                    self.visit_type_qualifier(tq)?;
+                }
+                if let Some(s) = size {
+                    if !type_qualifiers.is_empty() {
+                        self.space()?;
+                    }
+                    self.visit_expression(s)?;
+                }
+                Ok(())
+            }
+            ArrayDeclarator::Static { type_qualifiers, size } => {
+                self.text("static")?;
+                for tq in type_qualifiers {
+                    self.space()?;
+                    self.visit_type_qualifier(tq)?;
+                }
+                self.space()?;
+                self.visit_expression(size)
+            }
+            ArrayDeclarator::VLA { type_qualifiers } => {
+                for (i, tq) in type_qualifiers.iter().enumerate() {
+                    if i > 0 {
+                        self.space()?;
+                    }
+                    self.visit_type_qualifier(tq)?;
+                }
+                if !type_qualifiers.is_empty() {
+                    self.space()?;
+                }
+                self.text("*")
+            }
+            ArrayDeclarator::Error => Ok(()),
+        }
+    }
+
+    fn visit_parameter_type_list(&mut self, p: &'a ParameterTypeList) -> Self::Result {
+        match p {
+            ParameterTypeList::Parameters(params) => {
+                for (i, param) in params.iter().enumerate() {
+                    if i > 0 {
+                        self.text(",")?;
+                        self.space()?;
+                    }
+                    self.visit_parameter_declaration(param)?;
+                }
+                Ok(())
+            }
+            ParameterTypeList::Variadic(params) => {
+                for (i, param) in params.iter().enumerate() {
+                    if i > 0 {
+                        self.text(",")?;
+                        self.space()?;
+                    }
+                    self.visit_parameter_declaration(param)?;
+                }
+                self.text(",")?;
+                self.space()?;
+                self.text("...")
+            }
+            ParameterTypeList::OnlyVariadic => self.text("..."),
+        }
+    }
+
+    fn visit_parameter_declaration(&mut self, p: &'a ParameterDeclaration) -> Self::Result {
+        for a in &p.attributes {
+            self.visit_attribute_specifier(a)?;
+            self.space()?;
+        }
+        self.visit_declaration_specifiers(&p.specifiers)?;
+        if let Some(kind) = &p.declarator {
+            self.space()?;
+            match kind {
+                ParameterDeclarationKind::Declarator(d) => self.visit_declarator(d)?,
+                ParameterDeclarationKind::Abstract(a) => self.visit_abstract_declarator(a)?,
+            }
         }
         Ok(())
-    })
-}
-
-fn print_attribute_token<'a, R: Render>(pp: &mut Printer<'a, R>, a: &'a AttributeToken) -> Result<(), R::Error> {
-    match a {
-        AttributeToken::Standard(identifier) => print_identifier(pp, identifier),
-        AttributeToken::Prefixed { prefix, identifier } => {
-            print_identifier(pp, prefix)?;
-            pp.text("::")?;
-            print_identifier(pp, identifier)
-        }
     }
 }
 
@@ -239,7 +1270,7 @@ fn print_balanced_token_sequence<'a, R: Render>(
                 pp.scan_break(0, -2)?;
                 pp.text("}")
             })?,
-            BalancedToken::Identifier(identifier) => print_identifier(pp, identifier)?,
+            BalancedToken::Identifier(identifier) => pp.text(&identifier.0)?,
             BalancedToken::StringLiteral(string_literals) => {
                 for (i, lit) in string_literals.0.iter().enumerate() {
                     if i > 0 {
@@ -248,7 +1279,11 @@ fn print_balanced_token_sequence<'a, R: Render>(
                     print_string_literal(pp, lit)?;
                 }
             }
-            BalancedToken::QuotedString(lit) => print_quoted_string(pp, lit)?,
+            BalancedToken::QuotedString(lit) => {
+                pp.text("`")?;
+                pp.text(lit)?;
+                pp.text("`")?;
+            }
             BalancedToken::Constant(constant) => print_constant(pp, constant)?,
             BalancedToken::Punctuator(punctuator) => print_punctuator(pp, punctuator)?,
             #[cfg(feature = "quasi-quote")]
@@ -286,12 +1321,6 @@ fn print_string_literal<'a, R: Render>(pp: &mut Printer<'a, R>, lit: &'a StringL
         }
     }
     pp.text("\"")
-}
-
-fn print_quoted_string<'a, R: Render>(pp: &mut Printer<'a, R>, lit: &'a String) -> Result<(), R::Error> {
-    pp.text("`")?;
-    pp.text(lit)?;
-    pp.text("`")
 }
 
 fn print_constant<'a, R: Render>(pp: &mut Printer<'a, R>, c: &'a Constant) -> Result<(), R::Error> {
@@ -438,1206 +1467,4 @@ fn print_punctuator<'a, R: Render>(pp: &mut Printer<'a, R>, p: &'a Punctuator) -
         Punctuator::HashHash => "##",
     };
     pp.text(text)
-}
-
-fn print_external_declaration<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    d: &'a ExternalDeclaration,
-) -> Result<(), R::Error> {
-    match d {
-        ExternalDeclaration::Function(f) => pp.visit_function_definition(f),
-        ExternalDeclaration::Declaration(d) => pp.visit_declaration(d),
-    }
-}
-
-fn print_statement<'a, R: Render>(pp: &mut Printer<'a, R>, s: &'a Statement) -> Result<(), R::Error> {
-    match s {
-        Statement::Labeled(ls) => {
-            // Print label
-            match &ls.label {
-                Label::Identifier { attributes, identifier } => {
-                    for a in attributes {
-                        pp.visit_attribute_specifier(a)?;
-                        pp.space()?;
-                    }
-                    pp.visit_label_name(identifier)?;
-                    pp.text(":")?;
-                }
-                Label::Case { attributes, expression } => {
-                    for a in attributes {
-                        pp.visit_attribute_specifier(a)?;
-                        pp.space()?;
-                    }
-                    pp.text("case")?;
-                    pp.space()?;
-                    print_constant_expression(pp, expression)?;
-                    pp.text(":")?;
-                }
-                Label::Default { attributes } => {
-                    for a in attributes {
-                        pp.visit_attribute_specifier(a)?;
-                        pp.space()?;
-                    }
-                    pp.text("default:")?;
-                }
-            }
-            pp.space()?;
-            pp.visit_statement(&ls.statement)
-        }
-        Statement::Unlabeled(u) => pp.visit_unlabeled_statement(u),
-    }
-}
-
-fn print_unlabeled_statement<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    s: &'a UnlabeledStatement,
-) -> Result<(), R::Error> {
-    match s {
-        UnlabeledStatement::Expression(es) => {
-            for a in &es.attributes {
-                pp.visit_attribute_specifier(a)?;
-                pp.space()?;
-            }
-            if let Some(expr) = &es.expression {
-                pp.visit_expression(expr)?;
-            }
-            pp.text(";")
-        }
-        UnlabeledStatement::Primary { attributes, block } => {
-            for a in attributes {
-                pp.visit_attribute_specifier(a)?;
-                pp.space()?;
-            }
-            match block {
-                PrimaryBlock::Compound(c) => pp.visit_compound_statement(c),
-                PrimaryBlock::Selection(sel) => print_selection_statement(pp, sel),
-                PrimaryBlock::Iteration(iter) => print_iteration_statement(pp, iter),
-            }
-        }
-        UnlabeledStatement::Jump { attributes, statement } => {
-            for a in attributes {
-                pp.visit_attribute_specifier(a)?;
-                pp.space()?;
-            }
-            match statement {
-                JumpStatement::Goto(id) => {
-                    pp.text("goto")?;
-                    pp.space()?;
-                    pp.visit_label_name(id)?;
-                    pp.text(";")
-                }
-                JumpStatement::Continue => pp.text("continue;"),
-                JumpStatement::Break => pp.text("break;"),
-                JumpStatement::Return(expr) => {
-                    pp.text("return")?;
-                    if let Some(e) = expr {
-                        pp.space()?;
-                        pp.visit_expression(e)?;
-                    }
-                    pp.text(";")
-                }
-            }
-        }
-    }
-}
-
-fn print_selection_statement<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    sel: &'a SelectionStatement,
-) -> Result<(), R::Error> {
-    match sel {
-        SelectionStatement::If { condition, then_stmt, else_stmt } => {
-            pp.text("if")?;
-            pp.space()?;
-            pp.text("(")?;
-            pp.visit_expression(condition)?;
-            pp.text(")")?;
-            pp.space()?;
-            pp.visit_statement(then_stmt)?;
-            if let Some(e) = else_stmt {
-                pp.space()?;
-                pp.text("else")?;
-                pp.space()?;
-                pp.visit_statement(e)?;
-            }
-            Ok(())
-        }
-        SelectionStatement::Switch { expression, statement } => {
-            pp.text("switch")?;
-            pp.space()?;
-            pp.text("(")?;
-            pp.visit_expression(expression)?;
-            pp.text(")")?;
-            pp.space()?;
-            pp.visit_statement(statement)
-        }
-    }
-}
-
-fn print_iteration_statement<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    iter: &'a IterationStatement,
-) -> Result<(), R::Error> {
-    match iter {
-        IterationStatement::While { condition, body } => {
-            pp.text("while")?;
-            pp.space()?;
-            pp.text("(")?;
-            pp.visit_expression(condition)?;
-            pp.text(")")?;
-            pp.space()?;
-            pp.visit_statement(body)
-        }
-        IterationStatement::DoWhile { body, condition } => {
-            pp.text("do")?;
-            pp.space()?;
-            pp.visit_statement(body)?;
-            pp.space()?;
-            pp.text("while")?;
-            pp.space()?;
-            pp.text("(")?;
-            pp.visit_expression(condition)?;
-            pp.text(");")
-        }
-        IterationStatement::For { init, condition, update, body } => {
-            pp.text("for")?;
-            pp.space()?;
-            pp.text("(")?;
-            if let Some(i) = init {
-                match i {
-                    ForInit::Expression(e) => {
-                        pp.visit_expression(e)?;
-                        pp.text(";")?;
-                    }
-                    ForInit::Declaration(d) => {
-                        pp.visit_declaration(d)?;
-                        // Declaration already includes the semicolon
-                    }
-                }
-            } else {
-                pp.text(";")?;
-            }
-            if let Some(c) = condition {
-                pp.space()?;
-                pp.visit_expression(c)?;
-            }
-            pp.text(";")?;
-            if let Some(u) = update {
-                pp.space()?;
-                pp.visit_expression(u)?;
-            }
-            pp.text(")")?;
-            pp.space()?;
-            pp.visit_statement(body)
-        }
-        IterationStatement::Error => Ok(()),
-    }
-}
-
-fn print_compound_statement<'a, R: Render>(pp: &mut Printer<'a, R>, c: &'a CompoundStatement) -> Result<(), R::Error> {
-    pp.igroup(2, |pp| {
-        pp.text("{")?;
-        pp.hard_break()?;
-        for item in &c.items {
-            match item {
-                BlockItem::Declaration(d) => {
-                    pp.visit_declaration(d)?;
-                    pp.hard_break()?;
-                }
-                BlockItem::Statement(s) => {
-                    pp.visit_unlabeled_statement(s)?;
-                    pp.hard_break()?;
-                }
-                BlockItem::Label(l) => {
-                    match l {
-                        Label::Identifier { attributes, identifier } => {
-                            for a in attributes {
-                                pp.visit_attribute_specifier(a)?;
-                                pp.space()?;
-                            }
-                            pp.visit_label_name(identifier)?;
-                            pp.text(":")?;
-                        }
-                        Label::Case { attributes, expression } => {
-                            for a in attributes {
-                                pp.visit_attribute_specifier(a)?;
-                                pp.space()?;
-                            }
-                            pp.text("case")?;
-                            pp.space()?;
-                            print_constant_expression(pp, expression)?;
-                            pp.text(":")?;
-                        }
-                        Label::Default { attributes } => {
-                            for a in attributes {
-                                pp.visit_attribute_specifier(a)?;
-                                pp.space()?;
-                            }
-                            pp.text("default:")?;
-                        }
-                    }
-                    pp.hard_break()?;
-                }
-            }
-        }
-        pp.scan_break(0, -2)?;
-        pp.text("}")
-    })
-}
-
-fn print_expression<'a, R: Render>(pp: &mut Printer<'a, R>, e: &'a Expression) -> Result<(), R::Error> {
-    match e {
-        Expression::Postfix(p) => pp.visit_postfix_expression(p),
-        Expression::Unary(u) => pp.visit_unary_expression(u),
-        Expression::Cast(c) => pp.visit_cast_expression(c),
-        Expression::Binary(b) => {
-            pp.visit_expression(&b.left)?;
-            pp.space()?;
-            print_binary_operator(pp, &b.operator)?;
-            pp.space()?;
-            pp.visit_expression(&b.right)
-        }
-        Expression::Conditional(cond) => {
-            pp.visit_expression(&cond.condition)?;
-            pp.space()?;
-            pp.text("?")?;
-            pp.space()?;
-            pp.visit_expression(&cond.then_expr)?;
-            pp.space()?;
-            pp.text(":")?;
-            pp.space()?;
-            pp.visit_expression(&cond.else_expr)
-        }
-        Expression::Assignment(a) => {
-            pp.visit_expression(&a.left)?;
-            pp.space()?;
-            print_assignment_operator(pp, &a.operator)?;
-            pp.space()?;
-            pp.visit_expression(&a.right)
-        }
-        Expression::Comma(c) => {
-            for (i, expr) in c.expressions.iter().enumerate() {
-                if i > 0 {
-                    pp.text(",")?;
-                    pp.space()?;
-                }
-                pp.visit_expression(expr)?;
-            }
-            Ok(())
-        }
-        Expression::Error => Ok(()),
-    }
-}
-
-fn print_binary_operator<'a, R: Render>(pp: &mut Printer<'a, R>, op: &BinaryOperator) -> Result<(), R::Error> {
-    let text = match op {
-        BinaryOperator::Multiply => "*",
-        BinaryOperator::Divide => "/",
-        BinaryOperator::Modulo => "%",
-        BinaryOperator::Add => "+",
-        BinaryOperator::Subtract => "-",
-        BinaryOperator::LeftShift => "<<",
-        BinaryOperator::RightShift => ">>",
-        BinaryOperator::BitwiseAnd => "&",
-        BinaryOperator::BitwiseXor => "^",
-        BinaryOperator::BitwiseOr => "|",
-        BinaryOperator::Less => "<",
-        BinaryOperator::Greater => ">",
-        BinaryOperator::LessEqual => "<=",
-        BinaryOperator::GreaterEqual => ">=",
-        BinaryOperator::Equal => "==",
-        BinaryOperator::NotEqual => "!=",
-        BinaryOperator::LogicalAnd => "&&",
-        BinaryOperator::LogicalOr => "||",
-    };
-    pp.text(text)
-}
-
-fn print_assignment_operator<'a, R: Render>(pp: &mut Printer<'a, R>, op: &AssignmentOperator) -> Result<(), R::Error> {
-    let text = match op {
-        AssignmentOperator::Assign => "=",
-        AssignmentOperator::MulAssign => "*=",
-        AssignmentOperator::DivAssign => "/=",
-        AssignmentOperator::ModAssign => "%=",
-        AssignmentOperator::AddAssign => "+=",
-        AssignmentOperator::SubAssign => "-=",
-        AssignmentOperator::LeftShiftAssign => "<<=",
-        AssignmentOperator::RightShiftAssign => ">>=",
-        AssignmentOperator::AndAssign => "&=",
-        AssignmentOperator::XorAssign => "^=",
-        AssignmentOperator::OrAssign => "|=",
-    };
-    pp.text(text)
-}
-
-fn print_postfix_expression<'a, R: Render>(pp: &mut Printer<'a, R>, p: &'a PostfixExpression) -> Result<(), R::Error> {
-    match p {
-        PostfixExpression::Primary(pr) => print_primary_expression(pp, pr),
-        PostfixExpression::ArrayAccess { array, index } => {
-            pp.visit_postfix_expression(array)?;
-            pp.text("[")?;
-            pp.visit_expression(index)?;
-            pp.text("]")
-        }
-        PostfixExpression::FunctionCall { function, arguments } => {
-            pp.visit_postfix_expression(function)?;
-            pp.igroup(2, |pp| {
-                pp.text("(")?;
-                for (i, arg) in arguments.iter().enumerate() {
-                    if i > 0 {
-                        pp.text(",")?;
-                        pp.space()?;
-                    }
-                    pp.visit_expression(arg)?;
-                }
-                pp.scan_break(0, -2)?;
-                pp.text(")")
-            })
-        }
-        PostfixExpression::MemberAccess { object, member } => {
-            pp.visit_postfix_expression(object)?;
-            pp.text(".")?;
-            pp.visit_member_name(member)
-        }
-        PostfixExpression::MemberAccessPtr { object, member } => {
-            pp.visit_postfix_expression(object)?;
-            pp.text("->")?;
-            pp.visit_member_name(member)
-        }
-        PostfixExpression::PostIncrement(inner) => {
-            pp.visit_postfix_expression(inner)?;
-            pp.text("++")
-        }
-        PostfixExpression::PostDecrement(inner) => {
-            pp.visit_postfix_expression(inner)?;
-            pp.text("--")
-        }
-        PostfixExpression::CompoundLiteral(cl) => {
-            pp.text("(")?;
-            for scs in &cl.storage_class_specifiers {
-                print_storage_class_specifier(pp, scs)?;
-                pp.space()?;
-            }
-            pp.visit_type_name(&cl.type_name)?;
-            pp.text(")")?;
-            print_braced_initializer(pp, &cl.initializer)
-        }
-    }
-}
-
-fn print_primary_expression<'a, R: Render>(pp: &mut Printer<'a, R>, pr: &'a PrimaryExpression) -> Result<(), R::Error> {
-    match pr {
-        PrimaryExpression::Identifier(id) => pp.visit_variable_name(id),
-        PrimaryExpression::Constant(c) => print_constant(pp, c),
-        PrimaryExpression::EnumerationConstant(id) => pp.visit_enum_constant(id),
-        PrimaryExpression::StringLiteral(lits) => {
-            for (i, lit) in lits.0.iter().enumerate() {
-                if i > 0 {
-                    pp.space()?;
-                }
-                print_string_literal(pp, lit)?;
-            }
-            Ok(())
-        }
-        PrimaryExpression::QuotedString(s) => print_quoted_string(pp, s),
-        PrimaryExpression::Parenthesized(e) => {
-            pp.text("(")?;
-            pp.visit_expression(e)?;
-            pp.text(")")
-        }
-        PrimaryExpression::Generic(g) => {
-            pp.text("_Generic")?;
-            pp.igroup(2, |pp| {
-                pp.text("(")?;
-                pp.visit_expression(&g.controlling_expression)?;
-                pp.text(",")?;
-                pp.space()?;
-                for (i, assoc) in g.associations.iter().enumerate() {
-                    if i > 0 {
-                        pp.text(",")?;
-                        pp.space()?;
-                    }
-                    match assoc {
-                        GenericAssociation::Type { type_name, expression } => {
-                            pp.visit_type_name(type_name)?;
-                            pp.text(":")?;
-                            pp.space()?;
-                            pp.visit_expression(expression)?;
-                        }
-                        GenericAssociation::Default { expression } => {
-                            pp.text("default:")?;
-                            pp.space()?;
-                            pp.visit_expression(expression)?;
-                        }
-                    }
-                }
-                pp.scan_break(0, -2)?;
-                pp.text(")")
-            })
-        }
-        PrimaryExpression::Error => Ok(()),
-    }
-}
-
-fn print_unary_expression<'a, R: Render>(pp: &mut Printer<'a, R>, u: &'a UnaryExpression) -> Result<(), R::Error> {
-    match u {
-        UnaryExpression::Postfix(p) => pp.visit_postfix_expression(p),
-        UnaryExpression::PreIncrement(inner) => {
-            pp.text("++")?;
-            pp.visit_unary_expression(inner)
-        }
-        UnaryExpression::PreDecrement(inner) => {
-            pp.text("--")?;
-            pp.visit_unary_expression(inner)
-        }
-        UnaryExpression::Unary { operator, operand } => {
-            print_unary_operator(pp, operator)?;
-            pp.visit_cast_expression(operand)
-        }
-        UnaryExpression::Sizeof(inner) => {
-            pp.text("sizeof")?;
-            pp.space()?;
-            pp.visit_unary_expression(inner)
-        }
-        UnaryExpression::SizeofType(tn) => {
-            pp.text("sizeof")?;
-            pp.text("(")?;
-            pp.visit_type_name(tn)?;
-            pp.text(")")
-        }
-        UnaryExpression::Alignof(tn) => {
-            pp.text("_Alignof")?;
-            pp.text("(")?;
-            pp.visit_type_name(tn)?;
-            pp.text(")")
-        }
-    }
-}
-
-fn print_unary_operator<'a, R: Render>(pp: &mut Printer<'a, R>, op: &UnaryOperator) -> Result<(), R::Error> {
-    let text = match op {
-        UnaryOperator::Address => "&",
-        UnaryOperator::Dereference => "*",
-        UnaryOperator::Plus => "+",
-        UnaryOperator::Minus => "-",
-        UnaryOperator::BitwiseNot => "~",
-        UnaryOperator::LogicalNot => "!",
-    };
-    pp.text(text)
-}
-
-fn print_cast_expression<'a, R: Render>(pp: &mut Printer<'a, R>, c: &'a CastExpression) -> Result<(), R::Error> {
-    match c {
-        CastExpression::Unary(u) => pp.visit_unary_expression(u),
-        CastExpression::Cast { type_name, expression } => {
-            pp.text("(")?;
-            pp.visit_type_name(type_name)?;
-            pp.text(")")?;
-            pp.visit_cast_expression(expression)
-        }
-    }
-}
-
-fn print_declaration<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a Declaration) -> Result<(), R::Error> {
-    match d {
-        Declaration::Normal { attributes, specifiers, declarators } => {
-            for a in attributes {
-                pp.visit_attribute_specifier(a)?;
-                pp.space()?;
-            }
-            pp.visit_declaration_specifiers(specifiers)?;
-            if !declarators.is_empty() {
-                pp.space()?;
-                for (i, init_decl) in declarators.iter().enumerate() {
-                    if i > 0 {
-                        pp.text(",")?;
-                        pp.space()?;
-                    }
-                    pp.visit_declarator(&init_decl.declarator)?;
-                    if let Some(initializer) = &init_decl.initializer {
-                        pp.space()?;
-                        pp.text("=")?;
-                        pp.space()?;
-                        print_initializer(pp, initializer)?;
-                    }
-                }
-            }
-            pp.text(";")
-        }
-        Declaration::Typedef { attributes, specifiers, declarators } => {
-            for a in attributes {
-                pp.visit_attribute_specifier(a)?;
-                pp.space()?;
-            }
-            pp.text("typedef")?;
-            pp.space()?;
-            // Print declaration specifiers, but skip Typedef storage class
-            // since we already printed "typedef"
-            print_declaration_specifiers_skip_typedef(pp, specifiers)?;
-            if !declarators.is_empty() {
-                pp.space()?;
-                for (i, decl) in declarators.iter().enumerate() {
-                    if i > 0 {
-                        pp.text(",")?;
-                        pp.space()?;
-                    }
-                    pp.visit_declarator(decl)?;
-                }
-            }
-            pp.text(";")
-        }
-        Declaration::StaticAssert(sa) => {
-            pp.text("_Static_assert")?;
-            pp.text("(")?;
-            print_constant_expression(pp, &sa.condition)?;
-            if let Some(msg) = &sa.message {
-                pp.text(",")?;
-                pp.space()?;
-                for (i, lit) in msg.0.iter().enumerate() {
-                    if i > 0 {
-                        pp.space()?;
-                    }
-                    print_string_literal(pp, lit)?;
-                }
-            }
-            pp.text(");")?;
-            Ok(())
-        }
-        Declaration::Attribute(attrs) => {
-            for (i, a) in attrs.iter().enumerate() {
-                if i > 0 {
-                    pp.space()?;
-                }
-                pp.visit_attribute_specifier(a)?;
-            }
-            pp.text(";")
-        }
-        Declaration::Error => Ok(()),
-    }
-}
-
-fn print_initializer<'a, R: Render>(pp: &mut Printer<'a, R>, init: &'a Initializer) -> Result<(), R::Error> {
-    match init {
-        Initializer::Expression(e) => pp.visit_expression(e),
-        Initializer::Braced(b) => print_braced_initializer(pp, b),
-    }
-}
-
-fn print_braced_initializer<'a, R: Render>(pp: &mut Printer<'a, R>, b: &'a BracedInitializer) -> Result<(), R::Error> {
-    pp.igroup(2, |pp| {
-        pp.text("{")?;
-        for (i, init) in b.initializers.iter().enumerate() {
-            if i > 0 {
-                pp.text(",")?;
-            }
-            pp.space()?;
-            if let Some(designation) = &init.designation {
-                print_designation(pp, designation)?;
-                pp.space()?;
-                pp.text("=")?;
-                pp.space()?;
-            }
-            print_initializer(pp, &init.initializer)?;
-        }
-        pp.scan_break(0, -2)?;
-        pp.text("}")
-    })
-}
-
-fn print_designation<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a Designation) -> Result<(), R::Error> {
-    if let Some(next) = &d.designation {
-        print_designation(pp, next)?;
-    }
-    match &d.designator {
-        Designator::Array(e) => {
-            pp.text("[")?;
-            print_constant_expression(pp, e)?;
-            pp.text("]")
-        }
-        Designator::Member(id) => {
-            pp.text(".")?;
-            pp.visit_member_name(id)
-        }
-    }
-}
-
-fn print_constant_expression<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    e: &'a ConstantExpression,
-) -> Result<(), R::Error> {
-    match e {
-        ConstantExpression::Expression(expr) => pp.visit_expression(expr),
-        ConstantExpression::Error => Ok(()),
-    }
-}
-
-fn print_declaration_specifiers<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    s: &'a DeclarationSpecifiers,
-) -> Result<(), R::Error> {
-    for (i, spec) in s.specifiers.iter().enumerate() {
-        if i > 0 {
-            pp.space()?;
-        }
-        match spec {
-            DeclarationSpecifier::StorageClass(scs) => print_storage_class_specifier(pp, scs)?,
-            DeclarationSpecifier::TypeSpecifierQualifier(tsq) => pp.visit_type_specifier_qualifier(tsq)?,
-            DeclarationSpecifier::Function { specifier, attributes } => {
-                for a in attributes {
-                    pp.visit_attribute_specifier(a)?;
-                    pp.space()?;
-                }
-                print_function_specifier(pp, specifier)?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn print_declaration_specifiers_skip_typedef<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    s: &'a DeclarationSpecifiers,
-) -> Result<(), R::Error> {
-    let mut first = true;
-    for spec in s.specifiers.iter() {
-        match spec {
-            DeclarationSpecifier::StorageClass(StorageClassSpecifier::Typedef) => {
-                // Skip the Typedef storage class, we already printed it
-                continue;
-            }
-            _ => {
-                if !first {
-                    pp.space()?;
-                }
-                first = false;
-                match spec {
-                    DeclarationSpecifier::StorageClass(scs) => print_storage_class_specifier(pp, scs)?,
-                    DeclarationSpecifier::TypeSpecifierQualifier(tsq) => pp.visit_type_specifier_qualifier(tsq)?,
-                    DeclarationSpecifier::Function { specifier, attributes } => {
-                        for a in attributes {
-                            pp.visit_attribute_specifier(a)?;
-                            pp.space()?;
-                        }
-                        print_function_specifier(pp, specifier)?;
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn print_storage_class_specifier<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    scs: &StorageClassSpecifier,
-) -> Result<(), R::Error> {
-    let text = match scs {
-        StorageClassSpecifier::Auto => "auto",
-        StorageClassSpecifier::Constexpr => "constexpr",
-        StorageClassSpecifier::Extern => "extern",
-        StorageClassSpecifier::Register => "register",
-        StorageClassSpecifier::Static => "static",
-        StorageClassSpecifier::ThreadLocal => "_Thread_local",
-        StorageClassSpecifier::Typedef => "typedef",
-    };
-    pp.text(text)
-}
-
-fn print_function_specifier<'a, R: Render>(pp: &mut Printer<'a, R>, fs: &FunctionSpecifier) -> Result<(), R::Error> {
-    let text = match fs {
-        FunctionSpecifier::Inline => "inline",
-        FunctionSpecifier::Noreturn => "_Noreturn",
-    };
-    pp.text(text)
-}
-
-fn print_type_specifier_qualifier<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    x: &'a TypeSpecifierQualifier,
-) -> Result<(), R::Error> {
-    match x {
-        TypeSpecifierQualifier::TypeSpecifier(ts) => pp.visit_type_specifier(ts),
-        TypeSpecifierQualifier::TypeQualifier(tq) => print_type_qualifier(pp, tq),
-        TypeSpecifierQualifier::AlignmentSpecifier(a) => print_alignment_specifier(pp, a),
-    }
-}
-
-fn print_type_qualifier<'a, R: Render>(pp: &mut Printer<'a, R>, tq: &TypeQualifier) -> Result<(), R::Error> {
-    let text = match tq {
-        TypeQualifier::Const => "const",
-        TypeQualifier::Restrict => "restrict",
-        TypeQualifier::Volatile => "volatile",
-        TypeQualifier::Atomic => "_Atomic",
-        TypeQualifier::Nonnull => "_Nonnull",
-        TypeQualifier::Nullable => "_Nullable",
-        TypeQualifier::ThreadLocal => "_Thread_local",
-    };
-    pp.text(text)
-}
-
-fn print_alignment_specifier<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    a: &'a AlignmentSpecifier,
-) -> Result<(), R::Error> {
-    pp.text("_Alignas")?;
-    pp.text("(")?;
-    match a {
-        AlignmentSpecifier::Type(tn) => pp.visit_type_name(tn)?,
-        AlignmentSpecifier::Expression(e) => print_constant_expression(pp, e)?,
-    }
-    pp.text(")")
-}
-
-fn print_type_specifier<'a, R: Render>(pp: &mut Printer<'a, R>, ts: &'a TypeSpecifier) -> Result<(), R::Error> {
-    match ts {
-        TypeSpecifier::Void => pp.text("void"),
-        TypeSpecifier::Char => pp.text("char"),
-        TypeSpecifier::Short => pp.text("short"),
-        TypeSpecifier::Int => pp.text("int"),
-        TypeSpecifier::Long => pp.text("long"),
-        TypeSpecifier::Float => pp.text("float"),
-        TypeSpecifier::Double => pp.text("double"),
-        TypeSpecifier::Signed => pp.text("signed"),
-        TypeSpecifier::Unsigned => pp.text("unsigned"),
-        TypeSpecifier::BitInt(e) => {
-            pp.text("_BitInt")?;
-            pp.text("(")?;
-            print_constant_expression(pp, e)?;
-            pp.text(")")
-        }
-        TypeSpecifier::Bool => pp.text("_Bool"),
-        TypeSpecifier::Complex => pp.text("_Complex"),
-        TypeSpecifier::Decimal32 => pp.text("_Decimal32"),
-        TypeSpecifier::Decimal64 => pp.text("_Decimal64"),
-        TypeSpecifier::Decimal128 => pp.text("_Decimal128"),
-        TypeSpecifier::Atomic(a) => pp.visit_atomic_type_specifier(a),
-        TypeSpecifier::Struct(s) => print_struct_or_union_specifier(pp, s),
-        TypeSpecifier::Enum(e) => print_enum_specifier(pp, e),
-        TypeSpecifier::TypedefName(id) => pp.visit_type_name_identifier(id),
-        TypeSpecifier::Typeof(t) => pp.visit_typeof(t),
-    }
-}
-
-fn print_struct_or_union_specifier<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    s: &'a StructOrUnionSpecifier,
-) -> Result<(), R::Error> {
-    let keyword = match s.kind {
-        StructOrUnion::Struct => "struct",
-        StructOrUnion::Union => "union",
-    };
-    pp.text(keyword)?;
-
-    for a in &s.attributes {
-        pp.space()?;
-        pp.visit_attribute_specifier(a)?;
-    }
-
-    if let Some(id) = &s.identifier {
-        pp.space()?;
-        pp.visit_struct_name(id)?;
-    }
-
-    if let Some(members) = &s.members {
-        pp.space()?;
-        pp.igroup(2, |pp| {
-            pp.text("{")?;
-            pp.hard_break()?;
-            for member in members {
-                print_member_declaration(pp, member)?;
-                pp.hard_break()?;
-            }
-            pp.scan_break(0, -2)?;
-            pp.text("}")
-        })?;
-    }
-
-    Ok(())
-}
-
-fn print_member_declaration<'a, R: Render>(pp: &mut Printer<'a, R>, m: &'a MemberDeclaration) -> Result<(), R::Error> {
-    match m {
-        MemberDeclaration::Normal { attributes, specifiers, declarators } => {
-            for a in attributes {
-                pp.visit_attribute_specifier(a)?;
-                pp.space()?;
-            }
-            pp.visit_specifier_qualifier_list(specifiers)?;
-            if !declarators.is_empty() {
-                pp.space()?;
-                for (i, decl) in declarators.iter().enumerate() {
-                    if i > 0 {
-                        pp.text(",")?;
-                        pp.space()?;
-                    }
-                    match decl {
-                        MemberDeclarator::Declarator(d) => pp.visit_declarator(d)?,
-                        MemberDeclarator::BitField { declarator, width } => {
-                            if let Some(d) = declarator {
-                                pp.visit_declarator(d)?;
-                            }
-                            pp.text(":")?;
-                            pp.space()?;
-                            print_constant_expression(pp, width)?;
-                        }
-                    }
-                }
-            }
-            pp.text(";")
-        }
-        MemberDeclaration::StaticAssert(sa) => {
-            pp.text("_Static_assert")?;
-            pp.text("(")?;
-            print_constant_expression(pp, &sa.condition)?;
-            if let Some(msg) = &sa.message {
-                pp.text(",")?;
-                pp.space()?;
-                for (i, lit) in msg.0.iter().enumerate() {
-                    if i > 0 {
-                        pp.space()?;
-                    }
-                    print_string_literal(pp, lit)?;
-                }
-            }
-            pp.text(");")
-        }
-        MemberDeclaration::Error => Ok(()),
-    }
-}
-
-fn print_enum_specifier<'a, R: Render>(pp: &mut Printer<'a, R>, e: &'a EnumSpecifier) -> Result<(), R::Error> {
-    pp.text("enum")?;
-
-    for a in &e.attributes {
-        pp.space()?;
-        pp.visit_attribute_specifier(a)?;
-    }
-
-    if let Some(id) = &e.identifier {
-        pp.space()?;
-        pp.visit_enum_name(id)?;
-    }
-
-    if let Some(type_spec) = &e.type_specifier {
-        pp.space()?;
-        pp.text(":")?;
-        pp.space()?;
-        pp.visit_specifier_qualifier_list(type_spec)?;
-    }
-
-    if let Some(enumerators) = &e.enumerators {
-        pp.space()?;
-        pp.igroup(2, |pp| {
-            pp.text("{")?;
-            pp.space()?;
-            for (i, enumerator) in enumerators.iter().enumerate() {
-                if i > 0 {
-                    pp.text(",")?;
-                    pp.space()?;
-                }
-                for a in &enumerator.attributes {
-                    pp.visit_attribute_specifier(a)?;
-                    pp.space()?;
-                }
-                pp.visit_enumerator_name(&enumerator.name)?;
-                if let Some(value) = &enumerator.value {
-                    pp.space()?;
-                    pp.text("=")?;
-                    pp.space()?;
-                    print_constant_expression(pp, value)?;
-                }
-            }
-            pp.scan_break(0, -2)?;
-            pp.text("}")
-        })?;
-    }
-
-    Ok(())
-}
-
-fn print_atomic_type_specifier<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    a: &'a AtomicTypeSpecifier,
-) -> Result<(), R::Error> {
-    pp.text("_Atomic")?;
-    pp.text("(")?;
-    pp.visit_type_name(&a.type_name)?;
-    pp.text(")")
-}
-
-fn print_typeof<'a, R: Render>(pp: &mut Printer<'a, R>, t: &'a TypeofSpecifier) -> Result<(), R::Error> {
-    match t {
-        TypeofSpecifier::Typeof(arg) => {
-            pp.text("typeof")?;
-            pp.text("(")?;
-            match arg {
-                TypeofSpecifierArgument::Expression(e) => pp.visit_expression(e)?,
-                TypeofSpecifierArgument::TypeName(tn) => pp.visit_type_name(tn)?,
-                TypeofSpecifierArgument::Error => {}
-            }
-            pp.text(")")
-        }
-        TypeofSpecifier::TypeofUnqual(arg) => {
-            pp.text("typeof_unqual")?;
-            pp.text("(")?;
-            match arg {
-                TypeofSpecifierArgument::Expression(e) => pp.visit_expression(e)?,
-                TypeofSpecifierArgument::TypeName(tn) => pp.visit_type_name(tn)?,
-                TypeofSpecifierArgument::Error => {}
-            }
-            pp.text(")")
-        }
-    }
-}
-
-fn print_specifier_qualifier_list<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    s: &'a SpecifierQualifierList,
-) -> Result<(), R::Error> {
-    for (i, item) in s.items.iter().enumerate() {
-        if i > 0 {
-            pp.space()?;
-        }
-        pp.visit_type_specifier_qualifier(item)?;
-    }
-    for a in &s.attributes {
-        pp.space()?;
-        pp.visit_attribute_specifier(a)?;
-    }
-    Ok(())
-}
-
-fn print_type_name<'a, R: Render>(pp: &mut Printer<'a, R>, tn: &'a TypeName) -> Result<(), R::Error> {
-    match tn {
-        TypeName::TypeName { specifiers, abstract_declarator } => {
-            pp.visit_specifier_qualifier_list(specifiers)?;
-            if let Some(ad) = abstract_declarator {
-                pp.space()?;
-                pp.visit_abstract_declarator(ad)?;
-            }
-            Ok(())
-        }
-        TypeName::Error => Ok(()),
-    }
-}
-
-fn print_declarator<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a Declarator) -> Result<(), R::Error> {
-    match d {
-        Declarator::Direct(dd) => pp.visit_direct_declarator(dd),
-        Declarator::Pointer { pointer, declarator } => {
-            print_pointer(pp, pointer)?;
-            pp.space()?;
-            pp.visit_declarator(declarator)
-        }
-        Declarator::Error => Ok(()),
-    }
-}
-
-fn print_pointer<'a, R: Render>(pp: &mut Printer<'a, R>, p: &'a Pointer) -> Result<(), R::Error> {
-    match p.pointer_or_block {
-        PointerOrBlock::Pointer => pp.text("*")?,
-        PointerOrBlock::Block => pp.text("^")?,
-    }
-
-    for a in &p.attributes {
-        pp.space()?;
-        pp.visit_attribute_specifier(a)?;
-    }
-
-    for tq in &p.type_qualifiers {
-        pp.space()?;
-        print_type_qualifier(pp, tq)?;
-    }
-
-    Ok(())
-}
-
-fn print_direct_declarator<'a, R: Render>(pp: &mut Printer<'a, R>, d: &'a DirectDeclarator) -> Result<(), R::Error> {
-    match d {
-        DirectDeclarator::Identifier { identifier, attributes } => {
-            pp.visit_variable_name(identifier)?;
-            for a in attributes {
-                pp.space()?;
-                pp.visit_attribute_specifier(a)?;
-            }
-            Ok(())
-        }
-        DirectDeclarator::Parenthesized(inner) => {
-            pp.text("(")?;
-            pp.visit_declarator(inner)?;
-            pp.text(")")
-        }
-        DirectDeclarator::Array { declarator, attributes, array_declarator } => {
-            pp.visit_direct_declarator(declarator)?;
-            for a in attributes {
-                pp.space()?;
-                pp.visit_attribute_specifier(a)?;
-            }
-            pp.text("[")?;
-            print_array_declarator(pp, array_declarator)?;
-            pp.text("]")
-        }
-        DirectDeclarator::Function { declarator, attributes, parameters } => {
-            pp.visit_direct_declarator(declarator)?;
-            pp.igroup(2, |pp| {
-                pp.text("(")?;
-                print_parameter_type_list(pp, parameters)?;
-                pp.scan_break(0, -2)?;
-                pp.text(")")
-            })?;
-            for a in attributes {
-                pp.space()?;
-                pp.visit_attribute_specifier(a)?;
-            }
-            Ok(())
-        }
-    }
-}
-
-fn print_array_declarator<'a, R: Render>(pp: &mut Printer<'a, R>, a: &'a ArrayDeclarator) -> Result<(), R::Error> {
-    match a {
-        ArrayDeclarator::Normal { type_qualifiers, size } => {
-            for (i, tq) in type_qualifiers.iter().enumerate() {
-                if i > 0 {
-                    pp.space()?;
-                }
-                print_type_qualifier(pp, tq)?;
-            }
-            if let Some(s) = size {
-                if !type_qualifiers.is_empty() {
-                    pp.space()?;
-                }
-                pp.visit_expression(s)?;
-            }
-            Ok(())
-        }
-        ArrayDeclarator::Static { type_qualifiers, size } => {
-            pp.text("static")?;
-            for tq in type_qualifiers {
-                pp.space()?;
-                print_type_qualifier(pp, tq)?;
-            }
-            pp.space()?;
-            pp.visit_expression(size)
-        }
-        ArrayDeclarator::VLA { type_qualifiers } => {
-            for (i, tq) in type_qualifiers.iter().enumerate() {
-                if i > 0 {
-                    pp.space()?;
-                }
-                print_type_qualifier(pp, tq)?;
-            }
-            if !type_qualifiers.is_empty() {
-                pp.space()?;
-            }
-            pp.text("*")
-        }
-        ArrayDeclarator::Error => Ok(()),
-    }
-}
-
-fn print_parameter_type_list<'a, R: Render>(pp: &mut Printer<'a, R>, p: &'a ParameterTypeList) -> Result<(), R::Error> {
-    match p {
-        ParameterTypeList::Parameters(params) => {
-            for (i, param) in params.iter().enumerate() {
-                if i > 0 {
-                    pp.text(",")?;
-                    pp.space()?;
-                }
-                print_parameter_declaration(pp, param)?;
-            }
-            Ok(())
-        }
-        ParameterTypeList::Variadic(params) => {
-            for (i, param) in params.iter().enumerate() {
-                if i > 0 {
-                    pp.text(",")?;
-                    pp.space()?;
-                }
-                print_parameter_declaration(pp, param)?;
-            }
-            pp.text(",")?;
-            pp.space()?;
-            pp.text("...")
-        }
-        ParameterTypeList::OnlyVariadic => pp.text("..."),
-    }
-}
-
-fn print_parameter_declaration<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    p: &'a ParameterDeclaration,
-) -> Result<(), R::Error> {
-    for a in &p.attributes {
-        pp.visit_attribute_specifier(a)?;
-        pp.space()?;
-    }
-    pp.visit_declaration_specifiers(&p.specifiers)?;
-    if let Some(kind) = &p.declarator {
-        pp.space()?;
-        match kind {
-            ParameterDeclarationKind::Declarator(d) => pp.visit_declarator(d)?,
-            ParameterDeclarationKind::Abstract(a) => pp.visit_abstract_declarator(a)?,
-        }
-    }
-    Ok(())
-}
-
-fn print_abstract_declarator<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    a: &'a AbstractDeclarator,
-) -> Result<(), R::Error> {
-    match a {
-        AbstractDeclarator::Direct(d) => pp.visit_direct_abstract_declarator(d),
-        AbstractDeclarator::Pointer { pointer, abstract_declarator } => {
-            print_pointer(pp, pointer)?;
-            if let Some(ad) = abstract_declarator {
-                pp.space()?;
-                pp.visit_abstract_declarator(ad)?;
-            }
-            Ok(())
-        }
-        AbstractDeclarator::Error => Ok(()),
-    }
-}
-
-fn print_direct_abstract_declarator<'a, R: Render>(
-    pp: &mut Printer<'a, R>,
-    d: &'a DirectAbstractDeclarator,
-) -> Result<(), R::Error> {
-    match d {
-        DirectAbstractDeclarator::Parenthesized(ad) => {
-            pp.text("(")?;
-            pp.visit_abstract_declarator(ad)?;
-            pp.text(")")
-        }
-        DirectAbstractDeclarator::Array { declarator, attributes, array_declarator } => {
-            if let Some(dd) = declarator {
-                pp.visit_direct_abstract_declarator(dd)?;
-            }
-            for a in attributes {
-                pp.space()?;
-                pp.visit_attribute_specifier(a)?;
-            }
-            pp.text("[")?;
-            print_array_declarator(pp, array_declarator)?;
-            pp.text("]")
-        }
-        DirectAbstractDeclarator::Function { declarator, attributes, parameters } => {
-            if let Some(dd) = declarator {
-                pp.visit_direct_abstract_declarator(dd)?;
-            }
-            pp.igroup(2, |pp| {
-                pp.text("(")?;
-                print_parameter_type_list(pp, parameters)?;
-                pp.scan_break(0, -2)?;
-                pp.text(")")
-            })?;
-            for a in attributes {
-                pp.space()?;
-                pp.visit_attribute_specifier(a)?;
-            }
-            Ok(())
-        }
-    }
 }

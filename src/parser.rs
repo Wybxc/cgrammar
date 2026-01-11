@@ -20,7 +20,6 @@ pub mod parser_utils {
 
     /// Parsing context.
     #[derive(Default, Clone, Copy)]
-    #[non_exhaustive]
     pub struct Context {
         /// Whether to disable error recovery.
         pub no_recover: bool,
@@ -467,19 +466,13 @@ pub fn declaration<'a>() -> impl Parser<'a, Tokens<'a>, Declaration, Extra<'a>> 
         .then(declaration_specifiers())
         .then(init_declarator_list().or_not().map(Option::unwrap_or_default))
         .then_ignore(punctuator(Punctuator::Semicolon))
-        .map(|((mut attributes, (specifiers, attributes_after)), declarators)| {
-            attributes.extend(attributes_after);
-            Declaration::Normal { attributes, specifiers, declarators }
-        });
+        .map(|((attributes, specifiers), declarators)| Declaration::Normal { attributes, specifiers, declarators });
 
     let typedef = attribute_specifier_sequence()
         .then(declaration_specifiers_with_typedef())
         .then(typedef_declarator_list().or_not().map(Option::unwrap_or_default))
         .then_ignore(punctuator(Punctuator::Semicolon))
-        .map(|((mut attributes, (specifiers, attributes_after)), declarators)| {
-            attributes.extend(attributes_after);
-            Declaration::Typedef { attributes, specifiers, declarators }
-        });
+        .map(|((attributes, specifiers), declarators)| Declaration::Typedef { attributes, specifiers, declarators });
 
     let static_assert = static_assert_declaration();
 
@@ -504,8 +497,7 @@ pub fn declaration<'a>() -> impl Parser<'a, Tokens<'a>, Declaration, Extra<'a>> 
 }
 
 /// (6.7) declaration specifiers (without typedef)
-pub fn declaration_specifiers<'a>()
--> impl Parser<'a, Tokens<'a>, (DeclarationSpecifiers, Vec<AttributeSpecifier>), Extra<'a>> + Clone {
+pub fn declaration_specifiers<'a>() -> impl Parser<'a, Tokens<'a>, DeclarationSpecifiers, Extra<'a>> + Clone {
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
@@ -514,15 +506,15 @@ pub fn declaration_specifiers<'a>()
             .at_least(1)
             .collect::<Vec<DeclarationSpecifier>>()
             .then(attribute_specifier_sequence())
-            .map(|(specifiers, attrs)| (DeclarationSpecifiers { specifiers }, attrs)),
+            .map(|(specifiers, attributes)| DeclarationSpecifiers { specifiers, attributes }),
     ))
     .labelled("declaration specifiers")
     .as_context()
 }
 
 /// (6.7) declaration specifiers (with typedef)
-pub fn declaration_specifiers_with_typedef<'a>()
--> impl Parser<'a, Tokens<'a>, (DeclarationSpecifiers, Vec<AttributeSpecifier>), Extra<'a>> + Clone {
+pub fn declaration_specifiers_with_typedef<'a>() -> impl Parser<'a, Tokens<'a>, DeclarationSpecifiers, Extra<'a>> + Clone
+{
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
@@ -532,7 +524,7 @@ pub fn declaration_specifiers_with_typedef<'a>()
             .at_least(1)
             .collect::<Vec<DeclarationSpecifier>>()
             .then(attribute_specifier_sequence())
-            .map(|(specifiers, attrs)| (DeclarationSpecifiers { specifiers }, attrs)),
+            .map(|(specifiers, attributes)| DeclarationSpecifiers { specifiers, attributes }),
     ))
     .labelled("declaration specifiers")
     .as_context()
@@ -546,9 +538,7 @@ pub fn declaration_specifier<'a>() -> impl Parser<'a, Tokens<'a>, DeclarationSpe
         interpolation(),
         storage_class_specifier().map(DeclarationSpecifier::StorageClass),
         type_specifier_qualifier().map(DeclarationSpecifier::TypeSpecifierQualifier),
-        function_specifier()
-            .then(attribute_specifier_sequence())
-            .map(|(specifier, attributes)| DeclarationSpecifier::Function { specifier, attributes }),
+        function_specifier().map(DeclarationSpecifier::Function),
     ))
     .labelled("declaration specifier")
     .as_context()
@@ -1117,10 +1107,7 @@ pub fn parameter_declaration<'a>() -> impl Parser<'a, Tokens<'a>, ParameterDecla
                     .map(Some),
                 abstract_declarator().map(ParameterDeclarationKind::Abstract).or_not(),
             )))
-            .map(|((mut attributes, (specifiers, attributes_after)), declarator)| {
-                attributes.extend(attributes_after);
-                ParameterDeclaration { attributes, specifiers, declarator }
-            }),
+            .map(|((attributes, specifiers), declarator)| ParameterDeclaration { attributes, specifiers, declarator }),
     ))
     .labelled("parameter declaration")
     .as_context()
@@ -1734,12 +1721,12 @@ pub fn function_definition<'a>() -> impl Parser<'a, Tokens<'a>, FunctionDefiniti
             .then(declaration_specifiers())
             .then(declarator())
             .then(compound_statement())
-            .map(
-                |(((mut attributes, (specifiers, attributes_after)), declarator), body)| {
-                    attributes.extend(attributes_after);
-                    FunctionDefinition { attributes, specifiers, declarator, body }
-                },
-            ),
+            .map(|(((attributes, specifiers), declarator), body)| FunctionDefinition {
+                attributes,
+                specifiers,
+                declarator,
+                body,
+            }),
     ))
     .labelled("function definition")
     .as_context()
@@ -1845,7 +1832,7 @@ where
     A: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     O: Clone,
 {
-    map_ctx(|ctx: &Context| Context { no_recover: true, ..*ctx }, parser)
+    map_ctx(|_| Context { no_recover: true }, parser)
 }
 
 /// Temporarily allow error recovery for the given parser.
@@ -1854,7 +1841,7 @@ where
     A: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     O: Clone,
 {
-    map_ctx(|ctx: &Context| Context { no_recover: false, ..*ctx }, parser)
+    map_ctx(|_| Context { no_recover: false }, parser)
 }
 
 /// Create a recovery strategy using a parser, respecting the `no_recover`
