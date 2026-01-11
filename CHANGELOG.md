@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/Wybxc/cgrammar/compare/v0.4.0...v0.5.0) - 2026-01-11
+
+### Added
+
+- fully quasi-quote support
+- add quasi-quote support
+- VisitorMut
+- add pretty_assertions and improve printer functionality
+- basic pretty printer
+
+### Fixed
+
+- printer and visitor
+
+### Other
+
+- clean printer.rs
+- ignore spans in testing printer
+- refactor code structure and improve documentation
+- test for pretty printer
+
 ## [0.4.0](https://github.com/Wybxc/cgrammar/compare/v0.3.0...v0.4.0) - 2025-12-26
 
 ### Other
