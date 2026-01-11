@@ -19,21 +19,19 @@ fn main() {
     let ast = quote! {
         translation_unit:
         r#"
-            void foo(const char* s[], int n);
+            int foo(const char* s[], int n);
 
             int main() {
-                foo(@args, @len);
+                int @var = foo(@args, @len);
             }
         "#,
+        var => Identifier("bar".into()),
         args => Expression::Postfix(PostfixExpression::CompoundLiteral(CompoundLiteral {
             storage_class_specifiers: vec![],
             type_name: quote!(type_name: "const char*[]"),
             initializer: BracedInitializer {
-                initializers: items.into_iter().map(|s| DesignatedInitializer {
-                    designation: None,
-                    initializer: Initializer::Expression(Box::new(
-                        quote!{expression: "@s", s => StringLiterals::from(s.to_string())}
-                    ))
+                initializers: items.into_iter().map(|s| {
+                    quote!{designated_initializer: "@s", s => StringLiterals::from(s.to_string())}
                 }).collect()
             }
         })),

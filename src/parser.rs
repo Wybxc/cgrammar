@@ -1206,18 +1206,19 @@ pub fn typedef_name<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> 
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
-        identifier().try_map_with(|name, extra| {
-            if extra.state().ctx().is_typedef_name(&name) {
-                Ok(name)
-            } else {
-                Err(expected_found(
-                    ["typedef name"],
-                    Some(BalancedToken::Identifier(name)),
-                    extra.span(),
-                ))
-            }
-        }),
+        identifier(),
     ))
+    .try_map_with(|name, extra| {
+        if extra.state().ctx().is_typedef_name(&name) {
+            Ok(name)
+        } else {
+            Err(expected_found(
+                ["typedef name"],
+                Some(BalancedToken::Identifier(name)),
+                extra.span(),
+            ))
+        }
+    })
     .labelled("typedef name")
     .as_context()
 }
@@ -1817,12 +1818,10 @@ pub fn interpolation<'a, T: quasi_quote::Interpolate>() -> impl Parser<'a, Token
         Token::Interpolation(value) => value
     }
     .try_map(|value, span| {
-        let v = (value as Box<dyn Any>)
+        (value as Box<dyn Any>)
             .downcast::<T>()
             .map(|value| *value)
-            .map_err(|_| Rich::custom(span, "unexpected interpolation value"));
-        // println!("try interpolation {}: {}", std::any::type_name::<T>(), v.is_ok());
-        v
+            .map_err(|_| Rich::custom(span, "unexpected interpolation value"))
     })
 }
 
