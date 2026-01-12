@@ -396,8 +396,10 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         let expr_prec = expr_precedence(e);
         let needs_parens = ctx.needs_parens(expr_prec);
 
+        self.scan_begin(0, true);
         if needs_parens {
             self.text("(")?;
+            self.scan_break(0, 2)?;
         }
 
         // Reset context for inner expression processing
@@ -407,89 +409,10 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             Expression::Postfix(p) => self.visit_postfix_expression(p)?,
             Expression::Unary(u) => self.visit_unary_expression(u)?,
             Expression::Cast(c) => self.visit_cast_expression(c)?,
-            Expression::Binary(b) => {
-                let op_prec = binary_op_precedence(&b.operator);
-                // All binary operators are left-associative in C
-                // Left operand: same precedence, no assoc flag (left side of left-assoc is fine)
-                self.extra = Context {
-                    precedence: op_prec,
-                    assoc: false,
-                    decl_precedence: 0,
-                };
-                self.visit_expression(&b.left)?;
-                self.space()?;
-                self.visit_binary_operator(&b.operator)?;
-                self.space()?;
-                // Right operand: same precedence, assoc = true (right side of left-assoc needs parens at equal prec)
-                self.extra = Context {
-                    precedence: op_prec,
-                    assoc: true,
-                    decl_precedence: 0,
-                };
-                self.visit_expression(&b.right)?;
-            }
-            Expression::Conditional(cond) => {
-                // Conditional is right-associative
-                // Condition needs parens if it's a conditional or lower precedence
-                self.extra = Context {
-                    precedence: precedence::CONDITIONAL,
-                    assoc: true,
-                    decl_precedence: 0,
-                };
-                self.visit_expression(&cond.condition)?;
-                self.space()?;
-                self.text("?")?;
-                self.space()?;
-                // then_expr can be any expression (comma is allowed inside ?:)
-                self.extra = Context::default();
-                self.visit_expression(&cond.then_expr)?;
-                self.space()?;
-                self.text(":")?;
-                self.space()?;
-                // else_expr: right-associative, so same precedence is OK
-                self.extra = Context {
-                    precedence: precedence::CONDITIONAL,
-                    assoc: false,
-                    decl_precedence: 0,
-                };
-                self.visit_expression(&cond.else_expr)?;
-            }
-            Expression::Assignment(a) => {
-                // Assignment is right-associative
-                // Left operand needs higher precedence (unary or above)
-                self.extra = Context {
-                    precedence: precedence::ASSIGNMENT,
-                    assoc: true,
-                    decl_precedence: 0,
-                };
-                self.visit_expression(&a.left)?;
-                self.space()?;
-                self.visit_assignment_operator(&a.operator)?;
-                self.space()?;
-                // Right operand: right-associative, so same precedence is OK
-                self.extra = Context {
-                    precedence: precedence::ASSIGNMENT,
-                    assoc: false,
-                    decl_precedence: 0,
-                };
-                self.visit_expression(&a.right)?;
-            }
-            Expression::Comma(c) => {
-                for (i, expr) in c.expressions.iter().enumerate() {
-                    if i > 0 {
-                        self.text(",")?;
-                        self.space()?;
-                    }
-                    // Comma is left-associative
-                    // Each element needs to be at least assignment level
-                    self.extra = Context {
-                        precedence: precedence::COMMA,
-                        assoc: i > 0, // right side needs parens at equal precedence
-                        decl_precedence: 0,
-                    };
-                    self.visit_expression(expr)?;
-                }
-            }
+            Expression::Binary(b) => self.visit_binary_expression(b)?,
+            Expression::Conditional(c) => self.visit_conditional_expression(c)?,
+            Expression::Assignment(a) => self.visit_assignment_expression(a)?,
+            Expression::Comma(c) => self.visit_comma_expression(c)?,
             Expression::Error => {}
         }
 
@@ -497,10 +420,39 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         self.extra = ctx;
 
         if needs_parens {
+            self.scan_break(0, 0)?;
             self.text(")")?;
         }
 
+        self.scan_end()?;
         Ok(())
+    }
+
+    fn visit_binary_expression(&mut self, b: &'a BinaryExpression) -> Self::Result {
+        self.igroup(0, |pp| {
+            let op_prec = binary_op_precedence(&b.operator);
+
+            // All binary operators are left-associative in C
+            // Left operand: same precedence, no assoc flag (left side of left-assoc is fine)
+            pp.extra = Context {
+                precedence: op_prec,
+                assoc: false,
+                decl_precedence: 0,
+            };
+            pp.visit_expression(&b.left)?;
+            pp.space()?;
+
+            pp.visit_binary_operator(&b.operator)?;
+            pp.scan_break(1, 2)?;
+
+            // Right operand: same precedence, assoc = true (right side of left-assoc needs parens at equal prec)
+            pp.extra = Context {
+                precedence: op_prec,
+                assoc: true,
+                decl_precedence: 0,
+            };
+            pp.visit_expression(&b.right)
+        })
     }
 
     fn visit_binary_operator(&mut self, op: &'a BinaryOperator) -> Self::Result {
@@ -527,6 +479,64 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         self.text(text)
     }
 
+    fn visit_conditional_expression(&mut self, cond: &'a ConditionalExpression) -> Self::Result {
+        self.igroup(2, |pp| {
+            // Conditional is right-associative
+            // Condition needs parens if it's a conditional or lower precedence
+            pp.extra = Context {
+                precedence: precedence::CONDITIONAL,
+                assoc: true,
+                decl_precedence: 0,
+            };
+            pp.visit_expression(&cond.condition)?;
+            pp.space()?;
+
+            pp.text("?")?;
+            pp.scan_break(1, 2)?;
+
+            // then_expr can be any expression (comma is allowed inside ?:)
+            pp.extra = Context::default();
+            pp.visit_expression(&cond.then_expr)?;
+            pp.space()?;
+
+            pp.text(":")?;
+            pp.scan_break(1, 2)?;
+
+            // else_expr: right-associative, so same precedence is OK
+            pp.extra = Context {
+                precedence: precedence::CONDITIONAL,
+                assoc: false,
+                decl_precedence: 0,
+            };
+            pp.visit_expression(&cond.else_expr)
+        })
+    }
+
+    fn visit_assignment_expression(&mut self, a: &'a AssignmentExpression) -> Self::Result {
+        self.igroup(0, |pp| {
+            // Assignment is right-associative
+            // Left operand needs higher precedence (unary or above)
+            pp.extra = Context {
+                precedence: precedence::ASSIGNMENT,
+                assoc: true,
+                decl_precedence: 0,
+            };
+            pp.visit_expression(&a.left)?;
+            pp.space()?;
+
+            pp.visit_assignment_operator(&a.operator)?;
+            pp.scan_break(1, 2)?;
+
+            // Right operand: right-associative, so same precedence is OK
+            pp.extra = Context {
+                precedence: precedence::ASSIGNMENT,
+                assoc: false,
+                decl_precedence: 0,
+            };
+            pp.visit_expression(&a.right)
+        })
+    }
+
     fn visit_assignment_operator(&mut self, op: &'a AssignmentOperator) -> Self::Result {
         let text = match op {
             AssignmentOperator::Assign => "=",
@@ -544,8 +554,29 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         self.text(text)
     }
 
+    fn visit_comma_expression(&mut self, c: &'a CommaExpression) -> Self::Result {
+        self.igroup(0, |pp| {
+            for (i, expr) in c.expressions.iter().enumerate() {
+                if i > 0 {
+                    pp.text(",")?;
+                    pp.scan_break(1, 2)?;
+                }
+
+                // Comma is left-associative
+                // Each element needs to be at least assignment level
+                pp.extra = Context {
+                    precedence: precedence::COMMA,
+                    assoc: i > 0, // right side needs parens at equal precedence
+                    decl_precedence: 0,
+                };
+                pp.visit_expression(expr)?;
+            }
+            Ok(())
+        })
+    }
+
     fn visit_declaration(&mut self, d: &'a Declaration) -> Self::Result {
-        self.igroup(2, |pp| {
+        self.igroup(0, |pp| {
             match d {
                 Declaration::Normal { attributes, specifiers, declarators } => {
                     for a in attributes {
@@ -979,8 +1010,8 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             pp.text("{")?;
 
             for item in &c.items {
-                pp.igroup(2, |pp| pp.visit_block_item(item))?;
                 pp.space()?;
+                pp.igroup(2, |pp| pp.visit_block_item(item))?;
             }
             pp.scan_break(1, -2)?;
             pp.text("}")
@@ -995,14 +1026,6 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             self.visit_declaration_specifier(spec)?;
         }
         Ok(())
-    }
-
-    fn visit_declaration_specifier(&mut self, spec: &'a DeclarationSpecifier) -> Self::Result {
-        match spec {
-            DeclarationSpecifier::StorageClass(scs) => self.visit_storage_class_specifier(scs),
-            DeclarationSpecifier::TypeSpecifierQualifier(tsq) => self.visit_type_specifier_qualifier(tsq),
-            DeclarationSpecifier::Function(fs) => self.visit_function_specifier(fs),
-        }
     }
 
     fn visit_storage_class_specifier(&mut self, scs: &'a StorageClassSpecifier) -> Self::Result {
@@ -1100,10 +1123,10 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             self.space()?;
             self.igroup(2, |pp| {
                 pp.text("{")?;
-                pp.hard_break()?;
+                pp.space()?;
                 for member in members {
                     pp.visit_member_declaration(member)?;
-                    pp.hard_break()?;
+                    pp.space()?;
                 }
                 pp.scan_break(0, -2)?;
                 pp.text("}")
@@ -1215,7 +1238,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
     }
 
     fn visit_enumerator(&mut self, e: &'a Enumerator) -> Self::Result {
-        self.igroup(2, |pp| {
+        self.igroup(0, |pp| {
             for a in &e.attributes {
                 pp.visit_attribute_specifier(a)?;
                 pp.space()?;
@@ -1224,7 +1247,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             if let Some(value) = &e.value {
                 pp.space()?;
                 pp.text("=")?;
-                pp.space()?;
+                pp.scan_break(1, 2)?;
                 pp.visit_constant_expression(value)?;
             }
             Ok(())
