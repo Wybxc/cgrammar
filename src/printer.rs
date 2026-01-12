@@ -104,90 +104,85 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         })
     }
 
-    fn visit_statement(&mut self, s: &'a Statement) -> Self::Result {
-        match s {
-            Statement::Labeled(ls) => {
-                // Print label
-                match &ls.label {
-                    Label::Identifier { attributes, identifier } => {
-                        for a in attributes {
-                            self.visit_attribute_specifier(a)?;
-                            self.space()?;
-                        }
-                        self.visit_label_name(identifier)?;
-                        self.text(":")?;
-                    }
-                    Label::Case { attributes, expression } => {
-                        for a in attributes {
-                            self.visit_attribute_specifier(a)?;
-                            self.space()?;
-                        }
-                        self.text("case")?;
-                        self.space()?;
-                        self.visit_constant_expression(expression)?;
-                        self.text(":")?;
-                    }
-                    Label::Default { attributes } => {
-                        for a in attributes {
-                            self.visit_attribute_specifier(a)?;
-                            self.space()?;
-                        }
-                        self.text("default:")?;
-                    }
+    fn visit_label(&mut self, l: &'a Label) -> Self::Result {
+        match l {
+            Label::Identifier { attributes, identifier } => {
+                for a in attributes {
+                    self.visit_attribute_specifier(a)?;
+                    self.space()?;
                 }
-                self.space()?;
-                self.visit_statement(&ls.statement)
+                self.visit_label_name(identifier)?;
+                self.text(":")?;
             }
-            Statement::Unlabeled(u) => self.visit_unlabeled_statement(u),
+            Label::Case { attributes, expression } => {
+                for a in attributes {
+                    self.visit_attribute_specifier(a)?;
+                    self.space()?;
+                }
+                self.text("case")?;
+                self.space()?;
+                self.visit_constant_expression(expression)?;
+                self.text(":")?;
+            }
+            Label::Default { attributes } => {
+                for a in attributes {
+                    self.visit_attribute_specifier(a)?;
+                    self.space()?;
+                }
+                self.text("default:")?;
+            }
         }
+        self.space()
     }
 
     fn visit_unlabeled_statement(&mut self, s: &'a UnlabeledStatement) -> Self::Result {
         match s {
-            UnlabeledStatement::Expression(es) => {
-                for a in &es.attributes {
-                    self.visit_attribute_specifier(a)?;
-                    self.space()?;
-                }
-                if let Some(expr) = &es.expression {
-                    self.visit_expression(expr)?;
-                }
-                self.text(";")
-            }
+            UnlabeledStatement::Expression(es) => self.visit_expression_statement(es),
             UnlabeledStatement::Primary { attributes, block } => {
                 for a in attributes {
                     self.visit_attribute_specifier(a)?;
                     self.space()?;
                 }
-                match block {
-                    PrimaryBlock::Compound(c) => self.visit_compound_statement(c),
-                    PrimaryBlock::Selection(sel) => self.visit_selection_statement(sel),
-                    PrimaryBlock::Iteration(iter) => self.visit_iteration_statement(iter),
-                }
+                self.visit_primary_block(block)
             }
             UnlabeledStatement::Jump { attributes, statement } => {
                 for a in attributes {
                     self.visit_attribute_specifier(a)?;
                     self.space()?;
                 }
-                match statement {
-                    JumpStatement::Goto(id) => {
-                        self.text("goto")?;
-                        self.space()?;
-                        self.visit_label_name(id)?;
-                        self.text(";")
-                    }
-                    JumpStatement::Continue => self.text("continue;"),
-                    JumpStatement::Break => self.text("break;"),
-                    JumpStatement::Return(expr) => {
-                        self.text("return")?;
-                        if let Some(e) = expr {
-                            self.space()?;
-                            self.visit_expression(e)?;
-                        }
-                        self.text(";")
-                    }
+                self.visit_jump_statement(statement)
+            }
+        }
+    }
+
+    fn visit_expression_statement(&mut self, e: &'a ExpressionStatement) -> Self::Result {
+        for a in &e.attributes {
+            self.visit_attribute_specifier(a)?;
+            self.space()?;
+        }
+        if let Some(expr) = &e.expression {
+            self.visit_expression(expr)?;
+        }
+        self.text(";")
+    }
+
+    fn visit_jump_statement(&mut self, j: &'a JumpStatement) -> Self::Result {
+        match j {
+            JumpStatement::Goto(id) => {
+                self.text("goto")?;
+                self.space()?;
+                self.visit_label_name(id)?;
+                self.text(";")
+            }
+            JumpStatement::Continue => self.text("continue;"),
+            JumpStatement::Break => self.text("break;"),
+            JumpStatement::Return(expr) => {
+                self.text("return")?;
+                if let Some(e) = expr {
+                    self.space()?;
+                    self.visit_expression(e)?;
                 }
+                self.text(";")
             }
         }
     }
@@ -249,16 +244,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.space()?;
                 self.text("(")?;
                 if let Some(i) = init {
-                    match i {
-                        ForInit::Expression(e) => {
-                            self.visit_expression(e)?;
-                            self.text(";")?;
-                        }
-                        ForInit::Declaration(d) => {
-                            self.visit_declaration(d)?;
-                            // Declaration already includes the semicolon
-                        }
-                    }
+                    self.visit_for_init(i)?;
                 } else {
                     self.text(";")?;
                 }
@@ -276,6 +262,18 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.visit_statement(body)
             }
             IterationStatement::Error => Ok(()),
+        }
+    }
+
+    fn visit_for_init(&mut self, fi: &'a ForInit) -> Self::Result {
+        match fi {
+            ForInit::Expression(e) => {
+                self.visit_expression(e)?;
+                self.text(";")
+            }
+            ForInit::Declaration(d) => {
+                self.visit_declaration(d) // Declaration already includes the semicolon
+            }
         }
     }
 
@@ -688,43 +686,10 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
     fn visit_compound_statement(&mut self, c: &'a CompoundStatement) -> Self::Result {
         self.cgroup(2, |pp| {
             pp.text("{")?;
+
             for item in &c.items {
+                pp.igroup(2, |pp| pp.visit_block_item(item))?;
                 pp.space()?;
-                match item {
-                    BlockItem::Declaration(d) => {
-                        pp.visit_declaration(d)?;
-                    }
-                    BlockItem::Statement(s) => {
-                        pp.visit_unlabeled_statement(s)?;
-                    }
-                    BlockItem::Label(l) => match l {
-                        Label::Identifier { attributes, identifier } => {
-                            for a in attributes {
-                                pp.visit_attribute_specifier(a)?;
-                                pp.space()?;
-                            }
-                            pp.visit_label_name(identifier)?;
-                            pp.text(":")?;
-                        }
-                        Label::Case { attributes, expression } => {
-                            for a in attributes {
-                                pp.visit_attribute_specifier(a)?;
-                                pp.space()?;
-                            }
-                            pp.text("case")?;
-                            pp.space()?;
-                            pp.visit_constant_expression(expression)?;
-                            pp.text(":")?;
-                        }
-                        Label::Default { attributes } => {
-                            for a in attributes {
-                                pp.visit_attribute_specifier(a)?;
-                                pp.space()?;
-                            }
-                            pp.text("default:")?;
-                        }
-                    },
-                }
             }
             pp.scan_break(1, -2)?;
             pp.text("}")
@@ -768,14 +733,6 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             FunctionSpecifier::Noreturn => "_Noreturn",
         };
         self.text(text)
-    }
-
-    fn visit_type_specifier_qualifier(&mut self, x: &'a TypeSpecifierQualifier) -> Self::Result {
-        match x {
-            TypeSpecifierQualifier::TypeSpecifier(ts) => self.visit_type_specifier(ts),
-            TypeSpecifierQualifier::TypeQualifier(tq) => self.visit_type_qualifier(tq),
-            TypeSpecifierQualifier::AlignmentSpecifier(a) => self.visit_alignment_specifier(a),
-        }
     }
 
     fn visit_type_qualifier(&mut self, tq: &'a TypeQualifier) -> Self::Result {
@@ -880,39 +837,50 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                             self.text(",")?;
                             self.space()?;
                         }
-                        match decl {
-                            MemberDeclarator::Declarator(d) => self.visit_declarator(d)?,
-                            MemberDeclarator::BitField { declarator, width } => {
-                                if let Some(d) = declarator {
-                                    self.visit_declarator(d)?;
-                                }
-                                self.text(":")?;
-                                self.space()?;
-                                self.visit_constant_expression(width)?;
-                            }
-                        }
+                        self.visit_member_declarator(decl)?;
                     }
                 }
                 self.text(";")
             }
-            MemberDeclaration::StaticAssert(sa) => {
-                self.text("_Static_assert")?;
-                self.text("(")?;
-                self.visit_constant_expression(&sa.condition)?;
-                if let Some(msg) = &sa.message {
-                    self.text(",")?;
-                    self.space()?;
-                    for (i, lit) in msg.0.iter().enumerate() {
-                        if i > 0 {
-                            self.space()?;
-                        }
-                        print_string_literal(self, lit)?;
-                    }
-                }
-                self.text(");")
-            }
+            MemberDeclaration::StaticAssert(sa) => self.visit_static_assert_declaration(sa),
             MemberDeclaration::Error => Ok(()),
         }
+    }
+
+    fn visit_member_declarator(&mut self, md: &'a MemberDeclarator) -> Self::Result {
+        match md {
+            MemberDeclarator::Declarator(d) => self.visit_declarator(d),
+            MemberDeclarator::BitField { declarator, width } => {
+                if let Some(d) = declarator {
+                    self.visit_declarator(d)?;
+                }
+                self.text(":")?;
+                self.space()?;
+                self.visit_constant_expression(width)
+            }
+        }
+    }
+
+    fn visit_static_assert_declaration(&mut self, sa: &'a StaticAssertDeclaration) -> Self::Result {
+        self.text("_Static_assert")?;
+        self.text("(")?;
+        self.visit_constant_expression(&sa.condition)?;
+        if let Some(msg) = &sa.message {
+            self.text(",")?;
+            self.space()?;
+            self.visit_static_assert_message(msg)?;
+        }
+        self.text(");")
+    }
+
+    fn visit_static_assert_message(&mut self, msg: &'a StringLiterals) -> Self::Result {
+        for (i, lit) in msg.0.iter().enumerate() {
+            if i > 0 {
+                self.space()?;
+            }
+            print_string_literal(self, lit)?;
+        }
+        Ok(())
     }
 
     fn visit_enum_specifier(&mut self, e: &'a EnumSpecifier) -> Self::Result {
@@ -937,25 +905,15 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
 
         if let Some(enumerators) = &e.enumerators {
             self.space()?;
-            self.igroup(2, |pp| {
+            self.cgroup(2, |pp| {
                 pp.text("{")?;
                 pp.space()?;
-                for (i, enumerator) in enumerators.iter().enumerate() {
+                for (i, e) in enumerators.iter().enumerate() {
                     if i > 0 {
                         pp.text(",")?;
                         pp.space()?;
                     }
-                    for a in &enumerator.attributes {
-                        pp.visit_attribute_specifier(a)?;
-                        pp.space()?;
-                    }
-                    pp.visit_enumerator_name(&enumerator.name)?;
-                    if let Some(value) = &enumerator.value {
-                        pp.space()?;
-                        pp.text("=")?;
-                        pp.space()?;
-                        pp.visit_constant_expression(value)?;
-                    }
+                    pp.visit_enumerator(e)?;
                 }
                 pp.scan_break(0, -2)?;
                 pp.text("}")
@@ -963,6 +921,23 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         }
 
         Ok(())
+    }
+
+    fn visit_enumerator(&mut self, e: &'a Enumerator) -> Self::Result {
+        self.igroup(2, |pp| {
+            for a in &e.attributes {
+                pp.visit_attribute_specifier(a)?;
+                pp.space()?;
+            }
+            pp.visit_enumerator_name(&e.name)?;
+            if let Some(value) = &e.value {
+                pp.space()?;
+                pp.text("=")?;
+                pp.space()?;
+                pp.visit_constant_expression(value)?;
+            }
+            Ok(())
+        })
     }
 
     fn visit_atomic_type_specifier(&mut self, a: &'a AtomicTypeSpecifier) -> Self::Result {
@@ -974,18 +949,11 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
 
     fn visit_typeof(&mut self, t: &'a TypeofSpecifier) -> Self::Result {
         match t {
-            TypeofSpecifier::Typeof(arg) => {
-                self.text("typeof")?;
-                self.text("(")?;
-                match arg {
-                    TypeofSpecifierArgument::Expression(e) => self.visit_expression(e)?,
-                    TypeofSpecifierArgument::TypeName(tn) => self.visit_type_name(tn)?,
-                    TypeofSpecifierArgument::Error => {}
-                }
-                self.text(")")
-            }
-            TypeofSpecifier::TypeofUnqual(arg) => {
-                self.text("typeof_unqual")?;
+            TypeofSpecifier::Typeof(_) => self.text("typeof")?,
+            TypeofSpecifier::TypeofUnqual(_) => self.text("typeof_unqual")?,
+        }
+        match t {
+            TypeofSpecifier::Typeof(arg) | TypeofSpecifier::TypeofUnqual(arg) => {
                 self.text("(")?;
                 match arg {
                     TypeofSpecifierArgument::Expression(e) => self.visit_expression(e)?,
@@ -1078,38 +1046,30 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         }
     }
 
-    fn visit_external_declaration(&mut self, d: &'a ExternalDeclaration) -> Self::Result {
-        match d {
-            ExternalDeclaration::Function(f) => self.visit_function_definition(f),
-            ExternalDeclaration::Declaration(d) => self.visit_declaration(d),
-        }
-    }
-
-    fn visit_initializer(&mut self, i: &'a Initializer) -> Self::Result {
-        match i {
-            Initializer::Expression(e) => self.visit_expression(e),
-            Initializer::Braced(b) => self.visit_braced_initializer(b),
-        }
-    }
-
     fn visit_braced_initializer(&mut self, b: &'a BracedInitializer) -> Self::Result {
-        self.igroup(2, |pp| {
+        self.cgroup(2, |pp| {
             pp.text("{")?;
             for (i, init) in b.initializers.iter().enumerate() {
                 if i > 0 {
                     pp.text(",")?;
                 }
                 pp.space()?;
-                if let Some(designation) = &init.designation {
-                    pp.visit_designation(designation)?;
-                    pp.space()?;
-                    pp.text("=")?;
-                    pp.space()?;
-                }
-                pp.visit_initializer(&init.initializer)?;
+                pp.visit_designated_initializer(init)?;
             }
             pp.scan_break(0, -2)?;
             pp.text("}")
+        })
+    }
+
+    fn visit_designated_initializer(&mut self, init: &'a DesignatedInitializer) -> Self::Result {
+        self.igroup(2, |pp| {
+            if let Some(designation) = &init.designation {
+                pp.visit_designation(designation)?;
+                pp.space()?;
+                pp.text("=")?;
+                pp.space()?;
+            }
+            pp.visit_initializer(&init.initializer)
         })
     }
 
@@ -1130,30 +1090,24 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         }
     }
 
-    fn visit_constant_expression(&mut self, e: &'a ConstantExpression) -> Self::Result {
-        match e {
-            ConstantExpression::Expression(expr) => self.visit_expression(expr),
-            ConstantExpression::Error => Ok(()),
-        }
-    }
-
     fn visit_pointer(&mut self, p: &'a Pointer) -> Self::Result {
-        match p.pointer_or_block {
-            PointerOrBlock::Pointer => self.text("*")?,
-            PointerOrBlock::Block => self.text("^")?,
-        }
-
+        self.visit_pointer_or_block(&p.pointer_or_block)?;
         for a in &p.attributes {
             self.space()?;
             self.visit_attribute_specifier(a)?;
         }
-
         for tq in &p.type_qualifiers {
             self.space()?;
             self.visit_type_qualifier(tq)?;
         }
-
         Ok(())
+    }
+
+    fn visit_pointer_or_block(&mut self, pb: &'a PointerOrBlock) -> Self::Result {
+        match pb {
+            PointerOrBlock::Pointer => self.text("*"),
+            PointerOrBlock::Block => self.text("^"),
+        }
     }
 
     fn visit_array_declarator(&mut self, a: &'a ArrayDeclarator) -> Self::Result {
@@ -1234,10 +1188,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         self.visit_declaration_specifiers(&p.specifiers)?;
         if let Some(kind) = &p.declarator {
             self.space()?;
-            match kind {
-                ParameterDeclarationKind::Declarator(d) => self.visit_declarator(d)?,
-                ParameterDeclarationKind::Abstract(a) => self.visit_abstract_declarator(a)?,
-            }
+            self.visit_parameter_declaration_kind(kind)?;
         }
         Ok(())
     }

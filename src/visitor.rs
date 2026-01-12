@@ -362,6 +362,11 @@ pub trait Visitor<'a> {
         walk_compound_statement(self, c)
     }
 
+    /// Visits a block item.
+    fn visit_block_item(&mut self, bi: &'a BlockItem) -> Self::Result {
+        walk_block_item(self, bi)
+    }
+
     /// Visits declaration specifiers.
     fn visit_declaration_specifiers(&mut self, s: &'a DeclarationSpecifiers) -> Self::Result {
         walk_declaration_specifiers(self, s)
@@ -700,13 +705,18 @@ pub fn walk_primary_block<'a, V: Visitor<'a> + ?Sized>(v: &mut V, pb: &'a Primar
 /// Walk a compound statement.
 pub fn walk_compound_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CompoundStatement) -> V::Result {
     for item in &c.items {
-        match item {
-            BlockItem::Declaration(d) => tr!(v.visit_declaration(d)),
-            BlockItem::Statement(u) => tr!(v.visit_unlabeled_statement(u)),
-            BlockItem::Label(l) => tr!(v.visit_label(l)),
-        }
+        tr!(v.visit_block_item(item));
     }
     V::Result::output()
+}
+
+/// Walk a block item.
+pub fn walk_block_item<'a, V: Visitor<'a> + ?Sized>(v: &mut V, bi: &'a BlockItem) -> V::Result {
+    match bi {
+        BlockItem::Declaration(d) => v.visit_declaration(d),
+        BlockItem::Statement(u) => v.visit_unlabeled_statement(u),
+        BlockItem::Label(l) => v.visit_label(l),
+    }
 }
 
 /// Walk a selection statement.
@@ -1541,6 +1551,11 @@ pub trait VisitorMut<'a> {
         walk_compound_statement_mut(self, c)
     }
 
+    /// Visits a block item with mutable access.
+    fn visit_block_item_mut(&mut self, b: &'a mut BlockItem) -> Self::Result {
+        walk_block_item_mut(self, b)
+    }
+
     /// Visits declaration specifiers with mutable access.
     fn visit_declaration_specifiers_mut(&mut self, s: &'a mut DeclarationSpecifiers) -> Self::Result {
         walk_declaration_specifiers_mut(self, s)
@@ -1892,13 +1907,18 @@ pub fn walk_compound_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(
     c: &'a mut CompoundStatement,
 ) -> V::Result {
     for item in &mut c.items {
-        match item {
-            BlockItem::Declaration(d) => tr!(v.visit_declaration_mut(d)),
-            BlockItem::Statement(u) => tr!(v.visit_unlabeled_statement_mut(u)),
-            BlockItem::Label(l) => tr!(v.visit_label_mut(l)),
-        }
+        tr!(v.visit_block_item_mut(item));
     }
     V::Result::output()
+}
+
+/// Walk a block item with mutable access.
+pub fn walk_block_item_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, b: &'a mut BlockItem) -> V::Result {
+    match b {
+        BlockItem::Declaration(d) => v.visit_declaration_mut(d),
+        BlockItem::Statement(u) => v.visit_unlabeled_statement_mut(u),
+        BlockItem::Label(l) => v.visit_label_mut(l),
+    }
 }
 
 /// Walk a selection statement with mutable access.
