@@ -4,7 +4,7 @@ use std::{io::Write, path::PathBuf};
 
 use cgrammar::{
     printer::Context,
-    visitor::{Visitor, VisitorMut, walk_expression_mut},
+    visitor::{Visitor, VisitorMut, walk_declarator_mut, walk_direct_declarator_mut, walk_expression_mut},
     *,
 };
 use elegance::Printer;
@@ -58,6 +58,7 @@ impl VisitorMut<'_> for RemoveParens {
     type Result = ();
 
     fn visit_expression_mut(&mut self, e: &'_ mut Expression) -> Self::Result {
+        walk_expression_mut(self, e);
         match e {
             Expression::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) => {
                 let inner = std::mem::replace(inner.as_mut(), Expression::Error);
@@ -65,7 +66,26 @@ impl VisitorMut<'_> for RemoveParens {
             }
             _ => {}
         }
-        walk_expression_mut(self, e)
+    }
+
+    fn visit_declarator_mut(&mut self, d: &'_ mut Declarator) -> Self::Result {
+        walk_declarator_mut(self, d);
+        if let Declarator::Direct(DirectDeclarator::Parenthesized(inner)) = d {
+            let inner = std::mem::replace(inner.as_mut(), Declarator::Error);
+            *d = inner;
+        }
+    }
+
+    fn visit_direct_declarator_mut(&mut self, d: &'_ mut DirectDeclarator) -> Self::Result {
+        walk_direct_declarator_mut(self, d);
+        if let DirectDeclarator::Parenthesized(boxed) = d {
+            let inner = std::mem::replace(boxed.as_mut(), Declarator::Error);
+            if let Declarator::Direct(dd) = inner {
+                *d = dd;
+            } else {
+                *boxed.as_mut() = inner;
+            }
+        }
     }
 }
 

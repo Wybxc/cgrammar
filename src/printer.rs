@@ -24,6 +24,19 @@ mod precedence {
     pub const POSTFIX: usize = 16;
 }
 
+/// Precedence levels for C declarators (lower number = lower precedence = binds less tightly)
+///
+/// In C declarator syntax:
+/// - `*` (pointer) has lower precedence than `[]` (array) and `()` (function)
+/// - So `int *p[10]` is an array of pointers, not a pointer to array
+/// - To get a pointer to array, parentheses are needed: `int (*p)[10]`
+mod decl_precedence {
+    /// Pointer declarator precedence (lowest)
+    pub const POINTER: usize = 1;
+    /// Array and function declarator precedence (highest)
+    pub const POSTFIX: usize = 2;
+}
+
 /// Context for expression printing, used to determine when parentheses are needed.
 ///
 /// This context tracks the precedence and associativity of the surrounding expression
@@ -35,11 +48,17 @@ pub struct Context {
     /// whether we're in a position that requires parens at equal precedence
     /// (e.g., right side of left-associative operator)
     assoc: bool,
+    /// the precedence of the surrounding declarator context (0 = no context/top level)
+    decl_precedence: usize,
 }
 
 impl Default for Context {
     fn default() -> Self {
-        Context { precedence: 0, assoc: false }
+        Context {
+            precedence: 0,
+            assoc: false,
+            decl_precedence: 0,
+        }
     }
 }
 
@@ -53,6 +72,11 @@ impl Context {
         } else {
             false
         }
+    }
+
+    /// Check if a declarator with the given precedence needs parentheses in this context
+    fn decl_needs_parens(&self, decl_prec: usize) -> bool {
+        self.decl_precedence > 0 && decl_prec < self.decl_precedence
     }
 }
 
@@ -387,13 +411,21 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 let op_prec = binary_op_precedence(&b.operator);
                 // All binary operators are left-associative in C
                 // Left operand: same precedence, no assoc flag (left side of left-assoc is fine)
-                self.extra = Context { precedence: op_prec, assoc: false };
+                self.extra = Context {
+                    precedence: op_prec,
+                    assoc: false,
+                    decl_precedence: 0,
+                };
                 self.visit_expression(&b.left)?;
                 self.space()?;
                 self.visit_binary_operator(&b.operator)?;
                 self.space()?;
                 // Right operand: same precedence, assoc = true (right side of left-assoc needs parens at equal prec)
-                self.extra = Context { precedence: op_prec, assoc: true };
+                self.extra = Context {
+                    precedence: op_prec,
+                    assoc: true,
+                    decl_precedence: 0,
+                };
                 self.visit_expression(&b.right)?;
             }
             Expression::Conditional(cond) => {
@@ -402,6 +434,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::CONDITIONAL,
                     assoc: true,
+                    decl_precedence: 0,
                 };
                 self.visit_expression(&cond.condition)?;
                 self.space()?;
@@ -417,6 +450,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::CONDITIONAL,
                     assoc: false,
+                    decl_precedence: 0,
                 };
                 self.visit_expression(&cond.else_expr)?;
             }
@@ -426,6 +460,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::ASSIGNMENT,
                     assoc: true,
+                    decl_precedence: 0,
                 };
                 self.visit_expression(&a.left)?;
                 self.space()?;
@@ -435,6 +470,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::ASSIGNMENT,
                     assoc: false,
+                    decl_precedence: 0,
                 };
                 self.visit_expression(&a.right)?;
             }
@@ -449,6 +485,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                     self.extra = Context {
                         precedence: precedence::COMMA,
                         assoc: i > 0, // right side needs parens at equal precedence
+                        decl_precedence: 0,
                     };
                     self.visit_expression(expr)?;
                 }
@@ -603,15 +640,39 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
     }
 
     fn visit_declarator(&mut self, d: &'a Declarator) -> Self::Result {
+        let ctx = self.extra;
+        let decl_prec = match d {
+            Declarator::Direct(_) => decl_precedence::POSTFIX,
+            Declarator::Pointer { .. } => decl_precedence::POINTER,
+            Declarator::Error => decl_precedence::POSTFIX,
+        };
+        let needs_parens = ctx.decl_needs_parens(decl_prec);
+
+        if needs_parens {
+            self.text("(")?;
+        }
+
+        // Reset declarator context for inner processing
+        self.extra.decl_precedence = 0;
+
         match d {
-            Declarator::Direct(dd) => self.visit_direct_declarator(dd),
+            Declarator::Direct(dd) => self.visit_direct_declarator(dd)?,
             Declarator::Pointer { pointer, declarator } => {
                 self.visit_pointer(pointer)?;
                 self.space()?;
-                self.visit_declarator(declarator)
+                self.visit_declarator(declarator)?;
             }
-            Declarator::Error => Ok(()),
+            Declarator::Error => {}
         }
+
+        // Restore context
+        self.extra = ctx;
+
+        if needs_parens {
+            self.text(")")?;
+        }
+
+        Ok(())
     }
 
     fn visit_direct_declarator(&mut self, d: &'a DirectDeclarator) -> Self::Result {
@@ -625,12 +686,35 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 Ok(())
             }
             DirectDeclarator::Parenthesized(inner) => {
-                self.text("(")?;
+                // Check if parens are actually needed based on inner declarator type
+                let inner_prec = match inner.as_ref() {
+                    Declarator::Direct(_) => decl_precedence::POSTFIX,
+                    Declarator::Pointer { .. } => decl_precedence::POINTER,
+                    Declarator::Error => decl_precedence::POSTFIX,
+                };
+                let ctx = self.extra;
+                let needs_parens = ctx.decl_needs_parens(inner_prec);
+
+                if needs_parens {
+                    self.text("(")?;
+                }
+
+                // Reset context since parens (if printed) protect the inner
+                self.extra.decl_precedence = 0;
                 self.visit_declarator(inner)?;
-                self.text(")")
+                self.extra = ctx;
+
+                if needs_parens {
+                    self.text(")")?;
+                }
+                Ok(())
             }
             DirectDeclarator::Array { declarator, attributes, array_declarator } => {
+                // Array has high precedence - inner declarator needs parens if it's a pointer
+                let old_ctx = self.extra;
+                self.extra.decl_precedence = decl_precedence::POSTFIX;
                 self.visit_direct_declarator(declarator)?;
+                self.extra = old_ctx;
                 for a in attributes {
                     self.space()?;
                     self.visit_attribute_specifier(a)?;
@@ -640,7 +724,11 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.text("]")
             }
             DirectDeclarator::Function { declarator, attributes, parameters } => {
+                // Function has high precedence - inner declarator needs parens if it's a pointer
+                let old_ctx = self.extra;
+                self.extra.decl_precedence = decl_precedence::POSTFIX;
                 self.visit_direct_declarator(declarator)?;
+                self.extra = old_ctx;
                 self.igroup(2, |pp| {
                     pp.text("(")?;
                     pp.visit_parameter_type_list(parameters)?;
@@ -795,6 +883,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::UNARY,
                     assoc: false,
+                    decl_precedence: 0,
                 };
                 self.visit_unary_expression(inner)?;
                 self.extra = old_ctx;
@@ -806,6 +895,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::UNARY,
                     assoc: false,
+                    decl_precedence: 0,
                 };
                 self.visit_unary_expression(inner)?;
                 self.extra = old_ctx;
@@ -817,6 +907,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::CAST,
                     assoc: false,
+                    decl_precedence: 0,
                 };
                 self.visit_cast_expression(operand)?;
                 self.extra = old_ctx;
@@ -829,6 +920,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::UNARY,
                     assoc: false,
+                    decl_precedence: 0,
                 };
                 self.visit_unary_expression(inner)?;
                 self.extra = old_ctx;
@@ -873,6 +965,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.extra = Context {
                     precedence: precedence::CAST,
                     assoc: false,
+                    decl_precedence: 0,
                 };
                 self.visit_cast_expression(expression)?;
                 self.extra = old_ctx;
@@ -1192,31 +1285,77 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
     }
 
     fn visit_abstract_declarator(&mut self, a: &'a AbstractDeclarator) -> Self::Result {
+        let ctx = self.extra;
+        let decl_prec = match a {
+            AbstractDeclarator::Direct(_) => decl_precedence::POSTFIX,
+            AbstractDeclarator::Pointer { .. } => decl_precedence::POINTER,
+            AbstractDeclarator::Error => decl_precedence::POSTFIX,
+        };
+        let needs_parens = ctx.decl_needs_parens(decl_prec);
+
+        if needs_parens {
+            self.text("(")?;
+        }
+
+        // Reset declarator context for inner processing
+        self.extra.decl_precedence = 0;
+
         match a {
-            AbstractDeclarator::Direct(d) => self.visit_direct_abstract_declarator(d),
+            AbstractDeclarator::Direct(d) => self.visit_direct_abstract_declarator(d)?,
             AbstractDeclarator::Pointer { pointer, abstract_declarator } => {
                 self.visit_pointer(pointer)?;
                 if let Some(ad) = abstract_declarator {
                     self.space()?;
                     self.visit_abstract_declarator(ad)?;
                 }
-                Ok(())
             }
-            AbstractDeclarator::Error => Ok(()),
+            AbstractDeclarator::Error => {}
         }
+
+        // Restore context
+        self.extra = ctx;
+
+        if needs_parens {
+            self.text(")")?;
+        }
+
+        Ok(())
     }
 
     fn visit_direct_abstract_declarator(&mut self, d: &'a DirectAbstractDeclarator) -> Self::Result {
         match d {
-            DirectAbstractDeclarator::Parenthesized(ad) => {
-                self.text("(")?;
-                self.visit_abstract_declarator(ad)?;
-                self.text(")")
+            DirectAbstractDeclarator::Parenthesized(inner) => {
+                // Check if parens are actually needed based on inner abstract declarator type
+                let inner_prec = match inner.as_ref() {
+                    AbstractDeclarator::Direct(_) => decl_precedence::POSTFIX,
+                    AbstractDeclarator::Pointer { .. } => decl_precedence::POINTER,
+                    AbstractDeclarator::Error => decl_precedence::POSTFIX,
+                };
+                let ctx = self.extra;
+                let needs_parens = ctx.decl_needs_parens(inner_prec);
+
+                if needs_parens {
+                    self.text("(")?;
+                }
+
+                // Reset context since parens (if printed) protect the inner
+                self.extra.decl_precedence = 0;
+                self.visit_abstract_declarator(inner)?;
+                self.extra = ctx;
+
+                if needs_parens {
+                    self.text(")")?;
+                }
+                Ok(())
             }
             DirectAbstractDeclarator::Array { declarator, attributes, array_declarator } => {
+                // Array has high precedence - inner declarator needs parens if it's a pointer
+                let old_ctx = self.extra;
+                self.extra.decl_precedence = decl_precedence::POSTFIX;
                 if let Some(dd) = declarator {
                     self.visit_direct_abstract_declarator(dd)?;
                 }
+                self.extra = old_ctx;
                 for a in attributes {
                     self.space()?;
                     self.visit_attribute_specifier(a)?;
@@ -1226,9 +1365,13 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.text("]")
             }
             DirectAbstractDeclarator::Function { declarator, attributes, parameters } => {
+                // Function has high precedence - inner declarator needs parens if it's a pointer
+                let old_ctx = self.extra;
+                self.extra.decl_precedence = decl_precedence::POSTFIX;
                 if let Some(dd) = declarator {
                     self.visit_direct_abstract_declarator(dd)?;
                 }
+                self.extra = old_ctx;
                 self.igroup(2, |pp| {
                     pp.text("(")?;
                     pp.visit_parameter_type_list(parameters)?;
