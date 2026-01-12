@@ -1,8 +1,98 @@
 //! Pretty printer for the AST.
 
-use elegance::{Printer, Render};
+use elegance::Render;
 
 use crate::{ast::*, visitor::Visitor};
+
+/// Precedence levels for C expressions (lower number = lower precedence = binds less tightly)
+mod precedence {
+    pub const COMMA: usize = 1;
+    pub const ASSIGNMENT: usize = 2;
+    pub const CONDITIONAL: usize = 3;
+    pub const LOGICAL_OR: usize = 4;
+    pub const LOGICAL_AND: usize = 5;
+    pub const BITWISE_OR: usize = 6;
+    pub const BITWISE_XOR: usize = 7;
+    pub const BITWISE_AND: usize = 8;
+    pub const EQUALITY: usize = 9;
+    pub const RELATIONAL: usize = 10;
+    pub const SHIFT: usize = 11;
+    pub const ADDITIVE: usize = 12;
+    pub const MULTIPLICATIVE: usize = 13;
+    pub const CAST: usize = 14;
+    pub const UNARY: usize = 15;
+    pub const POSTFIX: usize = 16;
+}
+
+/// Context for expression printing, used to determine when parentheses are needed.
+///
+/// This context tracks the precedence and associativity of the surrounding expression
+/// to enable minimal parenthesization when printing expressions.
+#[derive(Debug, Clone, Copy)]
+pub struct Context {
+    /// the precedence of the surrounding context (0 = no context/top level)
+    precedence: usize,
+    /// whether we're in a position that requires parens at equal precedence
+    /// (e.g., right side of left-associative operator)
+    assoc: bool,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Context { precedence: 0, assoc: false }
+    }
+}
+
+impl Context {
+    /// Check if an expression with the given precedence needs parentheses in this context
+    fn needs_parens(&self, expr_prec: usize) -> bool {
+        if expr_prec < self.precedence {
+            true
+        } else if expr_prec == self.precedence && self.assoc {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// Get the precedence of a binary operator
+fn binary_op_precedence(op: &BinaryOperator) -> usize {
+    match op {
+        BinaryOperator::Multiply | BinaryOperator::Divide | BinaryOperator::Modulo => precedence::MULTIPLICATIVE,
+        BinaryOperator::Add | BinaryOperator::Subtract => precedence::ADDITIVE,
+        BinaryOperator::LeftShift | BinaryOperator::RightShift => precedence::SHIFT,
+        BinaryOperator::Less | BinaryOperator::Greater | BinaryOperator::LessEqual | BinaryOperator::GreaterEqual => {
+            precedence::RELATIONAL
+        }
+        BinaryOperator::Equal | BinaryOperator::NotEqual => precedence::EQUALITY,
+        BinaryOperator::BitwiseAnd => precedence::BITWISE_AND,
+        BinaryOperator::BitwiseXor => precedence::BITWISE_XOR,
+        BinaryOperator::BitwiseOr => precedence::BITWISE_OR,
+        BinaryOperator::LogicalAnd => precedence::LOGICAL_AND,
+        BinaryOperator::LogicalOr => precedence::LOGICAL_OR,
+    }
+}
+
+/// Get the precedence of an expression
+fn expr_precedence(e: &Expression) -> usize {
+    match e {
+        Expression::Postfix(_) => precedence::POSTFIX,
+        Expression::Unary(_) => precedence::UNARY,
+        Expression::Cast(_) => precedence::CAST,
+        Expression::Binary(b) => binary_op_precedence(&b.operator),
+        Expression::Conditional(_) => precedence::CONDITIONAL,
+        Expression::Assignment(_) => precedence::ASSIGNMENT,
+        Expression::Comma(_) => precedence::COMMA,
+        Expression::Error => precedence::POSTFIX,
+    }
+}
+
+/// A pretty printer for C AST nodes.
+///
+/// This type alias configures the elegance printer with the [`Context`] type
+/// for tracking expression precedence during printing.
+pub type Printer<'a, R> = elegance::Printer<'a, R, String, Context>;
 
 impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
     type Result = Result<(), R::Error>;
@@ -278,34 +368,75 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
     }
 
     fn visit_expression(&mut self, e: &'a Expression) -> Self::Result {
+        let ctx = self.extra;
+        let expr_prec = expr_precedence(e);
+        let needs_parens = ctx.needs_parens(expr_prec);
+
+        if needs_parens {
+            self.text("(")?;
+        }
+
+        // Reset context for inner expression processing
+        self.extra = Context::default();
+
         match e {
-            Expression::Postfix(p) => self.visit_postfix_expression(p),
-            Expression::Unary(u) => self.visit_unary_expression(u),
-            Expression::Cast(c) => self.visit_cast_expression(c),
+            Expression::Postfix(p) => self.visit_postfix_expression(p)?,
+            Expression::Unary(u) => self.visit_unary_expression(u)?,
+            Expression::Cast(c) => self.visit_cast_expression(c)?,
             Expression::Binary(b) => {
+                let op_prec = binary_op_precedence(&b.operator);
+                // All binary operators are left-associative in C
+                // Left operand: same precedence, no assoc flag (left side of left-assoc is fine)
+                self.extra = Context { precedence: op_prec, assoc: false };
                 self.visit_expression(&b.left)?;
                 self.space()?;
                 self.visit_binary_operator(&b.operator)?;
                 self.space()?;
-                self.visit_expression(&b.right)
+                // Right operand: same precedence, assoc = true (right side of left-assoc needs parens at equal prec)
+                self.extra = Context { precedence: op_prec, assoc: true };
+                self.visit_expression(&b.right)?;
             }
             Expression::Conditional(cond) => {
+                // Conditional is right-associative
+                // Condition needs parens if it's a conditional or lower precedence
+                self.extra = Context {
+                    precedence: precedence::CONDITIONAL,
+                    assoc: true,
+                };
                 self.visit_expression(&cond.condition)?;
                 self.space()?;
                 self.text("?")?;
                 self.space()?;
+                // then_expr can be any expression (comma is allowed inside ?:)
+                self.extra = Context::default();
                 self.visit_expression(&cond.then_expr)?;
                 self.space()?;
                 self.text(":")?;
                 self.space()?;
-                self.visit_expression(&cond.else_expr)
+                // else_expr: right-associative, so same precedence is OK
+                self.extra = Context {
+                    precedence: precedence::CONDITIONAL,
+                    assoc: false,
+                };
+                self.visit_expression(&cond.else_expr)?;
             }
             Expression::Assignment(a) => {
+                // Assignment is right-associative
+                // Left operand needs higher precedence (unary or above)
+                self.extra = Context {
+                    precedence: precedence::ASSIGNMENT,
+                    assoc: true,
+                };
                 self.visit_expression(&a.left)?;
                 self.space()?;
                 self.visit_assignment_operator(&a.operator)?;
                 self.space()?;
-                self.visit_expression(&a.right)
+                // Right operand: right-associative, so same precedence is OK
+                self.extra = Context {
+                    precedence: precedence::ASSIGNMENT,
+                    assoc: false,
+                };
+                self.visit_expression(&a.right)?;
             }
             Expression::Comma(c) => {
                 for (i, expr) in c.expressions.iter().enumerate() {
@@ -313,12 +444,26 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                         self.text(",")?;
                         self.space()?;
                     }
+                    // Comma is left-associative
+                    // Each element needs to be at least assignment level
+                    self.extra = Context {
+                        precedence: precedence::COMMA,
+                        assoc: i > 0, // right side needs parens at equal precedence
+                    };
                     self.visit_expression(expr)?;
                 }
-                Ok(())
             }
-            Expression::Error => Ok(()),
+            Expression::Error => {}
         }
+
+        // Restore context
+        self.extra = ctx;
+
+        if needs_parens {
+            self.text(")")?;
+        }
+
+        Ok(())
     }
 
     fn visit_binary_operator(&mut self, op: &'a BinaryOperator) -> Self::Result {
@@ -517,7 +662,11 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             PostfixExpression::ArrayAccess { array, index } => {
                 self.visit_postfix_expression(array)?;
                 self.text("[")?;
+                // Reset context since brackets protect the index expression
+                let old_ctx = self.extra;
+                self.extra = Context::default();
                 self.visit_expression(index)?;
+                self.extra = old_ctx;
                 self.text("]")
             }
             PostfixExpression::FunctionCall { function, arguments } => {
@@ -529,7 +678,11 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                             pp.text(",")?;
                             pp.space()?;
                         }
+                        // Reset context since function call parens protect arguments
+                        let old_ctx = pp.extra;
+                        pp.extra = Context::default();
                         pp.visit_expression(arg)?;
+                        pp.extra = old_ctx;
                     }
                     pp.scan_break(0, -2)?;
                     pp.text(")")
@@ -587,13 +740,20 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             }
             PrimaryExpression::Parenthesized(e) => {
                 self.text("(")?;
+                // Reset context since the parens we're printing protect the inner expression
+                let old_ctx = self.extra;
+                self.extra = Context::default();
                 self.visit_expression(e)?;
+                self.extra = old_ctx;
                 self.text(")")
             }
             PrimaryExpression::Generic(g) => {
                 self.text("_Generic")?;
                 self.igroup(2, |pp| {
                     pp.text("(")?;
+                    // Reset context since _Generic parens protect the expressions
+                    let old_ctx = pp.extra;
+                    pp.extra = Context::default();
                     pp.visit_expression(&g.controlling_expression)?;
                     pp.text(",")?;
                     pp.space()?;
@@ -616,6 +776,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                             }
                         }
                     }
+                    pp.extra = old_ctx;
                     pp.scan_break(0, -2)?;
                     pp.text(")")
                 })
@@ -629,20 +790,49 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             UnaryExpression::Postfix(p) => self.visit_postfix_expression(p),
             UnaryExpression::PreIncrement(inner) => {
                 self.text("++")?;
-                self.visit_unary_expression(inner)
+                // Unary operators are right-associative, operand needs unary precedence
+                let old_ctx = self.extra;
+                self.extra = Context {
+                    precedence: precedence::UNARY,
+                    assoc: false,
+                };
+                self.visit_unary_expression(inner)?;
+                self.extra = old_ctx;
+                Ok(())
             }
             UnaryExpression::PreDecrement(inner) => {
                 self.text("--")?;
-                self.visit_unary_expression(inner)
+                let old_ctx = self.extra;
+                self.extra = Context {
+                    precedence: precedence::UNARY,
+                    assoc: false,
+                };
+                self.visit_unary_expression(inner)?;
+                self.extra = old_ctx;
+                Ok(())
             }
             UnaryExpression::Unary { operator, operand } => {
                 self.visit_unary_operator(operator)?;
-                self.visit_cast_expression(operand)
+                let old_ctx = self.extra;
+                self.extra = Context {
+                    precedence: precedence::CAST,
+                    assoc: false,
+                };
+                self.visit_cast_expression(operand)?;
+                self.extra = old_ctx;
+                Ok(())
             }
             UnaryExpression::Sizeof(inner) => {
                 self.text("sizeof")?;
                 self.space()?;
-                self.visit_unary_expression(inner)
+                let old_ctx = self.extra;
+                self.extra = Context {
+                    precedence: precedence::UNARY,
+                    assoc: false,
+                };
+                self.visit_unary_expression(inner)?;
+                self.extra = old_ctx;
+                Ok(())
             }
             UnaryExpression::SizeofType(tn) => {
                 self.text("sizeof")?;
@@ -678,7 +868,15 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.text("(")?;
                 self.visit_type_name(type_name)?;
                 self.text(")")?;
-                self.visit_cast_expression(expression)
+                // Cast is right-associative
+                let old_ctx = self.extra;
+                self.extra = Context {
+                    precedence: precedence::CAST,
+                    assoc: false,
+                };
+                self.visit_cast_expression(expression)?;
+                self.extra = old_ctx;
+                Ok(())
             }
         }
     }

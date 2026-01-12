@@ -38,7 +38,7 @@ fn main() {
         len => Constant::Integer((items.len() as i128).into()),
     };
 
-    let mut pp = elegance::Printer::new(String::new(), 80);
+    let mut pp = elegance::Printer::new_extra(String::new(), 80, Default::default());
     pp.visit_translation_unit(&ast).unwrap();
     println!("{}", pp.finish().unwrap())
 }

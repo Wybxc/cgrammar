@@ -5,7 +5,7 @@
 
 #[cfg(feature = "printer")]
 fn main() {
-    use cgrammar::*;
+    use cgrammar::{printer::Context, *};
     use chumsky::Parser;
 
     let file = std::env::args().nth(1).unwrap();
@@ -27,8 +27,8 @@ fn main() {
     init_state.ctx_mut().add_typedef_name("thm".into());
     let ast = parser.parse_with_state(tokens.as_input(), &mut init_state);
     if ast.has_output() {
-        let mut pp = elegance::Printer::new(String::new(), 80);
-        pp.visit_translation_unit(&ast.output().unwrap());
+        let mut pp = elegance::Printer::new_extra(String::new(), 80, Context::default());
+        pp.visit_translation_unit(&ast.output().unwrap()).unwrap();
         println!("{}", pp.finish().unwrap());
     } else {
         eprintln!("Parse failed!");

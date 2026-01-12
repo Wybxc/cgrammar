@@ -3,7 +3,8 @@
 use std::{io::Write, path::PathBuf};
 
 use cgrammar::{
-    visitor::{Visitor, VisitorMut},
+    printer::Context,
+    visitor::{Visitor, VisitorMut, walk_expression_mut},
     *,
 };
 use elegance::Printer;
@@ -21,7 +22,7 @@ fn parse_c(code: &str) -> TranslationUnit {
 
 // Helper function to print AST to string
 fn print_ast(ast: &TranslationUnit) -> String {
-    let mut printer = Printer::new(String::new(), 80);
+    let mut printer = Printer::new_extra(String::new(), 80, Context::default());
     printer.visit_translation_unit(ast).unwrap();
     printer.finish().unwrap()
 }
@@ -51,6 +52,23 @@ impl VisitorMut<'_> for RemoveSpans {
     }
 }
 
+struct RemoveParens;
+
+impl VisitorMut<'_> for RemoveParens {
+    type Result = ();
+
+    fn visit_expression_mut(&mut self, e: &'_ mut Expression) -> Self::Result {
+        match e {
+            Expression::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) => {
+                let inner = std::mem::replace(inner.as_mut(), Expression::Error);
+                *e = inner;
+            }
+            _ => {}
+        }
+        walk_expression_mut(self, e)
+    }
+}
+
 // ============================================================================
 // Round-trip Tests (Parse -> Print -> Parse)
 // ============================================================================
@@ -60,6 +78,7 @@ fn verify_roundtrip(code: &str) {
     // First parse
     let mut ast1 = parse_c(code);
     RemoveSpans.visit_translation_unit_mut(&mut ast1);
+    RemoveParens.visit_translation_unit_mut(&mut ast1);
 
     // Print
     let printed = print_ast(&ast1);
@@ -67,6 +86,7 @@ fn verify_roundtrip(code: &str) {
     // Re-tokenize and parse the printed output
     let mut ast2 = parse_c(&printed);
     RemoveSpans.visit_translation_unit_mut(&mut ast2);
+    RemoveParens.visit_translation_unit_mut(&mut ast2);
 
     // Verify that the ASTs are equivalent
     assert_eq!(ast1, ast2);
