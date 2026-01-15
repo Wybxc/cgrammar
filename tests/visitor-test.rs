@@ -61,31 +61,31 @@ impl<'a> Visitor<'a> for IdentifierCollector {
     type Result = ();
 
     fn visit_variable_name(&mut self, id: &'a Identifier) {
-        self.variables.push(id.0.clone());
+        self.variables.push(id.0.to_string());
     }
 
     fn visit_type_name_identifier(&mut self, id: &'a Identifier) {
-        self.type_names.push(id.0.clone());
+        self.type_names.push(id.0.to_string());
     }
 
     fn visit_struct_name(&mut self, id: &'a Identifier) {
-        self.struct_names.push(id.0.clone());
+        self.struct_names.push(id.0.to_string());
     }
 
     fn visit_enum_name(&mut self, id: &'a Identifier) {
-        self.enum_names.push(id.0.clone());
+        self.enum_names.push(id.0.to_string());
     }
 
     fn visit_enumerator_name(&mut self, id: &'a Identifier) {
-        self.enumerators.push(id.0.clone());
+        self.enumerators.push(id.0.to_string());
     }
 
     fn visit_label_name(&mut self, id: &'a Identifier) {
-        self.labels.push(id.0.clone());
+        self.labels.push(id.0.to_string());
     }
 
     fn visit_member_name(&mut self, id: &'a Identifier) {
-        self.members.push(id.0.clone());
+        self.members.push(id.0.to_string());
     }
 }
 
@@ -189,7 +189,7 @@ impl<'a> Visitor<'a> for IdentifierFinder {
     type Result = ControlFlow<()>;
 
     fn visit_variable_name(&mut self, id: &'a Identifier) -> Self::Result {
-        if id.0 == self.target {
+        if id.0.as_ref() == self.target {
             self.found = true;
             ControlFlow::Break(())
         } else {
@@ -452,7 +452,7 @@ fn extract_declarator_name(d: &Declarator) -> Option<String> {
 
 fn extract_direct_declarator_name(dd: &DirectDeclarator) -> Option<String> {
     match dd {
-        DirectDeclarator::Identifier { identifier, .. } => Some(identifier.0.clone()),
+        DirectDeclarator::Identifier { identifier, .. } => Some(identifier.0.to_string()),
         DirectDeclarator::Parenthesized(d) => extract_declarator_name(d),
         DirectDeclarator::Array { declarator, .. } => extract_direct_declarator_name(declarator),
         DirectDeclarator::Function { declarator, .. } => extract_direct_declarator_name(declarator),
@@ -552,8 +552,8 @@ impl<'a> VisitorMut<'a> for VariableRenamer {
     type Result = ();
 
     fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) {
-        if id.0 == self.old_name {
-            id.0 = self.new_name.clone();
+        if id.0.as_ref() == self.old_name {
+            id.0 = self.new_name.as_str().into();
             self.rename_count += 1;
         }
     }
@@ -608,7 +608,7 @@ impl<'a> VisitorMut<'a> for StructNamePrefixer {
     type Result = ();
 
     fn visit_struct_name_mut(&mut self, id: &'a mut Identifier) {
-        id.0 = format!("{}{}", self.prefix, id.0);
+        id.0 = format!("{}{}", self.prefix, id.0).into();
         self.count += 1;
     }
 }
@@ -647,15 +647,15 @@ impl<'a> VisitorMut<'a> for EnumConstantRenamer {
     type Result = ();
 
     fn visit_enumerator_name_mut(&mut self, id: &'a mut Identifier) {
-        if let Some(new_name) = self.mapping.get(&id.0) {
-            id.0 = new_name.clone();
+        if let Some(new_name) = self.mapping.get(id.0.as_ref()) {
+            id.0 = new_name.as_str().into();
             self.rename_count += 1;
         }
     }
 
     fn visit_enum_constant_mut(&mut self, id: &'a mut Identifier) {
-        if let Some(new_name) = self.mapping.get(&id.0) {
-            id.0 = new_name.clone();
+        if let Some(new_name) = self.mapping.get(id.0.as_ref()) {
+            id.0 = new_name.as_str().into();
             self.rename_count += 1;
         }
     }
@@ -690,7 +690,7 @@ impl<'a> VisitorMut<'a> for MemberNameUppercaser {
     type Result = ();
 
     fn visit_member_name_mut(&mut self, id: &'a mut Identifier) {
-        id.0 = id.0.to_uppercase();
+        id.0 = id.0.to_uppercase().into();
         self.count += 1;
     }
 }
@@ -740,8 +740,8 @@ impl<'a> VisitorMut<'a> for LimitedRenamer {
     type Result = ControlFlow<()>;
 
     fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) -> Self::Result {
-        if id.0 == self.old_name {
-            id.0 = self.new_name.clone();
+        if id.0.as_ref() == self.old_name {
+            id.0 = self.new_name.as_str().into();
             self.rename_count += 1;
             if self.rename_count >= self.max_renames {
                 return ControlFlow::Break(());
@@ -790,16 +790,16 @@ impl<'a> VisitorMut<'a> for TypedefRenamer {
     type Result = ();
 
     fn visit_type_name_identifier_mut(&mut self, id: &'a mut Identifier) {
-        if id.0 == self.old_name {
-            id.0 = self.new_name.clone();
+        if id.0.as_ref() == self.old_name {
+            id.0 = self.new_name.as_str().into();
             self.count += 1;
         }
     }
 
     fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) {
         // Also rename in typedef declaration
-        if id.0 == self.old_name {
-            id.0 = self.new_name.clone();
+        if id.0.as_ref() == self.old_name {
+            id.0 = self.new_name.as_str().into();
             self.count += 1;
         }
     }
@@ -841,8 +841,8 @@ impl<'a> VisitorMut<'a> for LabelRenamer {
     type Result = ();
 
     fn visit_label_name_mut(&mut self, id: &'a mut Identifier) {
-        if id.0 == self.old_name {
-            id.0 = self.new_name.clone();
+        if id.0.as_ref() == self.old_name {
+            id.0 = self.new_name.as_str().into();
             self.count += 1;
         }
     }
@@ -913,14 +913,14 @@ impl<'a> VisitorMut<'a> for ComprehensiveTransformer {
 
     fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) {
         if !id.0.starts_with(&self.variable_prefix) {
-            id.0 = format!("{}{}", self.variable_prefix, id.0);
+            id.0 = format!("{}{}", self.variable_prefix, id.0).into();
             self.modifications += 1;
         }
     }
 
     fn visit_struct_name_mut(&mut self, id: &'a mut Identifier) {
         if !id.0.ends_with(&self.struct_suffix) {
-            id.0 = format!("{}{}", id.0, self.struct_suffix);
+            id.0 = format!("{}{}", id.0, self.struct_suffix).into();
             self.modifications += 1;
         }
     }
@@ -995,11 +995,11 @@ impl<'a> VisitorMut<'a> for FallibleRenamer {
     type Result = Result<(), String>;
 
     fn visit_variable_name_mut(&mut self, id: &'a mut Identifier) -> Self::Result {
-        if id.0 == self.old_name {
+        if id.0.as_ref() == self.old_name {
             if self.rename_count >= self.max_renames {
                 return Err(format!("Maximum renames ({}) exceeded", self.max_renames));
             }
-            id.0 = self.new_name.clone();
+            id.0 = self.new_name.as_str().into();
             self.rename_count += 1;
         }
         Ok(())

@@ -1752,7 +1752,7 @@ pub fn identifier<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> + 
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
-        identifier_or_keyword().try_map(|id, span| match id.0.as_str() {
+        identifier_or_keyword().try_map(|id, span| match id.as_ref() {
             "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do" | "double" | "else"
             | "enum" | "extern" | "float" | "for" | "goto" | "if" | "inline" | "int" | "long" | "register"
             | "restrict" | "return" | "short" | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
@@ -1815,7 +1815,7 @@ pub fn interpolation<'a, T: quasi_quote::Interpolate>() -> impl Parser<'a, Token
 /// Parse a specific keyword.
 pub fn keyword<'a>(kwd: &str) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
     select! {
-        Token::Identifier(Identifier(name)) if name == kwd => ()
+        Token::Identifier(name) if name.as_ref() == kwd => ()
     }
 }
 

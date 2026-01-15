@@ -47,7 +47,7 @@ fn main() {
             _ => None,
         })
         .flatten()
-        .filter(|attr| attr.token.get_identifier("cst").is_some_and(|n| n.0 == "gl"))
+        .filter(|attr| attr.token.get_identifier("cst").is_some_and(|n| n.as_ref() == "gl"))
         .filter_map(|attr| attr.arguments.as_ref())
         .for_each(|gl| {
             let parser = statement();

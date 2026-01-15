@@ -1,7 +1,7 @@
 //! <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf>
 #![allow(missing_docs)]
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 #[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
@@ -16,7 +16,7 @@ use crate::span::{SourceRange, Spanned};
 /// Identifier (6.4.2.1)
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
-pub struct Identifier(pub String);
+pub struct Identifier(pub Arc<str>);
 
 impl fmt::Display for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -26,7 +26,13 @@ impl fmt::Display for Identifier {
 
 impl From<&str> for Identifier {
     fn from(s: &str) -> Self {
-        Identifier(s.to_string())
+        Identifier(s.into())
+    }
+}
+
+impl AsRef<str> for Identifier {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
@@ -969,13 +975,13 @@ impl AttributeToken {
     /// Check if the attribute token is a prefixed attribute with the given
     /// prefix.
     pub fn is_prefixed(&self, prefix: &str) -> bool {
-        matches!(self, AttributeToken::Prefixed { prefix: p, .. } if p.0 == prefix)
+        matches!(self, AttributeToken::Prefixed { prefix: p, .. } if p.as_ref() == prefix)
     }
 
     /// Check if the attribute token is a standard attribute with the given
     /// name.
     pub fn is_standard(&self, name: &str) -> bool {
-        matches!(self, AttributeToken::Standard(id) if id.0 == name)
+        matches!(self, AttributeToken::Standard(id) if id.as_ref() == name)
     }
 
     /// Get the prefix and identifier of a prefixed attribute token, or None if
@@ -1000,7 +1006,7 @@ impl AttributeToken {
     /// return its identifier.
     pub fn get_identifier(&self, prefix: &str) -> Option<&Identifier> {
         match self {
-            AttributeToken::Prefixed { prefix: p, identifier } if p.0 == prefix => Some(identifier),
+            AttributeToken::Prefixed { prefix: p, identifier } if p.as_ref() == prefix => Some(identifier),
             _ => None,
         }
     }
@@ -1193,8 +1199,8 @@ pub mod quasi_quote {
         }
     }
 
-    pub trait Interpolate: NamedAny + DynClone + DynEq {}
-    impl<T: Any + DynClone + DynEq> Interpolate for T {}
+    pub trait Interpolate: NamedAny + DynClone + DynEq + Send + Sync {}
+    impl<T: Any + DynClone + DynEq + Send + Sync> Interpolate for T {}
 
     dyn_clone::clone_trait_object!(Interpolate);
     dyn_eq::eq_trait_object!(Interpolate);
@@ -1227,7 +1233,7 @@ pub mod quasi_quote {
     #[derive(Debug, Clone, PartialEq, Eq)]
     #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
     pub struct Template {
-        pub name: String,
+        pub name: Arc<str>,
     }
 
     impl BalancedTokenSequence {
@@ -1236,7 +1242,7 @@ pub mod quasi_quote {
                 match &mut token.value {
                     BalancedToken::Interpolation(interpolate) => {
                         if let Some(template) = (interpolate.as_ref() as &dyn Any).downcast_ref::<Template>() {
-                            let name = template.name.as_str();
+                            let name = template.name.as_ref();
                             let value = mapping.get(&name).ok_or(format!("template slot `{name}` not given"))?;
                             *interpolate = value.clone();
                         }
@@ -1261,5 +1267,17 @@ pub mod quasi_quote {
                 ),)*
             ].into_iter().collect::<::std::collections::HashMap<_, _>>()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+
+    #[test]
+    fn test_send_sync() {
+        assert_send::<super::TranslationUnit>();
+        assert_sync::<super::TranslationUnit>();
     }
 }
