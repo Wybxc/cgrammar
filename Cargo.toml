@@ -1,6 +1,6 @@
 [package]
 name = "cgrammar"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2024"
 description = "A comprehensive C language grammar parser library written in Rust, implementing the C23 standard (ISO/IEC 9899:2023)."
 repository = "https://github.com/Wybxc/cgrammar"
