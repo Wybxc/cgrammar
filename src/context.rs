@@ -1,11 +1,13 @@
-use std::cell::{Ref, RefCell, RefMut};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    rc::Rc,
+};
 
 use chumsky::{
     input::{Checkpoint, Cursor, Input},
     inspector::Inspector,
 };
-use imbl::{GenericHashSet, shared_ptr::RcK};
-use rustc_hash::FxBuildHasher;
+use rustc_hash::FxHashSet;
 use slab::Slab;
 
 use crate::Identifier;
@@ -157,8 +159,8 @@ impl ContextRefMut<'_> {
 
 #[derive(Default, Clone)]
 pub struct Namespace {
-    typedef_names: GenericHashSet<Identifier, FxBuildHasher, RcK>,
-    enum_constants: GenericHashSet<Identifier, FxBuildHasher, RcK>,
+    typedef_names: Rc<FxHashSet<Identifier>>,
+    enum_constants: Rc<FxHashSet<Identifier>>,
 }
 
 impl Namespace {
@@ -171,10 +173,10 @@ impl Namespace {
     }
 
     pub fn add_typedef_name(&mut self, name: Identifier) {
-        self.typedef_names.insert(name);
+        Rc::make_mut(&mut self.typedef_names).insert(name);
     }
 
     pub fn add_enum_constant(&mut self, name: Identifier) {
-        self.enum_constants.insert(name);
+        Rc::make_mut(&mut self.enum_constants).insert(name);
     }
 }
