@@ -2,6 +2,7 @@ use std::{
     any::{Any, TypeId},
     cell::{OnceCell, RefCell},
     marker::PhantomData,
+    ops::Deref,
     rc::{Rc, Weak},
 };
 
@@ -10,7 +11,9 @@ use chumsky::{
     input::InputRef,
     prelude::*,
 };
-use rustc_hash::FxHashMap;
+#[cfg(feature = "dbg-pls")]
+use dbg_pls::DebugPls;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Brand<T, B>(T, PhantomData<B>);
@@ -26,6 +29,36 @@ impl<T, B> Brand<T, B> {
 
     pub fn inner(&self) -> &T {
         &self.0
+    }
+}
+
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
+pub struct StringRef(&'static str);
+
+impl StringRef {
+    pub fn new(s: &str) -> Self {
+        thread_local! {
+            static STRINGS: RefCell<FxHashSet<&'static str>> = RefCell::new(FxHashSet::default());
+        }
+        STRINGS.with(|strings| {
+            let mut strings = strings.borrow_mut();
+            if let Some(&s) = strings.get(s) {
+                StringRef(s)
+            } else {
+                let s: &'static str = Box::leak(Box::<str>::from(s));
+                strings.insert(s);
+                StringRef(s)
+            }
+        })
+    }
+}
+
+impl Deref for StringRef {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
 

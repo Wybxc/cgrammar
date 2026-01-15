@@ -1,7 +1,5 @@
 //! Span utilities.
 
-use std::rc::Rc;
-
 use chumsky::{
     input::{Input, MappedInput},
     span::SimpleSpan,
@@ -9,14 +7,14 @@ use chumsky::{
 #[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
 
-use crate::{BalancedToken, BalancedTokenSequence};
+use crate::{BalancedToken, BalancedTokenSequence, utils::StringRef};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 /// Source context information for error reporting.
 pub struct SourceContext {
     /// The source file name.
-    pub file: Option<Rc<str>>,
+    pub file: Option<StringRef>,
     /// The current line number.
     pub line: usize,
     /// The byte offset of the beginning of the line.

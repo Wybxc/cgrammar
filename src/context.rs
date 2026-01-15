@@ -1,12 +1,11 @@
-use std::cell::RefCell;
+use std::rc::Rc;
 
 use chumsky::{
     input::{Checkpoint, Cursor, Input},
     inspector::Inspector,
 };
-use imbl::{GenericHashSet, GenericVector, shared_ptr::RcK};
+use imbl::{GenericHashSet, shared_ptr::RcK};
 use rustc_hash::FxBuildHasher;
-use slab::Slab;
 
 use crate::Identifier;
 
@@ -14,7 +13,6 @@ use crate::Identifier;
 #[derive(Clone)]
 pub struct State {
     current: Context,
-    checkpoints: RefCell<Slab<Context>>,
 }
 
 impl Default for State {
@@ -26,10 +24,7 @@ impl Default for State {
 impl State {
     /// Create a new parsing state.
     pub fn new() -> Self {
-        Self {
-            current: Context::default(),
-            checkpoints: RefCell::new(Slab::new()),
-        }
+        Self { current: Context::default() }
     }
 
     /// Get a reference to the current context.
@@ -47,25 +42,22 @@ impl<'src, I> Inspector<'src, I> for State
 where
     I: Input<'src>,
 {
-    type Checkpoint = usize;
+    type Checkpoint = Context;
 
     fn on_token(&mut self, _token: &I::Token) {}
 
     fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, I>) -> Self::Checkpoint {
-        let mut checkpoints = self.checkpoints.borrow_mut();
-        checkpoints.insert(self.current.clone())
+        self.current.clone()
     }
 
     fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, I, Self::Checkpoint>) {
-        let checkpoints = self.checkpoints.borrow();
-        let context = checkpoints.get(*marker.inspector()).expect("Invalid checkpoint");
-        self.current = context.clone();
+        self.current = marker.inspector().clone();
     }
 }
 
 #[derive(Clone)]
 pub struct Context {
-    namespaces: GenericVector<Namespace, RcK>,
+    namespaces: Rc<Vec<Namespace>>,
 }
 
 impl Default for Context {
@@ -77,10 +69,7 @@ impl Default for Context {
         builtin.add_typedef_name(Identifier::from("_Float128"));
         builtin.add_typedef_name(Identifier::from("_Bool"));
 
-        let mut namespaces = GenericVector::new();
-        namespaces.push_back(builtin);
-        namespaces.push_back(Namespace::default());
-
+        let namespaces = Rc::new(vec![builtin, Namespace::default()]);
         Self { namespaces }
     }
 }
@@ -95,7 +84,9 @@ impl Context {
     }
 
     fn namespace_mut(&mut self) -> &mut Namespace {
-        self.namespaces.back_mut().expect("No namespace to mutate")
+        Rc::make_mut(&mut self.namespaces)
+            .last_mut()
+            .expect("No namespace to mutate")
     }
 
     pub fn add_typedef_name(&mut self, name: Identifier) {
@@ -107,11 +98,11 @@ impl Context {
     }
 
     pub fn push(&mut self) {
-        self.namespaces.push_back(Namespace::default());
+        Rc::make_mut(&mut self.namespaces).push(Namespace::default());
     }
 
     pub fn pop(&mut self) {
-        self.namespaces.pop_back();
+        Rc::make_mut(&mut self.namespaces).pop();
     }
 }
 

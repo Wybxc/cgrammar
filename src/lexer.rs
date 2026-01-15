@@ -1,7 +1,5 @@
 //! Lexer for C source code, producing balanced token sequences.
 
-use std::cell::RefCell;
-
 use chumsky::{
     input::{Checkpoint, Cursor, MapExtra},
     inspector::Inspector,
@@ -9,11 +7,11 @@ use chumsky::{
     text::Char,
 };
 use ordered_float::NotNan;
-use slab::Slab;
 
 use crate::{
     ast::*,
     span::{SourceContext, SourceRange, Spanned},
+    utils::StringRef,
 };
 
 /// Utilities for the lexer.
@@ -24,7 +22,7 @@ pub mod lexer_utils {
     pub type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
 
     /// Lexer state tracking position and context.
-    #[derive(Clone)]
+    #[derive(Clone, Copy)]
     pub struct State {
         /// Whether the cursor is at the beginning of a line.
         pub line_begin: bool,
@@ -32,8 +30,6 @@ pub mod lexer_utils {
         pub cursor: usize,
         /// Current source context.
         pub context: SourceContext,
-        /// Saved checkpoints for backtracking.
-        checkpoints: RefCell<Slab<SourceContext>>,
     }
 
     impl Default for State {
@@ -42,7 +38,6 @@ pub mod lexer_utils {
                 line_begin: true,
                 cursor: 0,
                 context: SourceContext::default(),
-                checkpoints: RefCell::new(Slab::new()),
             }
         }
     }
@@ -50,15 +45,11 @@ pub mod lexer_utils {
     impl State {
         /// Create a new lexer state with an optional file name.
         pub fn new(file: Option<&str>) -> Self {
+            let file = file.map(StringRef::new);
             Self {
                 line_begin: true,
                 cursor: 0,
-                context: SourceContext {
-                    file: file.map(|s| s.into()),
-                    line: 1,
-                    bol: 0,
-                },
-                checkpoints: RefCell::new(Slab::new()),
+                context: SourceContext { file, line: 1, bol: 0 },
             }
         }
     }
@@ -68,7 +59,7 @@ pub mod lexer_utils {
     pub struct StateCheckpoint {
         line_begin: bool,
         cursor: usize,
-        context: usize,
+        context: SourceContext,
     }
 
     impl<'src> Inspector<'src, &'src str> for State {
@@ -86,12 +77,10 @@ pub mod lexer_utils {
         }
 
         fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, &'src str>) -> Self::Checkpoint {
-            let mut checkpoints = self.checkpoints.borrow_mut();
-            let context = checkpoints.insert(self.context.clone());
             StateCheckpoint {
                 line_begin: self.line_begin,
                 cursor: self.cursor,
-                context,
+                context: self.context,
             }
         }
 
@@ -99,12 +88,7 @@ pub mod lexer_utils {
             let checkpoint = marker.inspector();
             self.line_begin = checkpoint.line_begin;
             self.cursor = checkpoint.cursor;
-            self.context = self
-                .checkpoints
-                .borrow()
-                .get(checkpoint.context)
-                .expect("Invalid checkpoint")
-                .clone();
+            self.context = checkpoint.context;
         }
     }
 }
@@ -503,7 +487,7 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
         let state: &mut State = inp.state();
         if let [line, file, ..] = &directive[..] {
             state.context.line = line.parse().unwrap();
-            state.context.file = Some(file.trim_matches('"').to_string().into());
+            state.context.file = Some(StringRef::new(file.trim_matches('"')));
         }
         Ok(())
     }));
