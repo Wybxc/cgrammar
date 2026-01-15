@@ -8,9 +8,8 @@ use chumsky::{
     inspector::Inspector,
 };
 use rustc_hash::FxHashSet;
-use slab::Slab;
 
-use crate::Identifier;
+use crate::{Identifier, utils::Slab};
 
 /// Parsing state.
 #[derive(Clone)]

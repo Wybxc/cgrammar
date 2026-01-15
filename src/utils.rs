@@ -13,6 +13,7 @@ use chumsky::{
 };
 #[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
+use derive_more::{Index, IndexMut};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +30,22 @@ impl<T, B> Brand<T, B> {
 
     pub fn inner(&self) -> &T {
         &self.0
+    }
+}
+
+/// A simple grow-only slab.
+#[derive(Clone, Index, IndexMut)]
+pub struct Slab<T>(Vec<T>);
+
+impl<T> Slab<T> {
+    pub const fn new() -> Self {
+        Slab(Vec::new())
+    }
+
+    pub fn insert(&mut self, value: T) -> usize {
+        let index = self.0.len();
+        self.0.push(value);
+        index
     }
 }
 
