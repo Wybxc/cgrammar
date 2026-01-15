@@ -4,7 +4,8 @@ use elegance::Render;
 
 use crate::{ast::*, visitor::Visitor};
 
-/// Precedence levels for C expressions (lower number = lower precedence = binds less tightly)
+/// Precedence levels for C expressions (lower number = lower precedence = binds
+/// less tightly)
 mod precedence {
     pub const COMMA: usize = 1;
     pub const ASSIGNMENT: usize = 2;
@@ -24,7 +25,8 @@ mod precedence {
     pub const POSTFIX: usize = 16;
 }
 
-/// Precedence levels for C declarators (lower number = lower precedence = binds less tightly)
+/// Precedence levels for C declarators (lower number = lower precedence = binds
+/// less tightly)
 ///
 /// In C declarator syntax:
 /// - `*` (pointer) has lower precedence than `[]` (array) and `()` (function)
@@ -37,10 +39,11 @@ mod decl_precedence {
     pub const POSTFIX: usize = 2;
 }
 
-/// Context for expression printing, used to determine when parentheses are needed.
+/// Context for expression printing, used to determine when parentheses are
+/// needed.
 ///
-/// This context tracks the precedence and associativity of the surrounding expression
-/// to enable minimal parenthesization when printing expressions.
+/// This context tracks the precedence and associativity of the surrounding
+/// expression to enable minimal parenthesization when printing expressions.
 #[derive(Debug, Clone, Copy)]
 pub struct Context {
     /// the precedence of the surrounding context (0 = no context/top level)
@@ -48,7 +51,8 @@ pub struct Context {
     /// whether we're in a position that requires parens at equal precedence
     /// (e.g., right side of left-associative operator)
     assoc: bool,
-    /// the precedence of the surrounding declarator context (0 = no context/top level)
+    /// the precedence of the surrounding declarator context (0 = no context/top
+    /// level)
     decl_precedence: usize,
 }
 
@@ -63,7 +67,8 @@ impl Default for Context {
 }
 
 impl Context {
-    /// Check if an expression with the given precedence needs parentheses in this context
+    /// Check if an expression with the given precedence needs parentheses in
+    /// this context
     fn needs_parens(&self, expr_prec: usize) -> bool {
         if expr_prec < self.precedence {
             true
@@ -74,7 +79,8 @@ impl Context {
         }
     }
 
-    /// Check if a declarator with the given precedence needs parentheses in this context
+    /// Check if a declarator with the given precedence needs parentheses in
+    /// this context
     fn decl_needs_parens(&self, decl_prec: usize) -> bool {
         self.decl_precedence > 0 && decl_prec < self.decl_precedence
     }
@@ -433,7 +439,8 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             let op_prec = binary_op_precedence(&b.operator);
 
             // All binary operators are left-associative in C
-            // Left operand: same precedence, no assoc flag (left side of left-assoc is fine)
+            // Left operand: same precedence, no assoc flag (left side of left-assoc is
+            // fine)
             pp.extra = Context {
                 precedence: op_prec,
                 assoc: false,
@@ -445,7 +452,8 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             pp.visit_binary_operator(&b.operator)?;
             pp.scan_break(1, 2)?;
 
-            // Right operand: same precedence, assoc = true (right side of left-assoc needs parens at equal prec)
+            // Right operand: same precedence, assoc = true (right side of left-assoc needs
+            // parens at equal prec)
             pp.extra = Context {
                 precedence: op_prec,
                 assoc: true,
@@ -755,7 +763,8 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.text("]")
             }
             DirectDeclarator::Function { declarator, attributes, parameters } => {
-                // Function has high precedence - inner declarator needs parens if it's a pointer
+                // Function has high precedence - inner declarator needs parens if it's a
+                // pointer
                 let old_ctx = self.extra;
                 self.extra.decl_precedence = decl_precedence::POSTFIX;
                 self.visit_direct_declarator(declarator)?;
@@ -1388,7 +1397,8 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                 self.text("]")
             }
             DirectAbstractDeclarator::Function { declarator, attributes, parameters } => {
-                // Function has high precedence - inner declarator needs parens if it's a pointer
+                // Function has high precedence - inner declarator needs parens if it's a
+                // pointer
                 let old_ctx = self.extra;
                 self.extra.decl_precedence = decl_precedence::POSTFIX;
                 if let Some(dd) = declarator {
