@@ -222,7 +222,7 @@ pub fn unary_expression<'a>() -> impl Parser<'a, Tokens<'a>, UnaryExpression, Ex
         .ignore_then(unary_expression())
         .map(Box::new);
 
-    let unary_operator = select! {
+    let unary_operator = select_ref! {
         Token::Punctuator(Punctuator::Ampersand) => UnaryOperator::Address,
         Token::Punctuator(Punctuator::Star) => UnaryOperator::Dereference,
         Token::Punctuator(Punctuator::Plus) => UnaryOperator::Plus,
@@ -383,7 +383,7 @@ pub fn conditional_expression<'a>()
 #[apply(cached)]
 pub fn assignment_expression<'a>()
 -> impl Parser<'a, Tokens<'a>, Brand<Expression, AssignmentExpression>, Extra<'a>> + Clone {
-    let assigment_opeartor = select! {
+    let assigment_opeartor = select_ref! {
         Token::Punctuator(Punctuator::Assign) => AssignmentOperator::Assign,
         Token::Punctuator(Punctuator::AddAssign) => AssignmentOperator::AddAssign,
         Token::Punctuator(Punctuator::SubAssign) => AssignmentOperator::SubAssign,
@@ -1681,8 +1681,8 @@ pub fn attribute_token<'a>() -> impl Parser<'a, Tokens<'a>, AttributeToken, Extr
 
 /// (6.7.12.1) attribute argument clause
 pub fn attribute_argument_clause<'a>() -> impl Parser<'a, Tokens<'a>, TokenStream, Extra<'a>> + Clone {
-    select! {
-        Token::Parenthesized(tokens) => tokens
+    select_ref! {
+        Token::Parenthesized(tokens) => tokens.clone(),
     }
 }
 
@@ -1741,8 +1741,8 @@ pub fn identifier_or_keyword<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Ex
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
-        select! {
-            Token::Identifier(value) => value
+        select_ref! {
+            Token::Identifier(value) => value.clone(),
         },
     ))
 }
@@ -1769,8 +1769,8 @@ pub fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clon
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
-        select! {
-            Token::Constant(value) => value
+        select_ref! {
+            Token::Constant(value) => value.clone(),
         },
     ))
 }
@@ -1780,8 +1780,8 @@ pub fn string_literal<'a>() -> impl Parser<'a, Tokens<'a>, StringLiterals, Extra
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
-        select! {
-            Token::StringLiteral(value) => value
+        select_ref! {
+            Token::StringLiteral(value) => value.clone(),
         },
     ))
 }
@@ -1791,8 +1791,8 @@ pub fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + C
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
-        select! {
-            Token::QuotedString(value) => value
+        select_ref! {
+            Token::QuotedString(value) => value.clone(),
         },
     ))
 }
@@ -1801,8 +1801,8 @@ pub fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + C
 /// Parse an interpolation token.
 pub fn interpolation<'a, T: quasi_quote::Interpolate>() -> impl Parser<'a, Tokens<'a>, T, Extra<'a>> + Clone {
     use std::any::Any;
-    select! {
-        Token::Interpolation(value) => value
+    select_ref! {
+        Token::Interpolation(value) => value.clone(),
     }
     .try_map(|value, span| {
         (value as Box<dyn Any>)
@@ -1814,15 +1814,15 @@ pub fn interpolation<'a, T: quasi_quote::Interpolate>() -> impl Parser<'a, Token
 
 /// Parse a specific keyword.
 pub fn keyword<'a>(kwd: &str) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
-    select! {
+    select_ref! {
         Token::Identifier(name) if name.as_ref() == kwd => ()
     }
 }
 
 /// Parse a specific punctuator token.
 pub fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
-    select! {
-        Token::Punctuator(p) if p == punc => ()
+    select_ref! {
+        Token::Punctuator(p) if *p == punc => ()
     }
 }
 
@@ -1867,7 +1867,7 @@ where
 pub fn recover_parenthesized<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
-    recover_via_parser(select! {
+    recover_via_parser(select_ref! {
         Token::Parenthesized(_) => error.clone()
     })
 }
@@ -1877,7 +1877,7 @@ pub fn recover_parenthesized<'a, O: Clone>(
 pub fn recover_bracketed<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
-    recover_via_parser(select! {
+    recover_via_parser(select_ref! {
         Token::Bracketed(_) => error.clone()
     })
 }
