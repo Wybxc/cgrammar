@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/Wybxc/cgrammar/compare/v0.5.1...v0.6.0) - 2026-01-15
+
+### Added
+
+- use `select_ref!` instead of `select!` to avoid clone overhead
+- make Identifier an Arc<str>
+- remove the use of imbl
+- optimize the parser state
+- optimize lexer state and parser state
+- slightly adjust the printed output
+- respect declarator precedence when printing
+- precedence-aware expression printer
+- align printer implementation with visitor
+
+### Other
+
+- remove imbl dependency and update lockfile
+- format comments
+- update example shrink-test-case
+- printer and visitor
+
 ## [0.5.1](https://github.com/Wybxc/cgrammar/compare/v0.5.0...v0.5.1) - 2026-01-11
 
 ### Fixed
