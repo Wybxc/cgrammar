@@ -13,28 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- use `select_ref!` instead of `select!` to avoid clone overhead
-- make Identifier an Arc<str>
-- remove the use of imbl
-- optimize the parser state
-- optimize lexer state and parser state
-- slightly adjust the printed output
-- respect declarator precedence when printing
-- precedence-aware expression printer
-- align printer implementation with visitor
+- Printer now respects operator and declarator precedence, generating minimal parentheses in output.
+- AST nodes now implement `Send` and `Sync` traits.
+- `AsRef<str>` implementation for `Identifier`.
 
-### Other
+### Changed
 
-- remove imbl dependency and update lockfile
-- format comments
-- update example shrink-test-case
-- printer and visitor
+- **Breaking**: `Identifier` now uses `Arc<str>` internally instead of `String` for improved memory efficiency and cloning performance.
+- **Breaking**: `DeclarationSpecifiers` now has a separate `attributes` field; `FunctionSpecifier` no longer carries attributes inline.
+- Upgraded `elegance` dependency to 0.4.0.
+- Removed `imbl` dependency.
+- Internal parser and lexer state optimizations for better performance.
 
 ## [0.5.1](https://github.com/Wybxc/cgrammar/compare/v0.5.0...v0.5.1) - 2026-01-11
 
 ### Fixed
 
-- failed to interpolate identifier in declaration
+- Fixed quasi-quote feature: identifier interpolation now works correctly in declarations (e.g., `quote!{declaration: "int @var;", var => Identifier(...)}`).
 
 ## [0.5.0](https://github.com/Wybxc/cgrammar/compare/v0.4.0...v0.5.0) - 2026-01-11
 
