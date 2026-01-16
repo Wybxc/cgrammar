@@ -11,10 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.0](https://github.com/Wybxc/cgrammar/compare/v0.6.0...v0.7.0) - 2026-01-16
 
-### Added
+### Changed
 
-- introduce lex API and span context interner
-- replace slab crate with simple grow-only slab
+- **Breaking**: The implementation of the lexer is no longer publicly visible. Instead, a unified `lex` API is provided for lexing.
 
 ## [0.6.0](https://github.com/Wybxc/cgrammar/compare/v0.5.1...v0.6.0) - 2026-01-15
 
