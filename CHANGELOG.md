@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/Wybxc/cgrammar/compare/v0.7.0...v0.7.1) - 2026-01-16
+
+### Other
+
+- add doc tests to CI
+- update example in README
+
 ## [0.7.0](https://github.com/Wybxc/cgrammar/compare/v0.6.0...v0.7.0) - 2026-01-16
 
 ### Changed
