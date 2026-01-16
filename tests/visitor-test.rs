@@ -5,8 +5,7 @@ use rstest::rstest;
 
 // Helper function to parse C code
 fn parse_c(code: &str) -> TranslationUnit {
-    let lexer = balanced_token_sequence();
-    let tokens = lexer.parse(code).unwrap();
+    let (tokens, _) = lex(code, None).unwrap();
     let parser = translation_unit();
     let result = parser.parse(tokens.as_input());
     result.output().unwrap().clone()

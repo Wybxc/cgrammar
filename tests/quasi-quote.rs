@@ -37,12 +37,12 @@ fn test_interpolation(
     #[case] mapping: HashMap<&'static str, Box<dyn Interpolate>>,
     #[case] target: &str,
 ) {
-    let mut tokens = balanced_token_sequence().parse(code).unwrap();
+    let (mut tokens, _) = lex(code, None).unwrap();
     tokens.interpolate(&mapping).unwrap();
     let mut ast1 = translation_unit().parse(tokens.as_input()).unwrap();
     RemoveSpans.visit_translation_unit_mut(&mut ast1);
 
-    let tokens = balanced_token_sequence().parse(target).unwrap();
+    let (tokens, _) = lex(target, None).unwrap();
     let mut ast2 = translation_unit().parse(tokens.as_input()).unwrap();
     RemoveSpans.visit_translation_unit_mut(&mut ast2);
 

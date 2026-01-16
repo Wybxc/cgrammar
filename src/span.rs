@@ -7,18 +7,68 @@ use chumsky::{
 #[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
 
-use crate::{BalancedToken, BalancedTokenSequence, utils::StringRef};
+use crate::{BalancedToken, BalancedTokenSequence, utils::Slab};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 /// Source context information for error reporting.
 pub struct SourceContext {
     /// The source file name.
-    pub file: Option<StringRef>,
+    pub(crate) file_id: isize,
     /// The current line number.
     pub line: usize,
     /// The byte offset of the beginning of the line.
     pub bol: usize,
+}
+
+impl Default for SourceContext {
+    fn default() -> Self {
+        Self { file_id: -1, line: 0, bol: 0 }
+    }
+}
+
+impl SourceContext {
+    /// Returns the filename associated with this source context.
+    pub fn filename<'a>(&self, interner: &'a SpanContexts) -> Option<&'a str> {
+        interner.get_filename(self.file_id)
+    }
+}
+
+/// A collection of span contexts for tracking source file information.
+#[derive(Clone)]
+pub struct SpanContexts {
+    filenames: Slab<String>,
+}
+
+impl Default for SpanContexts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SpanContexts {
+    /// Creates a new empty span context collection.
+    pub fn new() -> Self {
+        Self { filenames: Slab::new() }
+    }
+
+    /// Interns a filename and returns its unique identifier.
+    pub fn intern_filename(&mut self, filename: &str) -> isize {
+        if let Some(id) = self.filenames.iter().position(|s| s == filename) {
+            id as isize
+        } else {
+            let id = self.filenames.insert(filename.to_string());
+            id.try_into().expect("Filename ID overflow")
+        }
+    }
+
+    /// Retrieves a filename by its interned ID.
+    pub fn get_filename(&self, id: isize) -> Option<&str> {
+        match usize::try_from(id) {
+            Ok(id) => self.filenames.get(id).map(|s| s.as_str()),
+            Err(_) => None,
+        }
+    }
 }
 
 /// A source range with context information.

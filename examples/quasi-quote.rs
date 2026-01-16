@@ -4,11 +4,11 @@ fn main() {
 
     macro_rules! quote {
         ($parser:path : $code:expr) => {{
-            let tokens = balanced_token_sequence().parse($code).unwrap();
+            let (tokens, _) = lex($code, None).unwrap();
             $parser().parse(tokens.as_input()).unwrap()
         }};
         ($parser:path : $code:expr, $($name:ident => $value:expr),* $(,)?) => {{
-            let mut tokens = balanced_token_sequence().parse($code).unwrap();
+            let (mut tokens, _) = lex($code, None).unwrap();
             tokens.interpolate(&interpolate! { $($name => $value),* }).unwrap();
             $parser().parse(tokens.as_input()).unwrap()
         }};

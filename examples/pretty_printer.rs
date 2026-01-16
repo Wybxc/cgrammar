@@ -11,15 +11,13 @@ fn main() {
     let file = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file.as_str()).unwrap();
 
-    let lexer = balanced_token_sequence();
-    let mut lexer_state = LexerState::new(Some(&file));
-    let tokens = lexer.parse_with_state(src.as_str(), &mut lexer_state);
-    if tokens.has_errors() {
-        for error in tokens.errors() {
+    let lex_result = lex(src.as_str(), Some(&file));
+    if lex_result.has_errors() {
+        for error in &lex_result.errors {
             println!("{}", error);
         }
     }
-    let tokens = tokens.output().unwrap();
+    let tokens = lex_result.output.as_ref().unwrap();
 
     let parser = translation_unit();
     let mut init_state = State::new();
@@ -35,7 +33,7 @@ fn main() {
     }
     if ast.has_errors() {
         for error in ast.into_errors() {
-            report(error);
+            report(error, &lex_result.contexts);
         }
         std::process::exit(1);
     }

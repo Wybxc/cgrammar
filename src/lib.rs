@@ -3,7 +3,7 @@
 
 mod ast;
 mod context;
-pub mod lexer;
+mod lexer;
 pub mod parser;
 #[cfg(feature = "printer")]
 pub mod printer;
@@ -15,7 +15,7 @@ pub mod visitor;
 pub use ast::*;
 pub use chumsky::Parser;
 pub use context::State;
-pub use lexer::{balanced_token_sequence, lexer_utils::State as LexerState};
+pub use lexer::lex;
 pub use parser::*;
 pub use report::*;
 pub use visitor::{Visitor, VisitorMut};

@@ -2,7 +2,6 @@ use std::{
     any::{Any, TypeId},
     cell::{OnceCell, RefCell},
     marker::PhantomData,
-    ops::Deref,
     rc::{Rc, Weak},
 };
 
@@ -11,10 +10,8 @@ use chumsky::{
     input::InputRef,
     prelude::*,
 };
-#[cfg(feature = "dbg-pls")]
-use dbg_pls::DebugPls;
 use derive_more::{Index, IndexMut};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Brand<T, B>(T, PhantomData<B>);
@@ -42,40 +39,18 @@ impl<T> Slab<T> {
         Slab(Vec::new())
     }
 
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.0.get(index)
+    }
+
     pub fn insert(&mut self, value: T) -> usize {
         let index = self.0.len();
         self.0.push(value);
         index
     }
-}
 
-#[repr(transparent)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
-pub struct StringRef(&'static str);
-
-impl StringRef {
-    pub fn new(s: &str) -> Self {
-        thread_local! {
-            static STRINGS: RefCell<FxHashSet<&'static str>> = RefCell::new(FxHashSet::default());
-        }
-        STRINGS.with(|strings| {
-            let mut strings = strings.borrow_mut();
-            if let Some(&s) = strings.get(s) {
-                StringRef(s)
-            } else {
-                let s: &'static str = Box::leak(Box::<str>::from(s));
-                strings.insert(s);
-                StringRef(s)
-            }
-        })
-    }
-}
-
-impl Deref for StringRef {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.0
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+        self.0.iter()
     }
 }
 

@@ -1,6 +1,10 @@
 //! Dump the AST of a C source file.
 //!
-//! Usage: `cargo run --example shrink_test_case --all-features -- path/to/source.c`
+//! Usage:
+//!
+//! ```sh
+//! cargo run --example shrink_test_case --all-features -- path/to/source.c
+//! ```
 
 use cgrammar::*;
 use chumsky::Parser;
@@ -13,10 +17,13 @@ enum ParseResult {
 }
 
 fn can_parse(file: &str, src: &str) -> ParseResult {
-    let lexer = balanced_token_sequence();
-    let mut lexer_state = LexerState::new(Some(file));
-    let tokens = lexer.parse_with_state(src, &mut lexer_state);
-    let Some(tokens) = tokens.output() else {
+    let lex_result = lex(src, Some(&file));
+    if lex_result.has_errors() {
+        for error in &lex_result.errors {
+            println!("{}", error);
+        }
+    }
+    let Some(tokens) = lex_result.output.as_ref() else {
         return ParseResult::LexError;
     };
 

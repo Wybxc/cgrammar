@@ -16,22 +16,20 @@ fn main() {
     init_state.ctx_mut().add_typedef_name("thm".into());
     let init_state = init_state;
 
-    let lexer = balanced_token_sequence();
-    let mut lexer_state = LexerState::new(Some(&file));
-    let tokens = lexer.parse_with_state(src.as_str(), &mut lexer_state);
-    if tokens.has_errors() {
-        for error in tokens.errors() {
+    let lex_result = lex(src.as_str(), Some(&file));
+    if lex_result.has_errors() {
+        for error in &lex_result.errors {
             println!("{}", error);
         }
     }
-    let tokens = tokens.output().unwrap();
+    let tokens = lex_result.output.as_ref().unwrap();
 
     let parser = translation_unit();
     let ast = parser.parse_with_state(tokens.as_input(), &mut init_state.clone());
     let (ast, errors) = ast.into_output_errors();
 
     for error in errors {
-        report(error);
+        report(error, &lex_result.contexts);
     }
 
     let ast = ast.expect("Parse failed!");
@@ -54,7 +52,7 @@ fn main() {
             let parsed = parser.parse_with_state(gl.as_input(), &mut init_state.clone());
             let (stmt, errors) = parsed.into_output_errors();
             for error in errors {
-                report(error);
+                report(error, &lex_result.contexts);
             }
             let Some(stmt) = stmt else {
                 eprintln!("Failed to parse gl statement");

@@ -10,9 +10,55 @@ use ordered_float::NotNan;
 
 use crate::{
     ast::*,
-    span::{SourceContext, SourceRange, Spanned},
-    utils::StringRef,
+    span::{SourceContext, SourceRange, SpanContexts, Spanned},
 };
+
+pub struct LexResult<'a> {
+    pub output: Option<BalancedTokenSequence>,
+    pub contexts: SpanContexts,
+    pub errors: Vec<Simple<'a, char>>,
+}
+
+impl LexResult<'_> {
+    /// Whether this result contains output
+    pub fn has_output(&self) -> bool {
+        self.output.is_some()
+    }
+
+    /// Whether this result has any errors
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    /// Convert this `LexResult` into the output. If any errors were generated
+    /// (including non-fatal errors!), a panic will occur instead.
+    #[track_caller]
+    pub fn unwrap(self) -> (BalancedTokenSequence, SpanContexts) {
+        if self.has_errors() {
+            panic!(
+                "called `ParseResult::unwrap` on a parse result containing errors: {:?}",
+                &self.errors
+            )
+        }
+        let output = self.output.expect("parser generated no errors or output");
+        (output, self.contexts)
+    }
+}
+
+/// Lexes the input source code into a balanced token sequence.
+///
+/// This function tokenizes the input string and returns the result along with
+/// any errors encountered during lexing.
+pub fn lex<'a>(source: &'a str, filename: Option<&str>) -> LexResult<'a> {
+    let mut state = lexer_utils::State::new(filename);
+    let result = balanced_token_sequence().parse_with_state(source, &mut state);
+    let (output, errors) = result.into_output_errors();
+    LexResult {
+        output,
+        contexts: state.span_contexts,
+        errors,
+    }
+}
 
 /// Utilities for the lexer.
 pub mod lexer_utils {
@@ -22,7 +68,7 @@ pub mod lexer_utils {
     pub type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
 
     /// Lexer state tracking position and context.
-    #[derive(Clone, Copy)]
+    #[derive(Clone)]
     pub struct State {
         /// Whether the cursor is at the beginning of a line.
         pub line_begin: bool,
@@ -30,26 +76,30 @@ pub mod lexer_utils {
         pub cursor: usize,
         /// Current source context.
         pub context: SourceContext,
+
+        pub span_contexts: SpanContexts,
     }
 
     impl Default for State {
         fn default() -> Self {
-            Self {
-                line_begin: true,
-                cursor: 0,
-                context: SourceContext::default(),
-            }
+            Self::new(None)
         }
     }
 
     impl State {
         /// Create a new lexer state with an optional file name.
-        pub fn new(file: Option<&str>) -> Self {
-            let file = file.map(StringRef::new);
+        pub fn new(filename: Option<&str>) -> Self {
+            let mut span_contexts = SpanContexts::new();
+            let file_id = if let Some(filename) = filename {
+                span_contexts.intern_filename(filename)
+            } else {
+                -1
+            };
             Self {
                 line_begin: true,
                 cursor: 0,
-                context: SourceContext { file, line: 1, bol: 0 },
+                context: SourceContext { file_id, line: 1, bol: 0 },
+                span_contexts,
             }
         }
     }
@@ -487,7 +537,7 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
         let state: &mut State = inp.state();
         if let [line, file, ..] = &directive[..] {
             state.context.line = line.parse().unwrap();
-            state.context.file = Some(StringRef::new(file.trim_matches('"')));
+            state.context.file_id = state.span_contexts.intern_filename(file.trim_matches('"'));
         }
         Ok(())
     }));
