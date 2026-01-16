@@ -43,7 +43,7 @@ fn main() {
     "#;
 
     // Tokenize the source code
-    let tokens = balanced_token_sequence().parse(source_code).unwrap();
+    let (tokens, _) = lex(source_code, None).unwrap();
 
     // Parse into AST
     let result = translation_unit().parse(tokens.as_input());
