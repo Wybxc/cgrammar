@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/Wybxc/cgrammar/compare/v0.7.1...v0.8.0) - 2026-01-30
+
+### Changed
+
+- **Breaking** (quasi-quote feature): Refactored interpolation mechanism to use separate `BalancedToken::Template` variant for template slots, instead of overloading `BalancedToken::Interpolation`. The `interpolate` method now looks for `Template` tokens and replaces them with the provided interpolations.
+
 ## [0.7.1](https://github.com/Wybxc/cgrammar/compare/v0.7.0...v0.7.1) - 2026-01-16
 
 ### Other
