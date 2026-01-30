@@ -8,6 +8,8 @@ use chumsky::{
 };
 use ordered_float::NotNan;
 
+#[cfg(feature = "quasi-quote")]
+use crate::quasi_quote::Template;
 use crate::{
     ast::*,
     span::{SourceContext, SourceRange, SpanContexts, Spanned},
@@ -478,7 +480,7 @@ pub fn balanced_token<'a>(
         identifier.map(BalancedToken::Identifier),
         punctuator.map(BalancedToken::Punctuator),
         #[cfg(feature = "quasi-quote")]
-        template.map(BalancedToken::Interpolation),
+        template.map(BalancedToken::Template),
         unknown_token.to(BalancedToken::Unknown),
     ))
 }
@@ -565,8 +567,8 @@ fn comment<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
 }
 
 #[cfg(feature = "quasi-quote")]
-fn template<'a>() -> impl Parser<'a, &'a str, Box<dyn quasi_quote::Interpolate + 'static>, Extra<'a>> + Clone {
+fn template<'a>() -> impl Parser<'a, &'a str, Template, Extra<'a>> + Clone {
     just("@")
         .ignore_then(identifier())
-        .map(|id| Box::new(quasi_quote::Template { name: id.0 }) as Box<dyn quasi_quote::Interpolate>)
+        .map(|id| quasi_quote::Template { name: id.0 })
 }

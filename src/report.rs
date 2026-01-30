@@ -18,6 +18,8 @@ impl fmt::Display for DiagnosticToken {
             BalancedToken::Constant(_) => write!(f, "constant"),
             BalancedToken::Punctuator(_) => write!(f, "punctuator"),
             #[cfg(feature = "quasi-quote")]
+            BalancedToken::Template(_) => write!(f, "template"),
+            #[cfg(feature = "quasi-quote")]
             BalancedToken::Interpolation(_) => write!(f, "interpolation"),
             BalancedToken::Unknown => write!(f, "unknown token"),
         }

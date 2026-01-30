@@ -1596,6 +1596,11 @@ fn print_balanced_token_sequence<'a, R: Render>(
             BalancedToken::Constant(constant) => print_constant(pp, constant)?,
             BalancedToken::Punctuator(punctuator) => print_punctuator(pp, punctuator)?,
             #[cfg(feature = "quasi-quote")]
+            BalancedToken::Template(template) => {
+                pp.text("@")?;
+                pp.text(template.name.as_ref())?;
+            }
+            #[cfg(feature = "quasi-quote")]
             BalancedToken::Interpolation(_) => {}
             BalancedToken::Unknown => {}
         }

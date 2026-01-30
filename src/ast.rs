@@ -267,6 +267,8 @@ pub enum BalancedToken {
     Constant(Constant),
     Punctuator(Punctuator),
     #[cfg(feature = "quasi-quote")]
+    Template(quasi_quote::Template),
+    #[cfg(feature = "quasi-quote")]
     Interpolation(Box<dyn quasi_quote::Interpolate + 'static>),
     Unknown, // For any other tokens not explicitly defined
 }
@@ -1240,12 +1242,10 @@ pub mod quasi_quote {
         pub fn interpolate(&mut self, mapping: &HashMap<&'static str, Box<dyn Interpolate>>) -> Result<(), String> {
             for token in &mut self.tokens {
                 match &mut token.value {
-                    BalancedToken::Interpolation(interpolate) => {
-                        if let Some(template) = (interpolate.as_ref() as &dyn Any).downcast_ref::<Template>() {
-                            let name = template.name.as_ref();
-                            let value = mapping.get(&name).ok_or(format!("template slot `{name}` not given"))?;
-                            *interpolate = value.clone();
-                        }
+                    BalancedToken::Template(template) => {
+                        let name = template.name.as_ref();
+                        let value = mapping.get(&name).ok_or(format!("template slot `{name}` not given"))?;
+                        token.value = BalancedToken::Interpolation(value.clone());
                     }
                     BalancedToken::Parenthesized(tokens) => tokens.interpolate(mapping)?,
                     BalancedToken::Bracketed(tokens) => tokens.interpolate(mapping)?,
