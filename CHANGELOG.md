@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/Wybxc/cgrammar/compare/v0.7.1...v0.8.0) - 2026-01-30
+
+### Added
+
+- make quasi-quote templates explicit in balanced token processing
+
+### Fixed
+
+- apply some clippy suggestions
+
 ## [0.7.1](https://github.com/Wybxc/cgrammar/compare/v0.7.0...v0.7.1) - 2026-01-16
 
 ### Other
