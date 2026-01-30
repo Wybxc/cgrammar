@@ -44,7 +44,7 @@ mod decl_precedence {
 ///
 /// This context tracks the precedence and associativity of the surrounding
 /// expression to enable minimal parenthesization when printing expressions.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Context {
     /// the precedence of the surrounding context (0 = no context/top level)
     precedence: usize,
@@ -56,27 +56,11 @@ pub struct Context {
     decl_precedence: usize,
 }
 
-impl Default for Context {
-    fn default() -> Self {
-        Context {
-            precedence: 0,
-            assoc: false,
-            decl_precedence: 0,
-        }
-    }
-}
-
 impl Context {
     /// Check if an expression with the given precedence needs parentheses in
     /// this context
     fn needs_parens(&self, expr_prec: usize) -> bool {
-        if expr_prec < self.precedence {
-            true
-        } else if expr_prec == self.precedence && self.assoc {
-            true
-        } else {
-            false
-        }
+        expr_prec < self.precedence || (expr_prec == self.precedence && self.assoc)
     }
 
     /// Check if a declarator with the given precedence needs parentheses in

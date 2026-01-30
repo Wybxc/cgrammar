@@ -491,7 +491,7 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
                 let range = SourceRange {
                     start: extra.span().start,
                     end: extra.span().end,
-                    context: extra.state().context.clone(),
+                    context: extra.state().context,
                 };
                 Spanned::new(token, range)
             })
@@ -503,7 +503,7 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
                 let eoi = SourceRange {
                     start: extra.span().end,
                     end: extra.span().end,
-                    context: extra.state().context.clone(),
+                    context: extra.state().context,
                 };
                 BalancedTokenSequence { tokens, eoi }
             })

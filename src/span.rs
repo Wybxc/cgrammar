@@ -119,6 +119,6 @@ pub type Tokens<'a> = MappedInput<
 impl BalancedTokenSequence {
     /// Convert this token sequence to a parser input.
     pub fn as_input(&self) -> Tokens<'_> {
-        self.tokens.as_slice().map(self.eoi.clone(), Spanned::as_unzipped)
+        self.tokens.as_slice().map(self.eoi, Spanned::as_unzipped)
     }
 }

@@ -17,7 +17,7 @@ enum ParseResult {
 }
 
 fn can_parse(file: &str, src: &str) -> ParseResult {
-    let lex_result = lex(src, Some(&file));
+    let lex_result = lex(src, Some(file));
     if lex_result.has_errors() {
         for error in &lex_result.errors {
             println!("{}", error);

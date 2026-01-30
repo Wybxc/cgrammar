@@ -26,7 +26,7 @@ fn main() {
     let ast = parser.parse_with_state(tokens.as_input(), &mut init_state);
     if ast.has_output() {
         let mut pp = elegance::Printer::new_extra(String::new(), 80, Context::default());
-        pp.visit_translation_unit(&ast.output().unwrap()).unwrap();
+        pp.visit_translation_unit(ast.output().unwrap()).unwrap();
         println!("{}", pp.finish().unwrap());
     } else {
         eprintln!("Parse failed!");

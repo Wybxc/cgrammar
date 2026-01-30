@@ -59,7 +59,7 @@ where
     fn on_token(&mut self, _token: &I::Token) {}
 
     fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, I>) -> Self::Checkpoint {
-        self.current.clone()
+        self.current
     }
 
     fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, I, Self::Checkpoint>) {

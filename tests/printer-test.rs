@@ -58,12 +58,9 @@ impl VisitorMut<'_> for RemoveParens {
 
     fn visit_expression_mut(&mut self, e: &'_ mut Expression) -> Self::Result {
         walk_expression_mut(self, e);
-        match e {
-            Expression::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) => {
-                let inner = std::mem::replace(inner.as_mut(), Expression::Error);
-                *e = inner;
-            }
-            _ => {}
+        if let Expression::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) = e {
+            let inner = std::mem::replace(inner.as_mut(), Expression::Error);
+            *e = inner;
         }
     }
 
