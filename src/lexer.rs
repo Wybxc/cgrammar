@@ -1,5 +1,6 @@
 //! Lexer for C source code, producing balanced token sequences.
 
+use ariadne::{Label, Report, ReportKind};
 use chumsky::{
     input::{Checkpoint, Cursor, MapExtra},
     inspector::Inspector,
@@ -44,6 +45,27 @@ impl LexResult<'_> {
         }
         let output = self.output.expect("parser generated no errors or output");
         (output, self.contexts)
+    }
+
+    /// Report errors using ariadne for pretty error messages
+    pub fn report_errors(&self) -> Vec<Report<'_>> {
+        self.errors
+            .iter()
+            .map(|error| {
+                let span = error.span();
+                let start = span.start;
+                let end = span.end;
+
+                Report::build(ReportKind::Error, start..end)
+                    .with_message("Lexing error")
+                    .with_label(if let Some(found) = error.found() {
+                        Label::new(start..end).with_message(format!("Unexpected token `{}`", found))
+                    } else {
+                        Label::new(start..end).with_message("Unexpected eof")
+                    })
+                    .finish()
+            })
+            .collect()
     }
 }
 
@@ -481,8 +503,8 @@ pub fn balanced_token<'a>(
         punctuator.map(BalancedToken::Punctuator),
         #[cfg(feature = "quasi-quote")]
         template.map(BalancedToken::Template),
-        unknown_token.to(BalancedToken::Unknown),
     ))
+    .recover_with(via_parser(unknown_token.to(BalancedToken::Unknown)))
 }
 
 /// (6.7.12.1) balanced token sequence

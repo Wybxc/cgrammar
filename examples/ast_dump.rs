@@ -12,8 +12,8 @@ fn main() {
 
     let lex_result = lex(src.as_str(), Some(&file));
     if lex_result.has_errors() {
-        for error in &lex_result.errors {
-            println!("{}", error);
+        for report in lex_result.report_errors() {
+            report.eprint(ariadne::Source::from(&src)).unwrap();
         }
     }
     let tokens = lex_result.output.as_ref().unwrap();

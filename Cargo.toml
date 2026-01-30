@@ -9,6 +9,7 @@ readme = "README.md"
 
 
 [dependencies]
+ariadne = "0.6.0"
 chumsky = { version = "0.12.0", features = ["extension", "pratt", "regex"] }
 dbg-pls = { version = "0.4.3", features = [
     "derive",
