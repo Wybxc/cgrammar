@@ -34,7 +34,3 @@ report = ["dep:ariadne"]
 pathdiff = "0.2.3"
 pretty_assertions = "1.4.1"
 rstest = "0.26.1"
-
-[[test]]
-name = "fuzz-lexer"
-harness = false
