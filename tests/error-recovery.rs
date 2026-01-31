@@ -15,7 +15,7 @@ use rstest::rstest;
 #[case("int a[f f];")]
 #[case("int a[1] = {[?]=1};")]
 fn test_error_recovery(#[case] input: String) {
-    let (tokens, _) = lex(&input, None).unwrap();
+    let (tokens, _) = lex(&input, None);
     let result = {
         let parser = translation_unit();
         parser.parse(tokens.as_input())

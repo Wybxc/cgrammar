@@ -243,6 +243,7 @@ pub enum Punctuator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BalancedTokenSequence {
     pub tokens: Vec<Spanned<BalancedToken>>,
+    pub closed: bool,
     pub eoi: Span,
 }
 

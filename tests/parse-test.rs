@@ -38,7 +38,7 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
     let output = prepocessor.wait_with_output().unwrap();
     let input = String::from_utf8(output.stdout).unwrap();
 
-    let (tokens, _) = lex(&input, None).unwrap();
+    let (tokens, _) = lex(&input, None);
 
     let parser = translation_unit();
     let result = parser.parse(tokens.as_input());

@@ -10,13 +10,7 @@ fn main() {
     let file = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file.as_str()).unwrap();
 
-    let lex_result = lex(src.as_str(), Some(&file));
-    if lex_result.has_errors() {
-        for report in lex_result.report_errors() {
-            report.eprint(ariadne::Source::from(&src)).unwrap();
-        }
-    }
-    let tokens = lex_result.output.as_ref().unwrap();
+    let (tokens, ctx_map) = lex(src.as_str(), Some(&file));
 
     let parser = translation_unit();
     let mut init_state = State::new();
@@ -30,7 +24,7 @@ fn main() {
     }
     if ast.has_errors() {
         for error in ast.into_errors() {
-            report(error, &lex_result.collection);
+            report(error, &ctx_map);
         }
         std::process::exit(1);
     }

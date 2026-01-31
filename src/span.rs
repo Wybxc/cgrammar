@@ -1,7 +1,11 @@
 //! Span utilities.
 
+#[cfg(feature = "report")]
+use std::collections::HashMap;
 use std::ops::Range;
 
+#[cfg(feature = "report")]
+use ariadne::Source;
 use chumsky::input::{Input, MappedInput};
 #[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
@@ -18,28 +22,64 @@ pub struct SourceContext {
     pub line_offset: i32,
 }
 
-/// A collection of span contexts for tracking source file information.
-#[derive(Clone)]
-pub struct ContextMapping {
-    contexts: Slab<SourceContext>,
-}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ContextId(i32);
 
-impl Default for ContextMapping {
-    fn default() -> Self {
-        Self::new()
+impl From<usize> for ContextId {
+    fn from(value: usize) -> Self {
+        ContextId(value.try_into().expect("Context ID overflow"))
     }
 }
 
-impl ContextMapping {
+impl ContextId {
+    pub const fn none() -> Self {
+        ContextId(-1)
+    }
+
+    pub fn idx(self) -> Option<usize> {
+        if self.0 < 0 { None } else { Some(self.0 as usize) }
+    }
+}
+
+/// A collection of span contexts for tracking source file information.
+#[derive(Clone)]
+pub struct ContextMapping<'a> {
+    pub source: &'a str,
+    contexts: Slab<SourceContext>,
+    #[cfg(feature = "report")]
+    ctx_source: HashMap<ContextId, Source<&'a str>>,
+}
+
+impl<'a> ContextMapping<'a> {
     /// Creates a new empty span context collection.
-    pub fn new() -> Self {
-        Self { contexts: Slab::new() }
+    pub fn new(source: &'a str) -> Self {
+        Self {
+            source,
+            contexts: Slab::new(),
+            #[cfg(feature = "report")]
+            ctx_source: HashMap::new(),
+        }
     }
 
     /// Inserts a new source context and returns its ID.
-    pub fn insert_context(&mut self, context: SourceContext) -> i32 {
-        let id = self.contexts.insert(context);
-        id.try_into().expect("Source context ID overflow")
+    pub fn insert_context(&mut self, context: SourceContext) -> ContextId {
+        self.contexts.insert(context).into()
+    }
+}
+
+#[cfg(feature = "report")]
+impl<'a> ariadne::Cache<ContextId> for ContextMapping<'a> {
+    type Storage = &'a str;
+
+    fn fetch(&mut self, id: &ContextId) -> Result<&Source<&'a str>, impl std::fmt::Debug> {
+        let source = self.ctx_source.entry(*id).or_insert_with(|| Source::from(self.source));
+        Ok::<_, ()>(source)
+    }
+
+    fn display<'b>(&self, id: &'b ContextId) -> Option<impl std::fmt::Display + 'b> {
+        id.idx()
+            .and_then(|idx| self.contexts.get(idx))
+            .map(|ctx| ctx.filename.to_string())
     }
 }
 
@@ -48,18 +88,22 @@ impl ContextMapping {
 pub struct Span {
     start: usize,
     len: u32,
-    ctx_id: i32,
+    ctx_id: ContextId,
 }
 
 impl Default for Span {
     fn default() -> Self {
-        Self { start: 0, len: 0, ctx_id: -1 }
+        Self {
+            start: 0,
+            len: 0,
+            ctx_id: ContextId::none(),
+        }
     }
 }
 
 impl Span {
     /// Create a new span from a range and context ID.
-    pub fn new(range: std::ops::Range<usize>, ctx_id: i32) -> Self {
+    pub fn new(range: std::ops::Range<usize>, ctx_id: ContextId) -> Self {
         Self {
             start: range.start,
             len: range.len().try_into().expect("Span length overflow"),
@@ -68,24 +112,20 @@ impl Span {
     }
 
     /// Create a new end-of-input span at the given position and context ID.
-    pub fn new_eoi(pos: usize, ctx_id: i32) -> Self {
+    pub fn new_eoi(pos: usize, ctx_id: ContextId) -> Self {
         Self { start: pos, len: 0, ctx_id }
     }
 
     /// Get the context and range of this span.
-    pub fn at_context(self, ctx_map: &ContextMapping) -> (Option<&SourceContext>, Range<usize>) {
-        let context = self
-            .ctx_id
-            .try_into()
-            .ok()
-            .and_then(|id: usize| ctx_map.contexts.get(id));
+    pub fn at_context<'a>(self, ctx_map: &'a ContextMapping) -> (Option<&'a SourceContext>, Range<usize>) {
+        let context = self.ctx_id.idx().and_then(|id: usize| ctx_map.contexts.get(id));
         let range = self.start..(self.start + self.len as usize);
         (context, range)
     }
 }
 
 impl chumsky::span::Span for Span {
-    type Context = i32;
+    type Context = ContextId;
 
     type Offset = usize;
 
@@ -112,7 +152,7 @@ impl chumsky::span::Span for Span {
 
 #[cfg(feature = "report")]
 impl ariadne::Span for Span {
-    type SourceId = i32;
+    type SourceId = ContextId;
 
     fn source(&self) -> &Self::SourceId {
         &self.ctx_id

@@ -1,7 +1,5 @@
 //! Lexer for C source code, producing balanced token sequences.
 
-#[cfg(feature = "report")]
-use ariadne::{Label, Report, ReportKind};
 use chumsky::{
     input::{Checkpoint, Cursor, MapExtra},
     inspector::Inspector,
@@ -17,85 +15,28 @@ use crate::{
     span::{ContextMapping, SourceContext, Span, Spanned},
 };
 
-pub struct LexResult<'a> {
-    pub output: Option<BalancedTokenSequence>,
-    pub collection: ContextMapping,
-    pub errors: Vec<Simple<'a, char>>,
-}
-
-impl LexResult<'_> {
-    /// Whether this result contains output
-    pub fn has_output(&self) -> bool {
-        self.output.is_some()
-    }
-
-    /// Whether this result has any errors
-    pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-
-    /// Convert this `LexResult` into the output. If any errors were generated
-    /// (including non-fatal errors!), a panic will occur instead.
-    #[track_caller]
-    pub fn unwrap(self) -> (BalancedTokenSequence, ContextMapping) {
-        if self.has_errors() {
-            panic!(
-                "called `ParseResult::unwrap` on a parse result containing errors: {:?}",
-                &self.errors
-            )
-        }
-        let output = self.output.expect("parser generated no errors or output");
-        (output, self.collection)
-    }
-
-    /// Report errors using ariadne for pretty error messages
-    #[cfg(feature = "report")]
-    pub fn report_errors(&self) -> Vec<Report<'_>> {
-        self.errors
-            .iter()
-            .map(|error| {
-                let span = error.span();
-                let start = span.start;
-                let end = span.end;
-
-                Report::build(ReportKind::Error, start..end)
-                    .with_message("Lexing error")
-                    .with_label(if let Some(found) = error.found() {
-                        Label::new(start..end).with_message(format!("Unexpected token `{}`", found))
-                    } else {
-                        Label::new(start..end).with_message("Unexpected eof")
-                    })
-                    .finish()
-            })
-            .collect()
-    }
-}
-
 /// Lexes the input source code into a balanced token sequence.
 ///
 /// This function tokenizes the input string and returns the result along with
 /// any errors encountered during lexing.
-pub fn lex<'a>(source: &'a str, filename: Option<&str>) -> LexResult<'a> {
-    let mut state = lexer_utils::State::new(filename);
+pub fn lex<'a>(source: &'a str, filename: Option<&str>) -> (BalancedTokenSequence, ContextMapping<'a>) {
+    let mut state = lexer_utils::State::new(source, filename);
     let result = balanced_token_sequence().parse_with_state(source, &mut state);
-    let (output, errors) = result.into_output_errors();
-    LexResult {
-        output,
-        collection: state.ctx_map,
-        errors,
-    }
+    (result.unwrap(), state.ctx_map)
 }
 
 /// Utilities for the lexer.
 pub mod lexer_utils {
+    use crate::span::ContextId;
+
     use super::*;
 
     /// Extra parser state for the lexer.
-    pub type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State, ()>;
+    pub type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State<'a>, ()>;
 
     /// Lexer state tracking position and context.
     #[derive(Clone)]
-    pub struct State {
+    pub struct State<'a> {
         /// Whether the cursor is at the beginning of a line.
         pub line_begin: bool,
         /// Current cursor position in the input.
@@ -103,26 +44,20 @@ pub mod lexer_utils {
         /// Current line number.
         pub lineno: i32,
         /// Current source context.
-        pub ctx_id: i32,
+        pub ctx_id: ContextId,
         /// Source collection for context tracking.
-        pub ctx_map: ContextMapping,
+        pub ctx_map: ContextMapping<'a>,
     }
 
-    impl Default for State {
-        fn default() -> Self {
-            Self::new(None)
-        }
-    }
-
-    impl State {
+    impl<'a> State<'a> {
         /// Create a new lexer state with an optional file name.
-        pub fn new(filename: Option<&str>) -> Self {
-            let mut ctx_map = ContextMapping::new();
+        pub fn new(source: &'a str, filename: Option<&str>) -> Self {
+            let mut ctx_map = ContextMapping::new(source);
             Self {
                 line_begin: true,
                 cursor: 0,
                 lineno: 1,
-                ctx_id: filename.map_or(-1, |filename| {
+                ctx_id: filename.map_or(ContextId::none(), |filename| {
                     ctx_map.insert_context(SourceContext {
                         filename: filename.into(),
                         line_offset: 0,
@@ -139,10 +74,10 @@ pub mod lexer_utils {
         line_begin: bool,
         cursor: usize,
         lineno: i32,
-        ctx_id: i32,
+        ctx_id: ContextId,
     }
 
-    impl<'src> Inspector<'src, &'src str> for State {
+    impl<'src> Inspector<'src, &'src str> for State<'src> {
         type Checkpoint = StateCheckpoint;
 
         fn on_token(&mut self, token: &char) {
@@ -471,23 +406,28 @@ pub fn punctuator<'a>() -> impl Parser<'a, &'a str, Punctuator, Extra<'a>> + Clo
 pub fn balanced_token<'a>(
     balanced_token_sequence: impl Parser<'a, &'a str, BalancedTokenSequence, Extra<'a>> + Clone,
 ) -> impl Parser<'a, &'a str, BalancedToken, Extra<'a>> + Clone {
+    let unclosed_token_sequence = balanced_token_sequence.clone().map(|mut s| {
+        s.closed = false;
+        s
+    });
+
     // Parenthesized: ( balanced-token-sequence? )
     let parenthesized = balanced_token_sequence
         .clone()
         .delimited_by(just('('), just(')'))
-        .recover_with(via_parser(just('(').ignore_then(balanced_token_sequence.clone())));
+        .or(just('(').ignore_then(unclosed_token_sequence.clone()));
 
     // Bracketed: [ balanced-token-sequence? ]
     let bracketed = balanced_token_sequence
         .clone()
         .delimited_by(just('['), just(']'))
-        .recover_with(via_parser(just('[').ignore_then(balanced_token_sequence.clone())));
+        .or(just('[').ignore_then(unclosed_token_sequence.clone()));
 
     // Braced: { balanced-token-sequence? }
     let braced = balanced_token_sequence
         .clone()
         .delimited_by(just('{'), just('}'))
-        .recover_with(via_parser(just('{').ignore_then(balanced_token_sequence.clone())));
+        .or(just('{').ignore_then(unclosed_token_sequence.clone()));
 
     // Other tokens (non-brackets)
     let identifier = identifier();
@@ -510,8 +450,8 @@ pub fn balanced_token<'a>(
         punctuator.map(BalancedToken::Punctuator),
         #[cfg(feature = "quasi-quote")]
         template.map(BalancedToken::Template),
+        unknown_token.to(BalancedToken::Unknown),
     ))
-    .recover_with(via_parser(unknown_token.to(BalancedToken::Unknown)))
 }
 
 /// (6.7.12.1) balanced token sequence
@@ -528,7 +468,7 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
             .collect::<Vec<_>>()
             .map_with(|tokens, extra| {
                 let eoi = Span::new_eoi(extra.span().end, extra.state().ctx_id);
-                BalancedTokenSequence { tokens, eoi }
+                BalancedTokenSequence { tokens, closed: true, eoi }
             })
     })
 }

@@ -12,20 +12,11 @@ use chumsky::Parser;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ParseResult {
     Success,
-    LexError,
     ParseError,
 }
 
 fn can_parse(file: &str, src: &str) -> ParseResult {
-    let lex_result = lex(src, Some(file));
-    if lex_result.has_errors() {
-        for error in &lex_result.errors {
-            println!("{}", error);
-        }
-    }
-    let Some(tokens) = lex_result.output.as_ref() else {
-        return ParseResult::LexError;
-    };
+    let (tokens, _) = lex(src, Some(file));
 
     let parser = translation_unit();
     let mut init_state = State::new();
