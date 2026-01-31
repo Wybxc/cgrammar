@@ -12,7 +12,7 @@ use ordered_float::NotNan;
 use crate::quasi_quote::Template;
 use crate::{
     ast::*,
-    span::{ContextMapping, SourceContext, Span, Spanned},
+    span::{ContextId, ContextMapping, SourceContext, Span, Spanned},
 };
 
 /// Lexes the input source code into a balanced token sequence.
@@ -487,7 +487,7 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
 
 /// any other token as unknown
 pub fn unknown<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
-    none_of(" \t\n\r()[]{}").repeated().at_least(1).collect()
+    any().and_is(whitespace().not()).ignored()
 }
 
 fn whitespace<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
@@ -511,9 +511,12 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
         let directive = directive.split_whitespace().collect::<Vec<_>>();
         let state: &mut State = inp.state();
         if let [line, file, ..] = &directive[..] {
-            state.ctx_id = state.ctx_map.insert_context(SourceContext {
-                filename: file.trim_matches('"').to_string(),
-                line_offset: state.lineno - line.parse::<i32>().expect("line number overflow"),
+            let line = line.parse::<i32>().ok();
+            state.ctx_id = line.map_or(ContextId::none(), |line| {
+                state.ctx_map.insert_context(SourceContext {
+                    filename: file.trim_matches('"').to_string(),
+                    line_offset: state.lineno - line,
+                })
             });
         }
         Ok(())
