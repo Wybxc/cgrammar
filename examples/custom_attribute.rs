@@ -29,7 +29,7 @@ fn main() {
     let (ast, errors) = ast.into_output_errors();
 
     for error in errors {
-        report(error, &lex_result.contexts);
+        report(error, &lex_result.collection);
     }
 
     let ast = ast.expect("Parse failed!");
@@ -52,7 +52,7 @@ fn main() {
             let parsed = parser.parse_with_state(gl.as_input(), &mut init_state.clone());
             let (stmt, errors) = parsed.into_output_errors();
             for error in errors {
-                report(error, &lex_result.contexts);
+                report(error, &lex_result.collection);
             }
             let Some(stmt) = stmt else {
                 eprintln!("Failed to parse gl statement");

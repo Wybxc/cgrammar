@@ -13,12 +13,12 @@ use ordered_float::NotNan;
 use crate::quasi_quote::Template;
 use crate::{
     ast::*,
-    span::{SourceContext, SourceRange, SpanContexts, Spanned},
+    span::{ContextMapping, SourceContext, Span, Spanned},
 };
 
 pub struct LexResult<'a> {
     pub output: Option<BalancedTokenSequence>,
-    pub contexts: SpanContexts,
+    pub collection: ContextMapping,
     pub errors: Vec<Simple<'a, char>>,
 }
 
@@ -36,7 +36,7 @@ impl LexResult<'_> {
     /// Convert this `LexResult` into the output. If any errors were generated
     /// (including non-fatal errors!), a panic will occur instead.
     #[track_caller]
-    pub fn unwrap(self) -> (BalancedTokenSequence, SpanContexts) {
+    pub fn unwrap(self) -> (BalancedTokenSequence, ContextMapping) {
         if self.has_errors() {
             panic!(
                 "called `ParseResult::unwrap` on a parse result containing errors: {:?}",
@@ -44,7 +44,7 @@ impl LexResult<'_> {
             )
         }
         let output = self.output.expect("parser generated no errors or output");
-        (output, self.contexts)
+        (output, self.collection)
     }
 
     /// Report errors using ariadne for pretty error messages
@@ -79,7 +79,7 @@ pub fn lex<'a>(source: &'a str, filename: Option<&str>) -> LexResult<'a> {
     let (output, errors) = result.into_output_errors();
     LexResult {
         output,
-        contexts: state.span_contexts,
+        collection: state.ctx_map,
         errors,
     }
 }
@@ -98,10 +98,12 @@ pub mod lexer_utils {
         pub line_begin: bool,
         /// Current cursor position in the input.
         pub cursor: usize,
+        /// Current line number.
+        pub lineno: i32,
         /// Current source context.
-        pub context: SourceContext,
-
-        pub span_contexts: SpanContexts,
+        pub ctx_id: i32,
+        /// Source collection for context tracking.
+        pub ctx_map: ContextMapping,
     }
 
     impl Default for State {
@@ -113,17 +115,18 @@ pub mod lexer_utils {
     impl State {
         /// Create a new lexer state with an optional file name.
         pub fn new(filename: Option<&str>) -> Self {
-            let mut span_contexts = SpanContexts::new();
-            let file_id = if let Some(filename) = filename {
-                span_contexts.intern_filename(filename)
-            } else {
-                -1
-            };
+            let mut ctx_map = ContextMapping::new();
             Self {
                 line_begin: true,
                 cursor: 0,
-                context: SourceContext { file_id, line: 1, bol: 0 },
-                span_contexts,
+                lineno: 1,
+                ctx_id: filename.map_or(-1, |filename| {
+                    ctx_map.insert_context(SourceContext {
+                        filename: filename.into(),
+                        line_offset: 0,
+                    })
+                }),
+                ctx_map,
             }
         }
     }
@@ -133,7 +136,8 @@ pub mod lexer_utils {
     pub struct StateCheckpoint {
         line_begin: bool,
         cursor: usize,
-        context: SourceContext,
+        lineno: i32,
+        ctx_id: i32,
     }
 
     impl<'src> Inspector<'src, &'src str> for State {
@@ -143,8 +147,7 @@ pub mod lexer_utils {
             self.cursor += token.len_utf8();
             if token.is_newline() {
                 self.line_begin = true;
-                self.context.line += 1;
-                self.context.bol = self.cursor;
+                self.lineno += 1;
             } else if self.line_begin && !token.is_whitespace() {
                 self.line_begin = false;
             }
@@ -154,7 +157,8 @@ pub mod lexer_utils {
             StateCheckpoint {
                 line_begin: self.line_begin,
                 cursor: self.cursor,
-                context: self.context,
+                lineno: self.lineno,
+                ctx_id: self.ctx_id,
             }
         }
 
@@ -162,7 +166,8 @@ pub mod lexer_utils {
             let checkpoint = marker.inspector();
             self.line_begin = checkpoint.line_begin;
             self.cursor = checkpoint.cursor;
-            self.context = checkpoint.context;
+            self.lineno = checkpoint.lineno;
+            self.ctx_id = checkpoint.ctx_id;
         }
     }
 }
@@ -512,23 +517,15 @@ pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSe
     recursive(|balanced_token_sequence| {
         balanced_token(balanced_token_sequence)
             .map_with(|token: BalancedToken, extra| {
-                let range = SourceRange {
-                    start: extra.span().start,
-                    end: extra.span().end,
-                    context: extra.state().context,
-                };
-                Spanned::new(token, range)
+                let span = Span::new(extra.span().into_range(), extra.state().ctx_id);
+                Spanned::new(token, span)
             })
             .separated_by(whitespace())
             .allow_leading()
             .allow_trailing()
             .collect::<Vec<_>>()
             .map_with(|tokens, extra| {
-                let eoi = SourceRange {
-                    start: extra.span().end,
-                    end: extra.span().end,
-                    context: extra.state().context,
-                };
+                let eoi = Span::new_eoi(extra.span().end, extra.state().ctx_id);
                 BalancedTokenSequence { tokens, eoi }
             })
     })
@@ -560,8 +557,10 @@ fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
         let directive = directive.split_whitespace().collect::<Vec<_>>();
         let state: &mut State = inp.state();
         if let [line, file, ..] = &directive[..] {
-            state.context.line = line.parse().unwrap();
-            state.context.file_id = state.span_contexts.intern_filename(file.trim_matches('"'));
+            state.ctx_id = state.ctx_map.insert_context(SourceContext {
+                filename: file.trim_matches('"').to_string(),
+                line_offset: state.lineno - line.parse::<i32>().expect("line number overflow"),
+            });
         }
         Ok(())
     }));

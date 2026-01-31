@@ -33,7 +33,7 @@ fn main() {
     }
     if ast.has_errors() {
         for error in ast.into_errors() {
-            report(error, &lex_result.contexts);
+            report(error, &lex_result.collection);
         }
         std::process::exit(1);
     }

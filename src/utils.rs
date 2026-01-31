@@ -48,10 +48,6 @@ impl<T> Slab<T> {
         self.0.push(value);
         index
     }
-
-    pub fn iter(&self) -> std::slice::Iter<'_, T> {
-        self.0.iter()
-    }
 }
 
 pub trait Cacher {

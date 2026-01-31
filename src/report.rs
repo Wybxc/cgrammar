@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::{ast::*, parser_utils::Error, span::SpanContexts};
+use crate::{ast::*, parser_utils::Error, span::ContextMapping};
 
 struct DiagnosticToken(BalancedToken);
 
@@ -27,10 +27,13 @@ impl fmt::Display for DiagnosticToken {
 }
 
 /// Report an error to stderr.
-pub fn report<'a>(error: Error<'a>, contexts: &SpanContexts) {
+pub fn report<'a>(error: Error<'a>, ctx_map: &ContextMapping) {
     let error = error.map_token(DiagnosticToken);
     let span = error.span();
-    let file = span.context.filename(contexts).unwrap_or("<unknown>");
-    let line = span.context.line;
-    eprintln!("error[{}:{}] {}", file, line, error.reason());
+    let (ctx, _range) = span.at_context(ctx_map);
+    eprintln!(
+        "error[{}] {}",
+        ctx.map_or("<unknown>", |c| c.filename.as_str()),
+        error.reason()
+    );
 }

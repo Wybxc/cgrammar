@@ -14,7 +14,7 @@ pub mod parser_utils {
     /// Token stream type used by the parser.
     pub type TokenStream = BalancedTokenSequence;
     /// Error type used by the parser.
-    pub type Error<'a> = Rich<'a, BalancedToken, SourceRange>;
+    pub type Error<'a> = Rich<'a, BalancedToken, Span>;
     /// Extra parser state including error tracking, state, and context.
     pub type Extra<'a> = chumsky::extra::Full<Error<'a>, State, Context>;
 
@@ -1887,8 +1887,8 @@ pub fn recover_bracketed<'a, O: Clone>(
 pub fn expected_found<'a, L>(
     expected: impl IntoIterator<Item = L>,
     found: Option<BalancedToken>,
-    span: SourceRange,
-) -> Rich<'a, Token, SourceRange>
+    span: Span,
+) -> Rich<'a, Token, Span>
 where
     L: Into<chumsky::error::RichPattern<'a, Token>>,
 {

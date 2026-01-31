@@ -29,7 +29,7 @@ fn print_ast(ast: &TranslationUnit) -> String {
 fn remove_spans(tokens: &mut BalancedTokenSequence) {
     tokens.eoi = Default::default();
     for token in &mut tokens.tokens {
-        token.range = Default::default();
+        token.span = Default::default();
         match &mut token.value {
             BalancedToken::Parenthesized(tokens) | BalancedToken::Bracketed(tokens) | BalancedToken::Braced(tokens) => {
                 remove_spans(tokens);

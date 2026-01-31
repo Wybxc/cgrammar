@@ -7,7 +7,7 @@ use std::{fmt, sync::Arc};
 use dbg_pls::DebugPls;
 use ordered_float::NotNan;
 
-use crate::span::{SourceRange, Spanned};
+use crate::span::{Span, Spanned};
 
 // =============================================================================
 // Lexical Elements (6.4)
@@ -243,7 +243,7 @@ pub enum Punctuator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BalancedTokenSequence {
     pub tokens: Vec<Spanned<BalancedToken>>,
-    pub eoi: SourceRange,
+    pub eoi: Span,
 }
 
 #[cfg(feature = "dbg-pls")]
