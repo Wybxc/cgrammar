@@ -308,7 +308,12 @@ pub fn character_constant<'a>() -> impl Parser<'a, &'a str, CharacterConstant, E
     let content = c_char.repeated().at_least(1).collect::<String>();
 
     prefix
-        .then(content.delimited_by(just('\''), just('\'')))
+        .then(
+            content
+                .clone()
+                .delimited_by(just('\''), just('\''))
+                .or(just('\'').ignore_then(content)),
+        )
         .map(|(encoding_prefix, value)| CharacterConstant { encoding_prefix, value })
 }
 
@@ -329,7 +334,12 @@ pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiterals, Extra<'a
     let content = escape_sequence().or(none_of("\"\\")).repeated().collect::<String>();
 
     prefix
-        .then(content.delimited_by(just('"'), just('"')))
+        .then(
+            content
+                .clone()
+                .delimited_by(just('"'), just('"'))
+                .or(just('"').ignore_then(content)),
+        )
         .map(|(encoding_prefix, value)| StringLiteral { encoding_prefix, value })
         .separated_by(whitespace())
         .at_least(1)
@@ -341,7 +351,9 @@ pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiterals, Extra<'a
 pub fn quoted_string<'a>() -> impl Parser<'a, &'a str, String, Extra<'a>> + Clone {
     let content = none_of("`").repeated().collect::<String>();
 
-    content.delimited_by(just('`'), just('`'))
+    content
+        .delimited_by(just('`'), just('`'))
+        .or(just('`').ignore_then(content))
 }
 
 /// (6.4.6) punctuator (excluding parentheses and brackets)
