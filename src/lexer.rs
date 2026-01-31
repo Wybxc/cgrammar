@@ -1,5 +1,6 @@
 //! Lexer for C source code, producing balanced token sequences.
 
+#[cfg(feature = "report")]
 use ariadne::{Label, Report, ReportKind};
 use chumsky::{
     input::{Checkpoint, Cursor, MapExtra},
@@ -48,6 +49,7 @@ impl LexResult<'_> {
     }
 
     /// Report errors using ariadne for pretty error messages
+    #[cfg(feature = "report")]
     pub fn report_errors(&self) -> Vec<Report<'_>> {
         self.errors
             .iter()

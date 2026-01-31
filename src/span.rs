@@ -110,6 +110,7 @@ impl chumsky::span::Span for Span {
     }
 }
 
+#[cfg(feature = "report")]
 impl ariadne::Span for Span {
     type SourceId = i32;
 

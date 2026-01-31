@@ -9,7 +9,7 @@ readme = "README.md"
 
 
 [dependencies]
-ariadne = "0.6.0"
+ariadne = { version = "0.6.0", optional = true }
 chumsky = { version = "0.12.0", features = ["extension", "pratt", "regex"] }
 dbg-pls = { version = "0.4.3", features = [
     "derive",
@@ -28,6 +28,7 @@ rustc-hash = "2.1.1"
 dbg-pls = ["dep:dbg-pls"]
 printer = ["dep:elegance"]
 quasi-quote = ["dep:dyn-clone", "dep:dyn-eq"]
+report = ["dep:ariadne"]
 
 [dev-dependencies]
 pathdiff = "0.2.3"
