@@ -39,8 +39,6 @@ pub mod lexer_utils {
     pub struct State<'a> {
         /// Whether the cursor is at the beginning of a line.
         pub line_begin: bool,
-        /// Current cursor position in the input.
-        pub cursor: usize,
         /// Current line number.
         pub lineno: i32,
         /// Current source context.
@@ -55,7 +53,6 @@ pub mod lexer_utils {
             let mut ctx_map = ContextMapping::new(source);
             Self {
                 line_begin: true,
-                cursor: 0,
                 lineno: 1,
                 ctx_id: filename.map_or(ContextId::none(), |filename| {
                     ctx_map.insert_context(SourceContext {
@@ -72,7 +69,6 @@ pub mod lexer_utils {
     #[derive(Clone, Copy)]
     pub struct StateCheckpoint {
         line_begin: bool,
-        cursor: usize,
         lineno: i32,
         ctx_id: ContextId,
     }
@@ -81,7 +77,6 @@ pub mod lexer_utils {
         type Checkpoint = StateCheckpoint;
 
         fn on_token(&mut self, token: &char) {
-            self.cursor += token.len_utf8();
             if token.is_newline() {
                 self.line_begin = true;
                 self.lineno += 1;
@@ -93,7 +88,6 @@ pub mod lexer_utils {
         fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, &'src str>) -> Self::Checkpoint {
             StateCheckpoint {
                 line_begin: self.line_begin,
-                cursor: self.cursor,
                 lineno: self.lineno,
                 ctx_id: self.ctx_id,
             }
@@ -102,7 +96,6 @@ pub mod lexer_utils {
         fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, &'src str, Self::Checkpoint>) {
             let checkpoint = marker.inspector();
             self.line_begin = checkpoint.line_begin;
-            self.cursor = checkpoint.cursor;
             self.lineno = checkpoint.lineno;
             self.ctx_id = checkpoint.ctx_id;
         }
