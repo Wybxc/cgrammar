@@ -22,6 +22,7 @@ pub struct SourceContext {
     pub line_offset: i32,
 }
 
+/// An identifier for a source context.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ContextId(i32);
 
@@ -32,10 +33,12 @@ impl From<usize> for ContextId {
 }
 
 impl ContextId {
+    /// A sentinel value representing no context.
     pub const fn none() -> Self {
         ContextId(-1)
     }
 
+    /// Get the index of this context ID, if it is valid.
     pub fn idx(self) -> Option<usize> {
         if self.0 < 0 { None } else { Some(self.0 as usize) }
     }
@@ -44,6 +47,7 @@ impl ContextId {
 /// A collection of span contexts for tracking source file information.
 #[derive(Clone)]
 pub struct ContextMapping<'a> {
+    /// The original source code.
     pub source: &'a str,
     contexts: Slab<SourceContext>,
     #[cfg(feature = "report")]
