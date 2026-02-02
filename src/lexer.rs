@@ -1,13 +1,12 @@
-//! Lexer for C source code, producing balanced token sequences (hand-written version).
+//! Lexer for C source code, producing balanced token sequences.
 
 use ordered_float::NotNan;
-use regex_automata::{Anchored, Input, meta::Regex};
 
 #[cfg(feature = "quasi-quote")]
 use crate::quasi_quote::Template;
 use crate::{
     ast::*,
-    span::{ContextId, ContextMapping, SourceContext, Span, Spanned},
+    span::{ContextMapping, SourceContext, Span, Spanned},
 };
 
 /// Lexes the input source code into a balanced token sequence.
@@ -20,91 +19,140 @@ pub fn lex<'a>(source: &'a str, filename: Option<&str>) -> (BalancedTokenSequenc
     (result, lexer.ctx_map)
 }
 
-trait Pattern {
-    fn matches(self, string: &str) -> Option<usize>;
-}
+mod lexer_core {
+    use regex_automata::{Anchored, Input, meta::Regex};
 
-impl Pattern for &'_ str {
-    fn matches(self, string: &str) -> Option<usize> {
-        string.starts_with(self).then_some(self.len())
+    use crate::span::{ContextId, ContextMapping, SourceContext, Span};
+
+    pub trait Pattern {
+        fn matches(self, string: &str) -> Option<usize>;
     }
-}
 
-impl Pattern for char {
-    fn matches(self, string: &str) -> Option<usize> {
-        string.chars().next().filter(|c| *c == self).map(|c| c.len_utf8())
-    }
-}
-
-impl Pattern for &'_ Regex {
-    fn matches(self, string: &str) -> Option<usize> {
-        let input = Input::new(string).anchored(Anchored::Yes);
-        self.find(input).map(|mat| mat.len())
-    }
-}
-
-struct Lexer<'a> {
-    string: &'a str,
-    cursor: usize,
-    /// Whether the cursor is at the beginning of a line.
-    line_begin: bool,
-    /// Current line number.
-    lineno: i32,
-    /// Current source context.
-    ctx_id: ContextId,
-    /// Source collection for context tracking.
-    ctx_map: ContextMapping<'a>,
-}
-
-impl<'a> Lexer<'a> {
-    fn new(string: &'a str, filename: Option<&str>) -> Self {
-        let mut ctx_map = ContextMapping::new(string);
-        Self {
-            string,
-            cursor: 0,
-            line_begin: true,
-            lineno: 1,
-            ctx_id: filename.map_or(ContextId::none(), |filename| {
-                ctx_map.insert_context(SourceContext {
-                    filename: filename.into(),
-                    line_offset: 0,
-                })
-            }),
-            ctx_map,
+    impl Pattern for &'_ str {
+        fn matches(self, string: &str) -> Option<usize> {
+            string.starts_with(self).then_some(self.len())
         }
     }
 
-    fn remaining(&self) -> &'a str {
-        &self.string[self.cursor..]
-    }
-
-    fn is_eof(&self) -> bool {
-        self.cursor >= self.string.len()
-    }
-
-    fn peek(&self) -> Option<char> {
-        self.remaining().chars().next()
-    }
-
-    fn eat(&mut self) -> Option<char> {
-        let ch = self.peek()?;
-        self.cursor += ch.len_utf8();
-        self.on_token(ch);
-        Some(ch)
-    }
-
-    fn on_token(&mut self, ch: char) {
-        if ch == '\n' {
-            self.line_begin = true;
-            self.lineno += 1;
-        } else if self.line_begin && !ch.is_whitespace() {
-            self.line_begin = false;
+    impl Pattern for char {
+        fn matches(self, string: &str) -> Option<usize> {
+            string.chars().next().filter(|c| *c == self).map(|c| c.len_utf8())
         }
     }
 
-    fn eat_if(&mut self, pat: impl Pattern) -> Option<&'a str> {
-        let remaining = self.remaining();
-        if let Some(len) = pat.matches(remaining) {
+    impl Pattern for &'_ Regex {
+        fn matches(self, string: &str) -> Option<usize> {
+            let input = Input::new(string).anchored(Anchored::Yes);
+            self.find(input).map(|mat| mat.len())
+        }
+    }
+
+    pub struct Lexer<'a> {
+        string: &'a str,
+        cursor: usize,
+        /// Whether the cursor is at the beginning of a line.
+        line_begin: bool,
+        /// Current line number.
+        lineno: i32,
+        /// Current source context.
+        ctx_id: ContextId,
+        /// Source collection for context tracking.
+        pub(crate) ctx_map: ContextMapping<'a>,
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct LexerCheckpoint {
+        cursor: usize,
+        line_begin: bool,
+        lineno: i32,
+        ctx_id: ContextId,
+    }
+
+    impl<'a> Lexer<'a> {
+        pub fn new(string: &'a str, filename: Option<&str>) -> Self {
+            let mut ctx_map = ContextMapping::new(string);
+            Self {
+                string,
+                cursor: 0,
+                line_begin: true,
+                lineno: 1,
+                ctx_id: filename.map_or(ContextId::none(), |filename| {
+                    ctx_map.insert_context(SourceContext {
+                        filename: filename.into(),
+                        line_offset: 0,
+                    })
+                }),
+                ctx_map,
+            }
+        }
+
+        pub fn checkpoint(&self) -> LexerCheckpoint {
+            LexerCheckpoint {
+                cursor: self.cursor,
+                line_begin: self.line_begin,
+                lineno: self.lineno,
+                ctx_id: self.ctx_id,
+            }
+        }
+
+        pub fn restore(&mut self, checkpoint: LexerCheckpoint) {
+            self.cursor = checkpoint.cursor;
+            self.line_begin = checkpoint.line_begin;
+            self.lineno = checkpoint.lineno;
+            self.ctx_id = checkpoint.ctx_id;
+        }
+
+        fn on_token(&mut self, ch: char) {
+            if ch == '\n' {
+                self.line_begin = true;
+                self.lineno += 1;
+            } else if self.line_begin && !ch.is_whitespace() {
+                self.line_begin = false;
+            }
+        }
+
+        pub fn remaining(&self) -> &'a str {
+            &self.string[self.cursor..]
+        }
+
+        pub fn is_eof(&self) -> bool {
+            self.cursor >= self.string.len()
+        }
+
+        pub fn cursor(&self) -> usize {
+            self.cursor
+        }
+
+        pub fn line_begin(&self) -> bool {
+            self.line_begin
+        }
+
+        pub fn lineno(&self) -> i32 {
+            self.lineno
+        }
+
+        pub fn ctx_id(&self) -> ContextId {
+            self.ctx_id
+        }
+
+        pub fn set_context(&mut self, context: SourceContext) {
+            self.ctx_id = self.ctx_map.insert_context(context);
+        }
+
+        pub fn peek(&self) -> Option<char> {
+            self.remaining().chars().next()
+        }
+
+        pub fn eat(&mut self) -> Option<char> {
+            let ch = self.peek()?;
+            self.cursor += ch.len_utf8();
+            self.on_token(ch);
+            Some(ch)
+        }
+
+        pub fn eat_if(&mut self, pat: impl Pattern) -> Option<&'a str> {
+            let remaining = self.remaining();
+            let len = pat.matches(remaining)?;
             let matched = &remaining[..len];
             // Update line tracking for each character
             for ch in matched.chars() {
@@ -112,15 +160,17 @@ impl<'a> Lexer<'a> {
             }
             self.cursor += len;
             Some(matched)
-        } else {
-            None
+        }
+
+        pub fn make_span(&self, start: usize) -> Span {
+            Span::new(start..self.cursor, self.ctx_id)
         }
     }
+}
 
-    fn make_span(&self, start: usize) -> Span {
-        Span::new(start..self.cursor, self.ctx_id)
-    }
+use lexer_core::Lexer;
 
+impl<'a> Lexer<'a> {
     /// (6.4.2.1) identifier
     fn identifier(&mut self) -> Option<Identifier> {
         // C identifiers can start with underscore or XID_Start, followed by XID_Continue
@@ -186,8 +236,8 @@ impl<'a> Lexer<'a> {
             (re!(r"l|L"), IntegerSuffix::Long),
             (re!(r"wb|WB"), IntegerSuffix::BitPrecise),
         ]
-        .iter()
-        .find_map(|(pattern, suffix)| self.eat_if(*pattern).map(|_| *suffix))
+        .into_iter()
+        .find_map(|(pattern, suffix)| self.eat_if(pattern).map(|_| suffix))
     }
 
     /// (6.4.4.2) floating constant
@@ -224,8 +274,8 @@ impl<'a> Lexer<'a> {
             (re!(r"f|F"), FloatingSuffix::F),
             (re!(r"l|L"), FloatingSuffix::L),
         ]
-        .iter()
-        .find_map(|(pattern, suffix)| self.eat_if(*pattern).map(|_| *suffix))
+        .into_iter()
+        .find_map(|(pattern, suffix)| self.eat_if(pattern).map(|_| suffix))
     }
 
     /// (6.4.4.4) encoding prefix
@@ -295,11 +345,11 @@ impl<'a> Lexer<'a> {
 
     /// (6.4.4.4) character constant
     fn character_constant(&mut self) -> Option<CharacterConstant> {
-        let start = self.cursor;
+        let ckpt = self.checkpoint();
         let encoding_prefix = self.encoding_prefix();
 
         if self.eat_if('\'').is_none() {
-            self.cursor = start;
+            self.restore(ckpt);
             return None;
         }
 
@@ -333,14 +383,15 @@ impl<'a> Lexer<'a> {
             ("true", PredefinedConstant::True),
             ("nullptr", PredefinedConstant::Nullptr),
         ]
-        .iter()
+        .into_iter()
         .find_map(|(keyword, constant)| {
-            if self.eat_if(*keyword).is_some() {
+            let ckpt = self.checkpoint();
+            if self.eat_if(keyword).is_some() {
                 if self.peek().is_none_or(|c| !c.is_alphanumeric() && c != '_') {
-                    Some(*constant)
+                    Some(constant)
                 } else {
                     // Revert if followed by more identifier characters
-                    self.cursor -= keyword.len();
+                    self.restore(ckpt);
                     None
                 }
             } else {
@@ -351,31 +402,31 @@ impl<'a> Lexer<'a> {
 
     /// (6.4.4) constant
     fn constant(&mut self) -> Option<Constant> {
-        let start = self.cursor;
+        let ckpt = self.checkpoint();
 
         // Try predefined constant first
         if let Some(pc) = self.predefined_constant() {
             return Some(Constant::Predefined(pc));
         }
-        self.cursor = start;
+        self.restore(ckpt);
 
         // Try floating constant (must be before integer for proper parsing of "0.5")
         if let Some(fc) = self.floating_constant() {
             return Some(Constant::Floating(fc));
         }
-        self.cursor = start;
+        self.restore(ckpt);
 
         // Try character constant
         if let Some(cc) = self.character_constant() {
             return Some(Constant::Character(cc));
         }
-        self.cursor = start;
+        self.restore(ckpt);
 
         // Try integer constant
         if let Some(ic) = self.integer_constant() {
             return Some(Constant::Integer(ic));
         }
-        self.cursor = start;
+        self.restore(ckpt);
 
         None
     }
@@ -385,11 +436,11 @@ impl<'a> Lexer<'a> {
         let mut literals = Vec::new();
 
         loop {
-            let start = self.cursor;
+            let ckpt = self.checkpoint();
             let encoding_prefix = self.encoding_prefix();
 
             if self.eat_if('"').is_none() {
-                self.cursor = start;
+                self.restore(ckpt);
                 break;
             }
 
@@ -556,11 +607,11 @@ impl<'a> Lexer<'a> {
 
     /// Skip line directive (#line, #pragma, etc.)
     fn skip_line_directive(&mut self) -> bool {
-        if !self.line_begin {
+        if !self.line_begin() {
             return false;
         }
 
-        let start = self.cursor;
+        let ckpt = self.checkpoint();
 
         // Skip leading whitespace on the line
         while let Some(ch) = self.peek() {
@@ -572,7 +623,7 @@ impl<'a> Lexer<'a> {
         }
 
         if self.eat_if('#').is_none() {
-            self.cursor = start;
+            self.restore(ckpt);
             return false;
         }
 
@@ -596,9 +647,9 @@ impl<'a> Lexer<'a> {
             if let [line, file, ..] = &parts[..]
                 && let Ok(line_num) = line.parse::<i32>()
             {
-                self.ctx_id = self.ctx_map.insert_context(SourceContext {
+                self.set_context(SourceContext {
                     filename: file.trim_matches('"').to_string(),
-                    line_offset: self.lineno - line_num,
+                    line_offset: self.lineno() - line_num,
                 });
             }
         }
@@ -609,7 +660,7 @@ impl<'a> Lexer<'a> {
     /// Skip whitespace, comments, and line directives
     fn skip_whitespace(&mut self) {
         loop {
-            let start = self.cursor;
+            let start = self.cursor();
 
             // Skip whitespace characters
             while let Some(ch) = self.peek() {
@@ -630,7 +681,7 @@ impl<'a> Lexer<'a> {
                 continue;
             }
 
-            if self.cursor == start {
+            if self.cursor() == start {
                 break;
             }
         }
@@ -641,7 +692,7 @@ impl<'a> Lexer<'a> {
     where
         F: Fn(BalancedTokenSequence) -> BalancedToken,
     {
-        let start = self.cursor;
+        let start = self.cursor();
         if self.eat_if(open).is_some() {
             let mut inner = self.balanced_token_sequence();
             if self.eat_if(close).is_none() {
@@ -657,7 +708,7 @@ impl<'a> Lexer<'a> {
     fn balanced_token(&mut self) -> Option<Spanned<BalancedToken>> {
         self.skip_whitespace();
 
-        let start = self.cursor;
+        let start = self.cursor();
 
         // Parenthesized: ( balanced-token-sequence? )
         if let Some(token) = self.parse_bracketed('(', ')', BalancedToken::Parenthesized) {
@@ -742,7 +793,7 @@ impl<'a> Lexer<'a> {
         }
 
         self.skip_whitespace();
-        let eoi = Span::new_eoi(self.cursor, self.ctx_id);
+        let eoi = Span::new_eoi(self.cursor(), self.ctx_id());
 
         BalancedTokenSequence { tokens, closed: true, eoi }
     }
