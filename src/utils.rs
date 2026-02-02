@@ -13,6 +13,14 @@ use chumsky::{
 use derive_more::{Index, IndexMut};
 use rustc_hash::FxHashMap;
 
+macro_rules! re {
+    ($re:literal) => {{
+        static RE: once_cell::sync::Lazy<regex_automata::meta::Regex> =
+            once_cell::sync::Lazy::new(|| regex_automata::meta::Regex::new($re).unwrap());
+        &*RE
+    }};
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Brand<T, B>(T, PhantomData<B>);
 
@@ -141,8 +149,6 @@ where
     }
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! cached {
     (
         $( #[$attrs:meta] )*
@@ -162,5 +168,3 @@ macro_rules! cached {
         }
     };
 }
-
-pub use crate::cached;
