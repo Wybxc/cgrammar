@@ -6,7 +6,7 @@ mod utils;
 
 mod ast;
 mod context;
-mod lexer;
+mod lexer2;
 pub mod parser;
 #[cfg(feature = "printer")]
 pub mod printer;
@@ -17,14 +17,7 @@ pub mod visitor;
 pub use ast::*;
 pub use chumsky::Parser;
 pub use context::State;
-pub use lexer::lex;
+pub use lexer2::lex;
 pub use parser::*;
 pub use report::*;
 pub use visitor::{Visitor, VisitorMut};
-
-mod lexer2;
-
-/// Lexer v2 (hand-written version) for testing
-pub mod lexer_v2 {
-    pub use crate::lexer2::lex;
-}

@@ -177,23 +177,17 @@ impl<'a> Lexer<'a> {
 
     /// (6.4.4.1) integer suffix
     fn integer_suffix(&mut self) -> Option<IntegerSuffix> {
-        if self.eat_if(re!(r"(u|U)(ll|LL)|(ll|LL)(u|U)")).is_some() {
-            Some(IntegerSuffix::UnsignedLongLong)
-        } else if self.eat_if(re!(r"(u|U)(l|L)|(l|L)(u|U)")).is_some() {
-            Some(IntegerSuffix::UnsignedLong)
-        } else if self.eat_if(re!(r"(u|U)(wb|WB)|(wb|WB)(u|U)")).is_some() {
-            Some(IntegerSuffix::UnsignedBitPrecise)
-        } else if self.eat_if(re!(r"u|U")).is_some() {
-            Some(IntegerSuffix::Unsigned)
-        } else if self.eat_if(re!(r"ll|LL")).is_some() {
-            Some(IntegerSuffix::LongLong)
-        } else if self.eat_if(re!(r"l|L")).is_some() {
-            Some(IntegerSuffix::Long)
-        } else if self.eat_if(re!(r"wb|WB")).is_some() {
-            Some(IntegerSuffix::BitPrecise)
-        } else {
-            None
-        }
+        [
+            (re!(r"(u|U)(ll|LL)|(ll|LL)(u|U)"), IntegerSuffix::UnsignedLongLong),
+            (re!(r"(u|U)(l|L)|(l|L)(u|U)"), IntegerSuffix::UnsignedLong),
+            (re!(r"(u|U)(wb|WB)|(wb|WB)(u|U)"), IntegerSuffix::UnsignedBitPrecise),
+            (re!(r"u|U"), IntegerSuffix::Unsigned),
+            (re!(r"ll|LL"), IntegerSuffix::LongLong),
+            (re!(r"l|L"), IntegerSuffix::Long),
+            (re!(r"wb|WB"), IntegerSuffix::BitPrecise),
+        ]
+        .iter()
+        .find_map(|(pattern, suffix)| self.eat_if(*pattern).map(|_| *suffix))
     }
 
     /// (6.4.4.2) floating constant
@@ -210,32 +204,28 @@ impl<'a> Lexer<'a> {
     /// (6.4.4.2) decimal floating constant
     fn decimal_floating_constant(&mut self) -> Option<NotNan<f64>> {
         let value = self.eat_if(re!(r"(?:(?:\d+(?:'?\d+)*)?\.(?:\d+(?:'?\d+)*)|(?:\d+(?:'?\d+)*)\.)(?:[eE][+-]?(?:\d+(?:'?\d+)*))?|(?:\d+(?:'?\d+)*)(?:[eE][+-]?(?:\d+(?:'?\d+)*))"))?;
-        let value = value.replace("'", "").parse().unwrap();
-        Some(value)
+        let parsed: f64 = value.replace("'", "").parse().ok()?;
+        NotNan::new(parsed).ok()
     }
 
     /// (6.4.4.2) hexadecimal floating constant
     fn hexadecimal_floating_constant(&mut self) -> Option<NotNan<f64>> {
         let value = self.eat_if(re!(r"(?:0[xX])(?:(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)?\.(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)|(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)\.?)(?:[pP][+-]?(?:\d+(?:'?\d+)*))"))?;
-        let value = hexf_parse::parse_hexf64(&value.replace("'", ""), false).unwrap();
-        Some(value.try_into().unwrap())
+        let parsed = hexf_parse::parse_hexf64(&value.replace("'", ""), false).ok()?;
+        NotNan::new(parsed).ok()
     }
 
     /// (6.4.4.2) floating suffix
     fn floating_suffix(&mut self) -> Option<FloatingSuffix> {
-        if self.eat_if(re!(r"df|DF")).is_some() {
-            Some(FloatingSuffix::DF)
-        } else if self.eat_if(re!(r"dd|DD")).is_some() {
-            Some(FloatingSuffix::DD)
-        } else if self.eat_if(re!(r"dl|DL")).is_some() {
-            Some(FloatingSuffix::DL)
-        } else if self.eat_if(re!(r"f|F")).is_some() {
-            Some(FloatingSuffix::F)
-        } else if self.eat_if(re!(r"l|L")).is_some() {
-            Some(FloatingSuffix::L)
-        } else {
-            None
-        }
+        [
+            (re!(r"df|DF"), FloatingSuffix::DF),
+            (re!(r"dd|DD"), FloatingSuffix::DD),
+            (re!(r"dl|DL"), FloatingSuffix::DL),
+            (re!(r"f|F"), FloatingSuffix::F),
+            (re!(r"l|L"), FloatingSuffix::L),
+        ]
+        .iter()
+        .find_map(|(pattern, suffix)| self.eat_if(*pattern).map(|_| *suffix))
     }
 
     /// (6.4.4.4) encoding prefix
@@ -258,49 +248,22 @@ impl<'a> Lexer<'a> {
         self.eat_if('\\')?;
         match self.peek()? {
             // Simple escape sequences
-            '\'' => {
+            c @ ('\'' | '"' | '?' | '\\' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v') => {
                 self.eat();
-                Some('\'')
-            }
-            '"' => {
-                self.eat();
-                Some('"')
-            }
-            '?' => {
-                self.eat();
-                Some('?')
-            }
-            '\\' => {
-                self.eat();
-                Some('\\')
-            }
-            'a' => {
-                self.eat();
-                Some('\x07')
-            }
-            'b' => {
-                self.eat();
-                Some('\x08')
-            }
-            'f' => {
-                self.eat();
-                Some('\x0C')
-            }
-            'n' => {
-                self.eat();
-                Some('\n')
-            }
-            'r' => {
-                self.eat();
-                Some('\r')
-            }
-            't' => {
-                self.eat();
-                Some('\t')
-            }
-            'v' => {
-                self.eat();
-                Some('\x0B')
+                Some(match c {
+                    '\'' => '\'',
+                    '"' => '"',
+                    '?' => '?',
+                    '\\' => '\\',
+                    'a' => '\x07',
+                    'b' => '\x08',
+                    'f' => '\x0C',
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    'v' => '\x0B',
+                    _ => unreachable!(),
+                })
             }
             // Octal escape sequence (\ooo)
             '0'..='7' => {
@@ -365,19 +328,25 @@ impl<'a> Lexer<'a> {
 
     /// (6.4.4.5) predefined constant
     fn predefined_constant(&mut self) -> Option<PredefinedConstant> {
-        if self.eat_if("false").is_some() {
-            // Make sure it's not a prefix of a longer identifier
-            if self.peek().is_none_or(|c| !c.is_alphanumeric() && c != '_') {
-                return Some(PredefinedConstant::False);
+        [
+            ("false", PredefinedConstant::False),
+            ("true", PredefinedConstant::True),
+            ("nullptr", PredefinedConstant::Nullptr),
+        ]
+        .iter()
+        .find_map(|(keyword, constant)| {
+            if self.eat_if(*keyword).is_some() {
+                if self.peek().is_none_or(|c| !c.is_alphanumeric() && c != '_') {
+                    Some(*constant)
+                } else {
+                    // Revert if followed by more identifier characters
+                    self.cursor -= keyword.len();
+                    None
+                }
+            } else {
+                None
             }
-        }
-        if self.eat_if("true").is_some() && self.peek().is_none_or(|c| !c.is_alphanumeric() && c != '_') {
-            return Some(PredefinedConstant::True);
-        }
-        if self.eat_if("nullptr").is_some() && self.peek().is_none_or(|c| !c.is_alphanumeric() && c != '_') {
-            return Some(PredefinedConstant::Nullptr);
-        }
-        None
+        })
     }
 
     /// (6.4.4) constant
@@ -481,140 +450,65 @@ impl<'a> Lexer<'a> {
 
     /// (6.4.6) punctuator (excluding parentheses and brackets)
     fn punctuator(&mut self) -> Option<Punctuator> {
+        // Helper macro to try patterns and return punctuator
+        macro_rules! try_punct {
+            ($($pat:expr => $variant:expr),* $(,)?) => {
+                $(
+                    if self.eat_if($pat).is_some() {
+                        return Some($variant);
+                    }
+                )*
+            };
+        }
+
         // Put longer operators first to avoid partial matches
         // Assignment and compound operators (3 chars)
-        if self.eat_if("<<=").is_some() {
-            return Some(Punctuator::LeftShiftAssign);
-        }
-        if self.eat_if(">>=").is_some() {
-            return Some(Punctuator::RightShiftAssign);
-        }
-        if self.eat_if("...").is_some() {
-            return Some(Punctuator::Ellipsis);
-        }
-
-        // Compound operators (2 chars)
-        if self.eat_if("*=").is_some() {
-            return Some(Punctuator::MulAssign);
-        }
-        if self.eat_if("/=").is_some() {
-            return Some(Punctuator::DivAssign);
-        }
-        if self.eat_if("%=").is_some() {
-            return Some(Punctuator::ModAssign);
-        }
-        if self.eat_if("+=").is_some() {
-            return Some(Punctuator::AddAssign);
-        }
-        if self.eat_if("-=").is_some() {
-            return Some(Punctuator::SubAssign);
-        }
-        if self.eat_if("&=").is_some() {
-            return Some(Punctuator::AndAssign);
-        }
-        if self.eat_if("^=").is_some() {
-            return Some(Punctuator::XorAssign);
-        }
-        if self.eat_if("|=").is_some() {
-            return Some(Punctuator::OrAssign);
-        }
-        if self.eat_if("##").is_some() {
-            return Some(Punctuator::HashHash);
-        }
-        if self.eat_if("++").is_some() {
-            return Some(Punctuator::Increment);
-        }
-        if self.eat_if("--").is_some() {
-            return Some(Punctuator::Decrement);
-        }
-        if self.eat_if("<<").is_some() {
-            return Some(Punctuator::LeftShift);
-        }
-        if self.eat_if(">>").is_some() {
-            return Some(Punctuator::RightShift);
-        }
-        if self.eat_if("<=").is_some() {
-            return Some(Punctuator::LessEqual);
-        }
-        if self.eat_if(">=").is_some() {
-            return Some(Punctuator::GreaterEqual);
-        }
-        if self.eat_if("==").is_some() {
-            return Some(Punctuator::Equal);
-        }
-        if self.eat_if("!=").is_some() {
-            return Some(Punctuator::NotEqual);
-        }
-        if self.eat_if("&&").is_some() {
-            return Some(Punctuator::LogicalAnd);
-        }
-        if self.eat_if("||").is_some() {
-            return Some(Punctuator::LogicalOr);
-        }
-        if self.eat_if("->").is_some() {
-            return Some(Punctuator::Arrow);
-        }
-        if self.eat_if("::").is_some() {
-            return Some(Punctuator::Scope);
-        }
-
-        // Simple operators (1 char)
-        if self.eat_if('.').is_some() {
-            return Some(Punctuator::Dot);
-        }
-        if self.eat_if('&').is_some() {
-            return Some(Punctuator::Ampersand);
-        }
-        if self.eat_if('*').is_some() {
-            return Some(Punctuator::Star);
-        }
-        if self.eat_if('+').is_some() {
-            return Some(Punctuator::Plus);
-        }
-        if self.eat_if('-').is_some() {
-            return Some(Punctuator::Minus);
-        }
-        if self.eat_if('~').is_some() {
-            return Some(Punctuator::Tilde);
-        }
-        if self.eat_if('!').is_some() {
-            return Some(Punctuator::Bang);
-        }
-        if self.eat_if('/').is_some() {
-            return Some(Punctuator::Slash);
-        }
-        if self.eat_if('%').is_some() {
-            return Some(Punctuator::Percent);
-        }
-        if self.eat_if('<').is_some() {
-            return Some(Punctuator::Less);
-        }
-        if self.eat_if('>').is_some() {
-            return Some(Punctuator::Greater);
-        }
-        if self.eat_if('^').is_some() {
-            return Some(Punctuator::Caret);
-        }
-        if self.eat_if('|').is_some() {
-            return Some(Punctuator::Pipe);
-        }
-        if self.eat_if('?').is_some() {
-            return Some(Punctuator::Question);
-        }
-        if self.eat_if(':').is_some() {
-            return Some(Punctuator::Colon);
-        }
-        if self.eat_if(';').is_some() {
-            return Some(Punctuator::Semicolon);
-        }
-        if self.eat_if('=').is_some() {
-            return Some(Punctuator::Assign);
-        }
-        if self.eat_if(',').is_some() {
-            return Some(Punctuator::Comma);
-        }
-        if self.eat_if('#').is_some() {
-            return Some(Punctuator::Hash);
+        try_punct! {
+            "<<=" => Punctuator::LeftShiftAssign,
+            ">>=" => Punctuator::RightShiftAssign,
+            "..." => Punctuator::Ellipsis,
+            // Compound operators (2 chars)
+            "*=" => Punctuator::MulAssign,
+            "/=" => Punctuator::DivAssign,
+            "%=" => Punctuator::ModAssign,
+            "+=" => Punctuator::AddAssign,
+            "-=" => Punctuator::SubAssign,
+            "&=" => Punctuator::AndAssign,
+            "^=" => Punctuator::XorAssign,
+            "|=" => Punctuator::OrAssign,
+            "##" => Punctuator::HashHash,
+            "++" => Punctuator::Increment,
+            "--" => Punctuator::Decrement,
+            "<<" => Punctuator::LeftShift,
+            ">>" => Punctuator::RightShift,
+            "<=" => Punctuator::LessEqual,
+            ">=" => Punctuator::GreaterEqual,
+            "==" => Punctuator::Equal,
+            "!=" => Punctuator::NotEqual,
+            "&&" => Punctuator::LogicalAnd,
+            "||" => Punctuator::LogicalOr,
+            "->" => Punctuator::Arrow,
+            "::" => Punctuator::Scope,
+            // Simple operators (1 char)
+            '.' => Punctuator::Dot,
+            '&' => Punctuator::Ampersand,
+            '*' => Punctuator::Star,
+            '+' => Punctuator::Plus,
+            '-' => Punctuator::Minus,
+            '~' => Punctuator::Tilde,
+            '!' => Punctuator::Bang,
+            '/' => Punctuator::Slash,
+            '%' => Punctuator::Percent,
+            '<' => Punctuator::Less,
+            '>' => Punctuator::Greater,
+            '^' => Punctuator::Caret,
+            '|' => Punctuator::Pipe,
+            '?' => Punctuator::Question,
+            ':' => Punctuator::Colon,
+            ';' => Punctuator::Semicolon,
+            '=' => Punctuator::Assign,
+            ',' => Punctuator::Comma,
+            '#' => Punctuator::Hash,
         }
 
         None
@@ -742,6 +636,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Helper method to parse parenthesized/bracketed/braced sequences
+    fn parse_bracketed<F>(&mut self, open: char, close: char, make_token: F) -> Option<Spanned<BalancedToken>>
+    where
+        F: Fn(BalancedTokenSequence) -> BalancedToken,
+    {
+        let start = self.cursor;
+        if self.eat_if(open).is_some() {
+            let mut inner = self.balanced_token_sequence();
+            if self.eat_if(close).is_none() {
+                inner.closed = false;
+            }
+            let span = self.make_span(start);
+            return Some(Spanned::new(make_token(inner), span));
+        }
+        None
+    }
+
     /// (6.7.12.1) balanced token
     fn balanced_token(&mut self) -> Option<Spanned<BalancedToken>> {
         self.skip_whitespace();
@@ -749,33 +660,18 @@ impl<'a> Lexer<'a> {
         let start = self.cursor;
 
         // Parenthesized: ( balanced-token-sequence? )
-        if self.eat_if('(').is_some() {
-            let mut inner = self.balanced_token_sequence();
-            if self.eat_if(')').is_none() {
-                inner.closed = false;
-            }
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Parenthesized(inner), span));
+        if let Some(token) = self.parse_bracketed('(', ')', BalancedToken::Parenthesized) {
+            return Some(token);
         }
 
         // Bracketed: [ balanced-token-sequence? ]
-        if self.eat_if('[').is_some() {
-            let mut inner = self.balanced_token_sequence();
-            if self.eat_if(']').is_none() {
-                inner.closed = false;
-            }
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Bracketed(inner), span));
+        if let Some(token) = self.parse_bracketed('[', ']', BalancedToken::Bracketed) {
+            return Some(token);
         }
 
         // Braced: { balanced-token-sequence? }
-        if self.eat_if('{').is_some() {
-            let mut inner = self.balanced_token_sequence();
-            if self.eat_if('}').is_none() {
-                inner.closed = false;
-            }
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Braced(inner), span));
+        if let Some(token) = self.parse_bracketed('{', '}', BalancedToken::Braced) {
+            return Some(token);
         }
 
         // String literal
