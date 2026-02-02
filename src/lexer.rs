@@ -1,12 +1,7 @@
-//! Lexer for C source code, producing balanced token sequences.
+//! Lexer for C source code, producing balanced token sequences (hand-written version).
 
-use chumsky::{
-    input::{Checkpoint, Cursor, MapExtra},
-    inspector::Inspector,
-    prelude::*,
-    text::Char,
-};
 use ordered_float::NotNan;
+use regex_automata::{Anchored, Input, meta::Regex};
 
 #[cfg(feature = "quasi-quote")]
 use crate::quasi_quote::Template;
@@ -20,526 +15,735 @@ use crate::{
 /// This function tokenizes the input string and returns the result along with
 /// any errors encountered during lexing.
 pub fn lex<'a>(source: &'a str, filename: Option<&str>) -> (BalancedTokenSequence, ContextMapping<'a>) {
-    let mut state = lexer_utils::State::new(source, filename);
-    let result = balanced_token_sequence().parse_with_state(source, &mut state);
-    (result.unwrap(), state.ctx_map)
+    let mut lexer = Lexer::new(source, filename);
+    let result = lexer.balanced_token_sequence();
+    (result, lexer.ctx_map)
 }
 
-/// Utilities for the lexer.
-pub mod lexer_utils {
-    use crate::span::ContextId;
+trait Pattern {
+    fn matches(self, string: &str) -> Option<usize>;
+}
 
-    use super::*;
+impl Pattern for &'_ str {
+    fn matches(self, string: &str) -> Option<usize> {
+        string.starts_with(self).then_some(self.len())
+    }
+}
 
-    /// Extra parser state for the lexer.
-    pub type Extra<'a> = chumsky::extra::Full<Simple<'a, char>, State<'a>, ()>;
+impl Pattern for char {
+    fn matches(self, string: &str) -> Option<usize> {
+        string.chars().next().filter(|c| *c == self).map(|c| c.len_utf8())
+    }
+}
 
-    /// Lexer state tracking position and context.
-    #[derive(Clone)]
-    pub struct State<'a> {
-        /// Whether the cursor is at the beginning of a line.
-        pub line_begin: bool,
-        /// Current line number.
-        pub lineno: i32,
-        /// Current source context.
-        pub ctx_id: ContextId,
-        /// Source collection for context tracking.
-        pub ctx_map: ContextMapping<'a>,
+impl Pattern for &'_ Regex {
+    fn matches(self, string: &str) -> Option<usize> {
+        let input = Input::new(string).anchored(Anchored::Yes);
+        self.find(input).map(|mat| mat.len())
+    }
+}
+
+struct Lexer<'a> {
+    string: &'a str,
+    cursor: usize,
+    /// Whether the cursor is at the beginning of a line.
+    line_begin: bool,
+    /// Current line number.
+    lineno: i32,
+    /// Current source context.
+    ctx_id: ContextId,
+    /// Source collection for context tracking.
+    ctx_map: ContextMapping<'a>,
+}
+
+impl<'a> Lexer<'a> {
+    fn new(string: &'a str, filename: Option<&str>) -> Self {
+        let mut ctx_map = ContextMapping::new(string);
+        Self {
+            string,
+            cursor: 0,
+            line_begin: true,
+            lineno: 1,
+            ctx_id: filename.map_or(ContextId::none(), |filename| {
+                ctx_map.insert_context(SourceContext {
+                    filename: filename.into(),
+                    line_offset: 0,
+                })
+            }),
+            ctx_map,
+        }
     }
 
-    impl<'a> State<'a> {
-        /// Create a new lexer state with an optional file name.
-        pub fn new(source: &'a str, filename: Option<&str>) -> Self {
-            let mut ctx_map = ContextMapping::new(source);
-            Self {
-                line_begin: true,
-                lineno: 1,
-                ctx_id: filename.map_or(ContextId::none(), |filename| {
-                    ctx_map.insert_context(SourceContext {
-                        filename: filename.into(),
-                        line_offset: 0,
-                    })
-                }),
-                ctx_map,
+    fn remaining(&self) -> &'a str {
+        &self.string[self.cursor..]
+    }
+
+    fn is_eof(&self) -> bool {
+        self.cursor >= self.string.len()
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.remaining().chars().next()
+    }
+
+    fn eat(&mut self) -> Option<char> {
+        let ch = self.peek()?;
+        self.cursor += ch.len_utf8();
+        self.on_token(ch);
+        Some(ch)
+    }
+
+    fn on_token(&mut self, ch: char) {
+        if ch == '\n' {
+            self.line_begin = true;
+            self.lineno += 1;
+        } else if self.line_begin && !ch.is_whitespace() {
+            self.line_begin = false;
+        }
+    }
+
+    fn eat_if(&mut self, pat: impl Pattern) -> Option<&'a str> {
+        let remaining = self.remaining();
+        if let Some(len) = pat.matches(remaining) {
+            let matched = &remaining[..len];
+            // Update line tracking for each character
+            for ch in matched.chars() {
+                self.on_token(ch);
+            }
+            self.cursor += len;
+            Some(matched)
+        } else {
+            None
+        }
+    }
+
+    fn make_span(&self, start: usize) -> Span {
+        Span::new(start..self.cursor, self.ctx_id)
+    }
+
+    /// (6.4.2.1) identifier
+    fn identifier(&mut self) -> Option<Identifier> {
+        // C identifiers can start with underscore or XID_Start, followed by XID_Continue
+        let ident = self.eat_if(re!(r"[_\p{XID_Start}]\p{XID_Continue}*"))?;
+        Some(Identifier(ident.into()))
+    }
+
+    /// (6.4.4.1) integer constant
+    fn integer_constant(&mut self) -> Option<IntegerConstant> {
+        // Order matters: hexadecimal and binary must come before octal
+        // to avoid matching "0" from "0x" or "0b" as octal
+        let value = self
+            .hexadecimal_constant()
+            .or_else(|| self.binary_constant())
+            .or_else(|| self.octal_constant())
+            .or_else(|| self.decimal_constant())?;
+        let suffix = self.integer_suffix();
+        Some(IntegerConstant { value, suffix })
+    }
+
+    /// (6.4.4.1) decimal constant
+    fn decimal_constant(&mut self) -> Option<i128> {
+        let value = self.eat_if(re!(r"[1-9](?:'?[0-9])*"))?;
+        let value = value.replace("'", "").parse().unwrap_or(i128::MAX);
+        Some(value)
+    }
+
+    /// (6.4.4.1) octal constant
+    fn octal_constant(&mut self) -> Option<i128> {
+        // Try 0o/0O prefix first, then traditional octal (0 followed by octal digits)
+        if let Some(value) = self.eat_if(re!(r"0[oO][0-7](?:'?[0-7])*")) {
+            let digits = &value[2..];
+            return Some(i128::from_str_radix(&digits.replace("'", ""), 8).unwrap_or(i128::MAX));
+        }
+        if let Some(value) = self.eat_if(re!(r"0(?:'?[0-7])*")) {
+            return Some(i128::from_str_radix(&value.replace("'", ""), 8).unwrap_or(i128::MAX));
+        }
+        None
+    }
+
+    /// (6.4.4.1) hexadecimal constant
+    fn hexadecimal_constant(&mut self) -> Option<i128> {
+        let value = self.eat_if(re!(r"0[xX][0-9a-fA-F](?:'?[0-9a-fA-F])*"))?;
+        let value = i128::from_str_radix(&value[2..].replace("'", ""), 16).unwrap_or(i128::MAX);
+        Some(value)
+    }
+
+    /// (6.4.4.1) binary constant
+    fn binary_constant(&mut self) -> Option<i128> {
+        let value = self.eat_if(re!(r"0[bB][01](?:'?[01])*"))?;
+        let value = i128::from_str_radix(&value[2..].replace("'", ""), 2).unwrap_or(i128::MAX);
+        Some(value)
+    }
+
+    /// (6.4.4.1) integer suffix
+    fn integer_suffix(&mut self) -> Option<IntegerSuffix> {
+        [
+            (re!(r"(u|U)(ll|LL)|(ll|LL)(u|U)"), IntegerSuffix::UnsignedLongLong),
+            (re!(r"(u|U)(l|L)|(l|L)(u|U)"), IntegerSuffix::UnsignedLong),
+            (re!(r"(u|U)(wb|WB)|(wb|WB)(u|U)"), IntegerSuffix::UnsignedBitPrecise),
+            (re!(r"u|U"), IntegerSuffix::Unsigned),
+            (re!(r"ll|LL"), IntegerSuffix::LongLong),
+            (re!(r"l|L"), IntegerSuffix::Long),
+            (re!(r"wb|WB"), IntegerSuffix::BitPrecise),
+        ]
+        .iter()
+        .find_map(|(pattern, suffix)| self.eat_if(*pattern).map(|_| *suffix))
+    }
+
+    /// (6.4.4.2) floating constant
+    fn floating_constant(&mut self) -> Option<FloatingConstant> {
+        // Hexadecimal floating constant must come first to avoid
+        // matching "0" from "0x" as decimal
+        let value = self
+            .hexadecimal_floating_constant()
+            .or_else(|| self.decimal_floating_constant())?;
+        let suffix = self.floating_suffix();
+        Some(FloatingConstant { value, suffix })
+    }
+
+    /// (6.4.4.2) decimal floating constant
+    fn decimal_floating_constant(&mut self) -> Option<NotNan<f64>> {
+        let value = self.eat_if(re!(r"(?:(?:\d+(?:'?\d+)*)?\.(?:\d+(?:'?\d+)*)|(?:\d+(?:'?\d+)*)\.)(?:[eE][+-]?(?:\d+(?:'?\d+)*))?|(?:\d+(?:'?\d+)*)(?:[eE][+-]?(?:\d+(?:'?\d+)*))"))?;
+        let parsed: f64 = value.replace("'", "").parse().ok()?;
+        NotNan::new(parsed).ok()
+    }
+
+    /// (6.4.4.2) hexadecimal floating constant
+    fn hexadecimal_floating_constant(&mut self) -> Option<NotNan<f64>> {
+        let value = self.eat_if(re!(r"(?:0[xX])(?:(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)?\.(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)|(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)\.?)(?:[pP][+-]?(?:\d+(?:'?\d+)*))"))?;
+        let parsed = hexf_parse::parse_hexf64(&value.replace("'", ""), false).ok()?;
+        NotNan::new(parsed).ok()
+    }
+
+    /// (6.4.4.2) floating suffix
+    fn floating_suffix(&mut self) -> Option<FloatingSuffix> {
+        [
+            (re!(r"df|DF"), FloatingSuffix::DF),
+            (re!(r"dd|DD"), FloatingSuffix::DD),
+            (re!(r"dl|DL"), FloatingSuffix::DL),
+            (re!(r"f|F"), FloatingSuffix::F),
+            (re!(r"l|L"), FloatingSuffix::L),
+        ]
+        .iter()
+        .find_map(|(pattern, suffix)| self.eat_if(*pattern).map(|_| *suffix))
+    }
+
+    /// (6.4.4.4) encoding prefix
+    fn encoding_prefix(&mut self) -> Option<EncodingPrefix> {
+        if self.eat_if("u8").is_some() {
+            Some(EncodingPrefix::U8)
+        } else if self.eat_if('u').is_some() {
+            Some(EncodingPrefix::U)
+        } else if self.eat_if('U').is_some() {
+            Some(EncodingPrefix::CapitalU)
+        } else if self.eat_if('L').is_some() {
+            Some(EncodingPrefix::L)
+        } else {
+            None
+        }
+    }
+
+    /// (6.4.4.4) escape sequence
+    fn escape_sequence(&mut self) -> Option<char> {
+        self.eat_if('\\')?;
+        match self.peek()? {
+            // Simple escape sequences
+            c @ ('\'' | '"' | '?' | '\\' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v') => {
+                self.eat();
+                Some(match c {
+                    '\'' => '\'',
+                    '"' => '"',
+                    '?' => '?',
+                    '\\' => '\\',
+                    'a' => '\x07',
+                    'b' => '\x08',
+                    'f' => '\x0C',
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    'v' => '\x0B',
+                    _ => unreachable!(),
+                })
+            }
+            // Octal escape sequence (\ooo)
+            '0'..='7' => {
+                let digits = self.eat_if(re!(r"[0-7]{1,3}"))?;
+                char::from_u32(u32::from_str_radix(digits, 8).ok()?)
+            }
+            // Hexadecimal escape sequence (\xhh)
+            'x' => {
+                self.eat();
+                let digits = self.eat_if(re!(r"[0-9a-fA-F]+"))?;
+                char::from_u32(u32::from_str_radix(digits, 16).ok()?)
+            }
+            // Universal character names (\uxxxx)
+            'u' => {
+                self.eat();
+                let digits = self.eat_if(re!(r"[0-9a-fA-F]{4}"))?;
+                char::from_u32(u32::from_str_radix(digits, 16).ok()?)
+            }
+            // Universal character names (\Uxxxxxxxx)
+            'U' => {
+                self.eat();
+                let digits = self.eat_if(re!(r"[0-9a-fA-F]{8}"))?;
+                char::from_u32(u32::from_str_radix(digits, 16).ok()?)
+            }
+            // Fallback: just return the character itself
+            _ => self.eat(),
+        }
+    }
+
+    /// (6.4.4.4) character constant
+    fn character_constant(&mut self) -> Option<CharacterConstant> {
+        let start = self.cursor;
+        let encoding_prefix = self.encoding_prefix();
+
+        if self.eat_if('\'').is_none() {
+            self.cursor = start;
+            return None;
+        }
+
+        let mut value = String::new();
+        loop {
+            match self.peek() {
+                Some('\'') => {
+                    self.eat();
+                    break;
+                }
+                Some('\\') => {
+                    if let Some(ch) = self.escape_sequence() {
+                        value.push(ch);
+                    }
+                }
+                Some(ch) if ch != '\n' => {
+                    value.push(ch);
+                    self.eat();
+                }
+                _ => break, // EOF or newline - unclosed character constant
             }
         }
+
+        Some(CharacterConstant { encoding_prefix, value })
     }
 
-    /// A checkpoint for the lexer state.
-    #[derive(Clone, Copy)]
-    pub struct StateCheckpoint {
-        line_begin: bool,
-        lineno: i32,
-        ctx_id: ContextId,
+    /// (6.4.4.5) predefined constant
+    fn predefined_constant(&mut self) -> Option<PredefinedConstant> {
+        [
+            ("false", PredefinedConstant::False),
+            ("true", PredefinedConstant::True),
+            ("nullptr", PredefinedConstant::Nullptr),
+        ]
+        .iter()
+        .find_map(|(keyword, constant)| {
+            if self.eat_if(*keyword).is_some() {
+                if self.peek().is_none_or(|c| !c.is_alphanumeric() && c != '_') {
+                    Some(*constant)
+                } else {
+                    // Revert if followed by more identifier characters
+                    self.cursor -= keyword.len();
+                    None
+                }
+            } else {
+                None
+            }
+        })
     }
 
-    impl<'src> Inspector<'src, &'src str> for State<'src> {
-        type Checkpoint = StateCheckpoint;
+    /// (6.4.4) constant
+    fn constant(&mut self) -> Option<Constant> {
+        let start = self.cursor;
 
-        fn on_token(&mut self, token: &char) {
-            if token.is_newline() {
-                self.line_begin = true;
-                self.lineno += 1;
-            } else if self.line_begin && !token.is_whitespace() {
-                self.line_begin = false;
+        // Try predefined constant first
+        if let Some(pc) = self.predefined_constant() {
+            return Some(Constant::Predefined(pc));
+        }
+        self.cursor = start;
+
+        // Try floating constant (must be before integer for proper parsing of "0.5")
+        if let Some(fc) = self.floating_constant() {
+            return Some(Constant::Floating(fc));
+        }
+        self.cursor = start;
+
+        // Try character constant
+        if let Some(cc) = self.character_constant() {
+            return Some(Constant::Character(cc));
+        }
+        self.cursor = start;
+
+        // Try integer constant
+        if let Some(ic) = self.integer_constant() {
+            return Some(Constant::Integer(ic));
+        }
+        self.cursor = start;
+
+        None
+    }
+
+    /// (6.4.5) string-literal
+    fn string_literal(&mut self) -> Option<StringLiterals> {
+        let mut literals = Vec::new();
+
+        loop {
+            let start = self.cursor;
+            let encoding_prefix = self.encoding_prefix();
+
+            if self.eat_if('"').is_none() {
+                self.cursor = start;
+                break;
+            }
+
+            let mut value = String::new();
+            loop {
+                match self.peek() {
+                    Some('"') => {
+                        self.eat();
+                        break;
+                    }
+                    Some('\\') => {
+                        if let Some(ch) = self.escape_sequence() {
+                            value.push(ch);
+                        }
+                    }
+                    Some(ch) if ch != '\n' => {
+                        value.push(ch);
+                        self.eat();
+                    }
+                    _ => break, // EOF or newline - unclosed string
+                }
+            }
+
+            literals.push(StringLiteral { encoding_prefix, value });
+
+            // Skip whitespace between adjacent string literals
+            self.skip_whitespace();
+        }
+
+        if literals.is_empty() {
+            None
+        } else {
+            Some(StringLiterals(literals))
+        }
+    }
+
+    /// extension syntax: `xxx` for quoted strings
+    fn quoted_string(&mut self) -> Option<String> {
+        self.eat_if('`')?;
+
+        let mut content = String::new();
+        loop {
+            match self.peek() {
+                Some('`') => {
+                    self.eat();
+                    break;
+                }
+                Some(ch) => {
+                    content.push(ch);
+                    self.eat();
+                }
+                None => break, // EOF - unclosed quoted string
             }
         }
 
-        fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, &'src str>) -> Self::Checkpoint {
-            StateCheckpoint {
-                line_begin: self.line_begin,
-                lineno: self.lineno,
-                ctx_id: self.ctx_id,
-            }
-        }
-
-        fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, &'src str, Self::Checkpoint>) {
-            let checkpoint = marker.inspector();
-            self.line_begin = checkpoint.line_begin;
-            self.lineno = checkpoint.lineno;
-            self.ctx_id = checkpoint.ctx_id;
-        }
+        Some(content)
     }
-}
 
-use lexer_utils::*;
+    /// (6.4.6) punctuator (excluding parentheses and brackets)
+    fn punctuator(&mut self) -> Option<Punctuator> {
+        // Helper macro to try patterns and return punctuator
+        macro_rules! try_punct {
+            ($($pat:expr => $variant:expr),* $(,)?) => {
+                $(
+                    if self.eat_if($pat).is_some() {
+                        return Some($variant);
+                    }
+                )*
+            };
+        }
 
-/// (6.4.2.1) identifier
-pub fn identifier<'a>() -> impl Parser<'a, &'a str, Identifier, Extra<'a>> + Clone {
-    text::ident().map(|value: &str| Identifier(value.into()))
-}
+        // Put longer operators first to avoid partial matches
+        // Assignment and compound operators (3 chars)
+        try_punct! {
+            "<<=" => Punctuator::LeftShiftAssign,
+            ">>=" => Punctuator::RightShiftAssign,
+            "..." => Punctuator::Ellipsis,
+            // Compound operators (2 chars)
+            "*=" => Punctuator::MulAssign,
+            "/=" => Punctuator::DivAssign,
+            "%=" => Punctuator::ModAssign,
+            "+=" => Punctuator::AddAssign,
+            "-=" => Punctuator::SubAssign,
+            "&=" => Punctuator::AndAssign,
+            "^=" => Punctuator::XorAssign,
+            "|=" => Punctuator::OrAssign,
+            "##" => Punctuator::HashHash,
+            "++" => Punctuator::Increment,
+            "--" => Punctuator::Decrement,
+            "<<" => Punctuator::LeftShift,
+            ">>" => Punctuator::RightShift,
+            "<=" => Punctuator::LessEqual,
+            ">=" => Punctuator::GreaterEqual,
+            "==" => Punctuator::Equal,
+            "!=" => Punctuator::NotEqual,
+            "&&" => Punctuator::LogicalAnd,
+            "||" => Punctuator::LogicalOr,
+            "->" => Punctuator::Arrow,
+            "::" => Punctuator::Scope,
+            // Simple operators (1 char)
+            '.' => Punctuator::Dot,
+            '&' => Punctuator::Ampersand,
+            '*' => Punctuator::Star,
+            '+' => Punctuator::Plus,
+            '-' => Punctuator::Minus,
+            '~' => Punctuator::Tilde,
+            '!' => Punctuator::Bang,
+            '/' => Punctuator::Slash,
+            '%' => Punctuator::Percent,
+            '<' => Punctuator::Less,
+            '>' => Punctuator::Greater,
+            '^' => Punctuator::Caret,
+            '|' => Punctuator::Pipe,
+            '?' => Punctuator::Question,
+            ':' => Punctuator::Colon,
+            ';' => Punctuator::Semicolon,
+            '=' => Punctuator::Assign,
+            ',' => Punctuator::Comma,
+            '#' => Punctuator::Hash,
+        }
 
-/// (6.4.4) constant
-pub fn constant<'a>() -> impl Parser<'a, &'a str, Constant, Extra<'a>> + Clone {
-    choice((
-        predefined_constant().map(Constant::Predefined),
-        floating_constant().map(Constant::Floating),
-        character_constant().map(Constant::Character),
-        integer_constant().map(Constant::Integer),
-    ))
-}
+        None
+    }
 
-/// (6.4.4.1) integer constant
-pub fn integer_constant<'a>() -> impl Parser<'a, &'a str, IntegerConstant, Extra<'a>> + Clone {
-    choice((
-        hexadecimal_constant(),
-        binary_constant(),
-        octal_constant(),
-        decimal_constant(),
-    ))
-    .then(integer_suffix().or_not())
-    .map(|(value, suffix)| IntegerConstant { value, suffix })
-}
-
-/// (6.4.4.1) decimal constant
-pub fn decimal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
-    regex(r"[1-9](?:'?[0-9])*")
-        .map(|s: &str| s.replace("'", ""))
-        .from_str::<i128>()
-        .unwrapped()
-}
-
-/// (6.4.4.1) octal constant
-pub fn octal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
-    choice((
-        choice((just("0o"), just("0O"))).ignore_then(regex(r"[0-7](?:'?[0-7])*")),
-        regex(r"0(?:'?[0-7])*"),
-    ))
-    .map(|s: &str| s.replace("'", ""))
-    .map(|s| i128::from_str_radix(&s, 8))
-    .unwrapped()
-}
-
-/// (6.4.4.1) hexadecimal constant
-pub fn hexadecimal_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
-    choice((just("0x"), just("0X")))
-        .ignore_then(regex(r"[0-9a-fA-F](?:'?[0-9a-fA-F])*"))
-        .map(|s: &str| s.replace("'", ""))
-        .map(|s| i128::from_str_radix(&s, 16))
-        .unwrapped()
-}
-
-/// (6.4.4.1) binary constant
-pub fn binary_constant<'a>() -> impl Parser<'a, &'a str, i128, Extra<'a>> + Clone {
-    choice((just("0b"), just("0B")))
-        .ignore_then(regex(r"[01](?:'?[01])*"))
-        .map(|s: &str| s.replace("'", ""))
-        .map(|digits| i128::from_str_radix(&digits, 2))
-        .unwrapped()
-}
-
-/// (6.4.4.1) integer suffix
-pub fn integer_suffix<'a>() -> impl Parser<'a, &'a str, IntegerSuffix, Extra<'a>> + Clone {
-    choice((
-        // Unsigned + Long variations
-        just("ull").or(just("ULL")).map(|_| IntegerSuffix::UnsignedLongLong),
-        just("ul").or(just("UL")).map(|_| IntegerSuffix::UnsignedLong),
-        just("llu").or(just("LLU")).map(|_| IntegerSuffix::UnsignedLongLong),
-        just("lu").or(just("LU")).map(|_| IntegerSuffix::UnsignedLong),
-        // Long variations
-        just("ll").or(just("LL")).map(|_| IntegerSuffix::LongLong),
-        just("l").or(just("L")).map(|_| IntegerSuffix::Long),
-        // Unsigned
-        just("u").or(just("U")).map(|_| IntegerSuffix::Unsigned),
-        // Bit-precise suffixes
-        just("uwb").or(just("UWB")).map(|_| IntegerSuffix::UnsignedBitPrecise),
-        just("wb").or(just("WB")).map(|_| IntegerSuffix::BitPrecise),
-    ))
-}
-
-/// (6.4.4.2) floating constant
-pub fn floating_constant<'a>() -> impl Parser<'a, &'a str, FloatingConstant, Extra<'a>> + Clone {
-    choice((decimal_floating_constant(), hexadecimal_floating_constant()))
-        .then(floating_suffix().or_not())
-        .map(|(value, suffix)| FloatingConstant { value, suffix })
-}
-
-/// (6.4.4.2) decimal floating constant
-pub fn decimal_floating_constant<'a>() -> impl Parser<'a, &'a str, NotNan<f64>, Extra<'a>> + Clone {
-    regex(r"(?:(?:\d+(?:'?\d+)*)?\.(?:\d+(?:'?\d+)*)|(?:\d+(?:'?\d+)*)\.)(?:[eE][+-]?(?:\d+(?:'?\d+)*))?|(?:\d+(?:'?\d+)*)(?:[eE][+-]?(?:\d+(?:'?\d+)*))")
-        .map(|s: &str| s.replace("'", ""))
-        .from_str::<NotNan<f64>>()
-        .unwrapped()
-}
-
-/// (6.4.4.2) hexadecimal floating constant
-pub fn hexadecimal_floating_constant<'a>() -> impl Parser<'a, &'a str, NotNan<f64>, Extra<'a>> + Clone {
-    regex(r"(?:0[xX])(?:(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)?\.(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)|(?:[0-9a-fA-F]+(?:'?[0-9a-fA-F]+)*)\.?)(?:[pP][+-]?(?:\d+(?:'?\d+)*))")
-        .map(|s: &str| s.replace("'", ""))
-        .map(|s| hexf_parse::parse_hexf64(&s, false))
-        .unwrapped()
-        .map(|v| v.try_into())
-        .unwrapped()
-}
-
-/// (6.4.4.2) floating suffix
-pub fn floating_suffix<'a>() -> impl Parser<'a, &'a str, FloatingSuffix, Extra<'a>> + Clone {
-    choice((
-        just("df").or(just("DF")).map(|_| FloatingSuffix::DF),
-        just("dd").or(just("DD")).map(|_| FloatingSuffix::DD),
-        just("dl").or(just("DL")).map(|_| FloatingSuffix::DL),
-        just("f").or(just("F")).map(|_| FloatingSuffix::F),
-        just("l").or(just("L")).map(|_| FloatingSuffix::L),
-    ))
-}
-
-/// (6.4.4.4) encoding prefix
-pub fn encoding_prefix<'a>() -> impl Parser<'a, &'a str, EncodingPrefix, Extra<'a>> + Clone {
-    choice((
-        just("u8").map(|_| EncodingPrefix::U8),
-        just("u").map(|_| EncodingPrefix::U),
-        just("U").map(|_| EncodingPrefix::CapitalU),
-        just("L").map(|_| EncodingPrefix::L),
-    ))
-}
-
-/// (6.4.4.4) escape sequence
-pub fn escape_sequence<'a>() -> impl Parser<'a, &'a str, char, Extra<'a>> + Clone {
-    just('\\').ignore_then(choice((
-        // Simple escape sequences
-        just('\'').map(|_| '\''),
-        just('"').map(|_| '"'),
-        just('?').map(|_| '?'),
-        just('\\').map(|_| '\\'),
-        just('a').map(|_| '\x07'),
-        just('b').map(|_| '\x08'),
-        just('f').map(|_| '\x0C'),
-        just('n').map(|_| '\n'),
-        just('r').map(|_| '\r'),
-        just('t').map(|_| '\t'),
-        just('v').map(|_| '\x0B'),
-        // Octal escape sequence (\ooo)
-        one_of('0'..='7')
-            .repeated()
-            .at_least(1)
-            .at_most(3)
-            .collect::<String>()
-            .map(|digits| char::from_u32(u32::from_str_radix(&digits, 8).unwrap()).unwrap()),
-        // Hexadecimal escape sequence (\xhh)
-        just('x')
-            .ignore_then(
-                one_of('0'..='9')
-                    .or(one_of('a'..='f'))
-                    .or(one_of('A'..='F'))
-                    .repeated()
-                    .at_least(1)
-                    .collect::<String>(),
-            )
-            .map(|digits| char::from_u32(u32::from_str_radix(&digits, 16).unwrap()).unwrap()),
-        // Universal character names (\uxxxx or \Uxxxxxxxx)
-        just('u')
-            .ignore_then(
-                one_of('0'..='9')
-                    .or(one_of('a'..='f'))
-                    .or(one_of('A'..='F'))
-                    .repeated()
-                    .exactly(4)
-                    .collect::<String>(),
-            )
-            .map(|digits| char::from_u32(u32::from_str_radix(&digits, 16).unwrap()).unwrap()),
-        just('U')
-            .ignore_then(
-                one_of('0'..='9')
-                    .or(one_of('a'..='f'))
-                    .or(one_of('A'..='F'))
-                    .repeated()
-                    .exactly(8)
-                    .collect::<String>(),
-            )
-            .map(|digits| char::from_u32(u32::from_str_radix(&digits, 16).unwrap()).unwrap()),
-        // Fallback: just return the character itself
-        any(),
-    )))
-}
-
-/// (6.4.4.4) character constant
-pub fn character_constant<'a>() -> impl Parser<'a, &'a str, CharacterConstant, Extra<'a>> + Clone {
-    let prefix = encoding_prefix().or_not();
-
-    let c_char = choice((escape_sequence(), none_of("'\\")));
-
-    let content = c_char.repeated().at_least(1).collect::<String>();
-
-    prefix
-        .then(
-            content
-                .clone()
-                .delimited_by(just('\''), just('\''))
-                .or(just('\'').ignore_then(content)),
-        )
-        .map(|(encoding_prefix, value)| CharacterConstant { encoding_prefix, value })
-}
-
-/// (6.4.4.5) predefined constant
-pub fn predefined_constant<'a>() -> impl Parser<'a, &'a str, PredefinedConstant, Extra<'a>> + Clone {
-    text::ident().try_map(|name, span| match name {
-        "false" => Ok(PredefinedConstant::False),
-        "true" => Ok(PredefinedConstant::True),
-        "nullptr" => Ok(PredefinedConstant::Nullptr),
-        _ => Err(Simple::new(None, span)),
-    })
-}
-
-/// (6.4.5) string-literal
-pub fn string_literal<'a>() -> impl Parser<'a, &'a str, StringLiterals, Extra<'a>> + Clone {
-    let prefix = encoding_prefix().or_not();
-
-    let content = escape_sequence().or(none_of("\"\\")).repeated().collect::<String>();
-
-    prefix
-        .then(
-            content
-                .clone()
-                .delimited_by(just('"'), just('"'))
-                .or(just('"').ignore_then(content)),
-        )
-        .map(|(encoding_prefix, value)| StringLiteral { encoding_prefix, value })
-        .separated_by(whitespace())
-        .at_least(1)
-        .collect::<Vec<StringLiteral>>()
-        .map(StringLiterals)
-}
-
-/// extension syntax: `xxx` for quoted strings
-pub fn quoted_string<'a>() -> impl Parser<'a, &'a str, String, Extra<'a>> + Clone {
-    let content = none_of("`").repeated().collect::<String>();
-
-    content
-        .delimited_by(just('`'), just('`'))
-        .or(just('`').ignore_then(content))
-}
-
-/// (6.4.6) punctuator (excluding parentheses and brackets)
-pub fn punctuator<'a>() -> impl Parser<'a, &'a str, Punctuator, Extra<'a>> + Clone {
-    // Put longer operators first to avoid partial matches
-    let assignment_ops = choice((
-        just("<<=").map(|_| Punctuator::LeftShiftAssign),
-        just(">>=").map(|_| Punctuator::RightShiftAssign),
-        just("*=").map(|_| Punctuator::MulAssign),
-        just("/=").map(|_| Punctuator::DivAssign),
-        just("%=").map(|_| Punctuator::ModAssign),
-        just("+=").map(|_| Punctuator::AddAssign),
-        just("-=").map(|_| Punctuator::SubAssign),
-        just("&=").map(|_| Punctuator::AndAssign),
-        just("^=").map(|_| Punctuator::XorAssign),
-        just("|=").map(|_| Punctuator::OrAssign),
-        just("##").map(|_| Punctuator::HashHash),
-    ));
-
-    let compound_ops = choice((
-        just("++").map(|_| Punctuator::Increment),
-        just("--").map(|_| Punctuator::Decrement),
-        just("<<").map(|_| Punctuator::LeftShift),
-        just(">>").map(|_| Punctuator::RightShift),
-        just("<=").map(|_| Punctuator::LessEqual),
-        just(">=").map(|_| Punctuator::GreaterEqual),
-        just("==").map(|_| Punctuator::Equal),
-        just("!=").map(|_| Punctuator::NotEqual),
-        just("&&").map(|_| Punctuator::LogicalAnd),
-        just("||").map(|_| Punctuator::LogicalOr),
-        just("->").map(|_| Punctuator::Arrow),
-        just("::").map(|_| Punctuator::Scope),
-        just("...").map(|_| Punctuator::Ellipsis),
-    ));
-
-    let simple_ops = choice((
-        just(".").map(|_| Punctuator::Dot),
-        just("&").map(|_| Punctuator::Ampersand),
-        just("*").map(|_| Punctuator::Star),
-        just("+").map(|_| Punctuator::Plus),
-        just("-").map(|_| Punctuator::Minus),
-        just("~").map(|_| Punctuator::Tilde),
-        just("!").map(|_| Punctuator::Bang),
-        just("/").map(|_| Punctuator::Slash),
-        just("%").map(|_| Punctuator::Percent),
-        just("<").map(|_| Punctuator::Less),
-        just(">").map(|_| Punctuator::Greater),
-        just("^").map(|_| Punctuator::Caret),
-        just("|").map(|_| Punctuator::Pipe),
-        just("?").map(|_| Punctuator::Question),
-        just(":").map(|_| Punctuator::Colon),
-        just(";").map(|_| Punctuator::Semicolon),
-        just("=").map(|_| Punctuator::Assign),
-        just(",").map(|_| Punctuator::Comma),
-        just("#").map(|_| Punctuator::Hash),
-    ));
-
-    assignment_ops.or(compound_ops).or(simple_ops)
-}
-
-/// (6.7.12.1) balanced token
-pub fn balanced_token<'a>(
-    balanced_token_sequence: impl Parser<'a, &'a str, BalancedTokenSequence, Extra<'a>> + Clone,
-) -> impl Parser<'a, &'a str, BalancedToken, Extra<'a>> + Clone {
-    let unclosed_token_sequence = balanced_token_sequence.clone().map(|mut s| {
-        s.closed = false;
-        s
-    });
-
-    // Parenthesized: ( balanced-token-sequence? )
-    let parenthesized = balanced_token_sequence
-        .clone()
-        .delimited_by(just('('), just(')'))
-        .or(just('(').ignore_then(unclosed_token_sequence.clone()));
-
-    // Bracketed: [ balanced-token-sequence? ]
-    let bracketed = balanced_token_sequence
-        .clone()
-        .delimited_by(just('['), just(']'))
-        .or(just('[').ignore_then(unclosed_token_sequence.clone()));
-
-    // Braced: { balanced-token-sequence? }
-    let braced = balanced_token_sequence
-        .clone()
-        .delimited_by(just('{'), just('}'))
-        .or(just('{').ignore_then(unclosed_token_sequence.clone()));
-
-    // Other tokens (non-brackets)
-    let identifier = identifier();
-    let string_literal = string_literal();
-    let quoted_string = quoted_string();
-    let constant = constant();
-    let punctuator = punctuator();
+    /// quasi-quote template
     #[cfg(feature = "quasi-quote")]
-    let template = template();
-    let unknown_token = unknown();
+    fn template(&mut self) -> Option<Template> {
+        self.eat_if('@')?;
+        let id = self.identifier()?;
+        Some(Template { name: id.0 })
+    }
 
-    choice((
-        parenthesized.map(BalancedToken::Parenthesized),
-        bracketed.map(BalancedToken::Bracketed),
-        braced.map(BalancedToken::Braced),
-        string_literal.map(BalancedToken::StringLiteral),
-        quoted_string.map(BalancedToken::QuotedString),
-        constant.map(BalancedToken::Constant),
-        identifier.map(BalancedToken::Identifier),
-        punctuator.map(BalancedToken::Punctuator),
-        #[cfg(feature = "quasi-quote")]
-        template.map(BalancedToken::Template),
-        unknown_token.to(BalancedToken::Unknown),
-    ))
-}
+    /// Skip single-line comment
+    fn skip_line_comment(&mut self) -> bool {
+        if self.eat_if("//").is_some() {
+            while let Some(ch) = self.peek() {
+                if ch == '\n' {
+                    break;
+                }
+                self.eat();
+            }
+            true
+        } else {
+            false
+        }
+    }
 
-/// (6.7.12.1) balanced token sequence
-pub fn balanced_token_sequence<'a>() -> impl Parser<'a, &'a str, BalancedTokenSequence, Extra<'a>> + Clone {
-    recursive(|balanced_token_sequence| {
-        balanced_token(balanced_token_sequence)
-            .map_with(|token: BalancedToken, extra| {
-                let span = Span::new(extra.span().into_range(), extra.state().ctx_id);
-                Spanned::new(token, span)
-            })
-            .separated_by(whitespace())
-            .allow_leading()
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .map_with(|tokens, extra| {
-                let eoi = Span::new_eoi(extra.span().end, extra.state().ctx_id);
-                BalancedTokenSequence { tokens, closed: true, eoi }
-            })
-    })
-}
+    /// Skip multi-line comment
+    fn skip_block_comment(&mut self) -> bool {
+        if self.eat_if("/*").is_some() {
+            loop {
+                if self.eat_if("*/").is_some() {
+                    break;
+                }
+                if self.eat().is_none() {
+                    break; // EOF
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
 
-/// any other token as unknown
-pub fn unknown<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
-    any().and_is(whitespace().not()).ignored()
-}
+    /// Skip line directive (#line, #pragma, etc.)
+    fn skip_line_directive(&mut self) -> bool {
+        if !self.line_begin {
+            return false;
+        }
 
-fn whitespace<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
-    line_directive()
-        .or(comment())
-        .or(text::whitespace().at_least(1))
-        .repeated()
-}
+        let start = self.cursor;
 
-fn line_directive<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
-    let pragma = just("#pragma").ignore_then(none_of("\n").repeated()).ignored();
-
-    let line = just('#').ignore_then(custom(|inp| {
-        let mut directive = String::new();
-        while let Some(token) = inp.next() {
-            directive.push(token);
-            if token.is_newline() {
+        // Skip leading whitespace on the line
+        while let Some(ch) = self.peek() {
+            if ch == ' ' || ch == '\t' {
+                self.eat();
+            } else {
                 break;
             }
         }
-        let directive = directive.split_whitespace().collect::<Vec<_>>();
-        let state: &mut State = inp.state();
-        if let [line, file, ..] = &directive[..] {
-            let line = line.parse::<i32>().ok();
-            state.ctx_id = line.map_or(ContextId::none(), |line| {
-                state.ctx_map.insert_context(SourceContext {
-                    filename: file.trim_matches('"').to_string(),
-                    line_offset: state.lineno - line,
-                })
-            });
+
+        if self.eat_if('#').is_none() {
+            self.cursor = start;
+            return false;
         }
-        Ok(())
-    }));
 
-    empty()
-        .try_map_with(|_, extra: &mut MapExtra<'_, '_, &'a str, Extra<'a>>| {
-            if extra.state().line_begin {
-                Ok(())
-            } else {
-                Err(Simple::new(None, extra.span()))
+        // Check for #pragma
+        let is_pragma = self.eat_if("pragma").is_some();
+
+        // Read until end of line
+        let mut directive = String::new();
+        while let Some(ch) = self.peek() {
+            if ch == '\n' {
+                self.eat();
+                break;
             }
-        })
-        .ignore_then(choice((pragma, line)))
-}
+            directive.push(ch);
+            self.eat();
+        }
 
-fn comment<'a>() -> impl Parser<'a, &'a str, (), Extra<'a>> + Clone {
-    choice((
-        // Single-line comment
-        just("//").ignore_then(none_of("\n").ignored().repeated()),
-        // Multi-line comment
-        just("/*")
-            .ignore_then(any().and_is(just("*/").not()).ignored().repeated())
-            .then_ignore(just("*/")),
-    ))
-}
+        if !is_pragma {
+            // Parse #line directive: # <line> "<file>"
+            let parts: Vec<&str> = directive.split_whitespace().collect();
+            if let [line, file, ..] = &parts[..]
+                && let Ok(line_num) = line.parse::<i32>()
+            {
+                self.ctx_id = self.ctx_map.insert_context(SourceContext {
+                    filename: file.trim_matches('"').to_string(),
+                    line_offset: self.lineno - line_num,
+                });
+            }
+        }
 
-#[cfg(feature = "quasi-quote")]
-fn template<'a>() -> impl Parser<'a, &'a str, Template, Extra<'a>> + Clone {
-    just("@")
-        .ignore_then(identifier())
-        .map(|id| quasi_quote::Template { name: id.0 })
+        true
+    }
+
+    /// Skip whitespace, comments, and line directives
+    fn skip_whitespace(&mut self) {
+        loop {
+            let start = self.cursor;
+
+            // Skip whitespace characters
+            while let Some(ch) = self.peek() {
+                if ch.is_whitespace() {
+                    self.eat();
+                } else {
+                    break;
+                }
+            }
+
+            // Skip comments
+            if self.skip_line_comment() || self.skip_block_comment() {
+                continue;
+            }
+
+            // Skip line directives
+            if self.skip_line_directive() {
+                continue;
+            }
+
+            if self.cursor == start {
+                break;
+            }
+        }
+    }
+
+    /// Helper method to parse parenthesized/bracketed/braced sequences
+    fn parse_bracketed<F>(&mut self, open: char, close: char, make_token: F) -> Option<Spanned<BalancedToken>>
+    where
+        F: Fn(BalancedTokenSequence) -> BalancedToken,
+    {
+        let start = self.cursor;
+        if self.eat_if(open).is_some() {
+            let mut inner = self.balanced_token_sequence();
+            if self.eat_if(close).is_none() {
+                inner.closed = false;
+            }
+            let span = self.make_span(start);
+            return Some(Spanned::new(make_token(inner), span));
+        }
+        None
+    }
+
+    /// (6.7.12.1) balanced token
+    fn balanced_token(&mut self) -> Option<Spanned<BalancedToken>> {
+        self.skip_whitespace();
+
+        let start = self.cursor;
+
+        // Parenthesized: ( balanced-token-sequence? )
+        if let Some(token) = self.parse_bracketed('(', ')', BalancedToken::Parenthesized) {
+            return Some(token);
+        }
+
+        // Bracketed: [ balanced-token-sequence? ]
+        if let Some(token) = self.parse_bracketed('[', ']', BalancedToken::Bracketed) {
+            return Some(token);
+        }
+
+        // Braced: { balanced-token-sequence? }
+        if let Some(token) = self.parse_bracketed('{', '}', BalancedToken::Braced) {
+            return Some(token);
+        }
+
+        // String literal
+        if let Some(sl) = self.string_literal() {
+            let span = self.make_span(start);
+            return Some(Spanned::new(BalancedToken::StringLiteral(sl), span));
+        }
+
+        // Quoted string (backtick)
+        if let Some(qs) = self.quoted_string() {
+            let span = self.make_span(start);
+            return Some(Spanned::new(BalancedToken::QuotedString(qs), span));
+        }
+
+        // Template (quasi-quote)
+        #[cfg(feature = "quasi-quote")]
+        if let Some(t) = self.template() {
+            let span = self.make_span(start);
+            return Some(Spanned::new(BalancedToken::Template(t), span));
+        }
+
+        // Constant (must try before identifier for true/false/nullptr)
+        if let Some(c) = self.constant() {
+            let span = self.make_span(start);
+            return Some(Spanned::new(BalancedToken::Constant(c), span));
+        }
+
+        // Identifier
+        if let Some(id) = self.identifier() {
+            let span = self.make_span(start);
+            return Some(Spanned::new(BalancedToken::Identifier(id), span));
+        }
+
+        // Punctuator
+        if let Some(p) = self.punctuator() {
+            let span = self.make_span(start);
+            return Some(Spanned::new(BalancedToken::Punctuator(p), span));
+        }
+
+        // Unknown token - any single character that doesn't match anything
+        if !self.is_eof() && self.peek().is_some_and(|c| !c.is_whitespace()) {
+            self.eat();
+            let span = self.make_span(start);
+            return Some(Spanned::new(BalancedToken::Unknown, span));
+        }
+
+        None
+    }
+
+    /// (6.7.12.1) balanced token sequence
+    fn balanced_token_sequence(&mut self) -> BalancedTokenSequence {
+        let mut tokens = Vec::new();
+
+        loop {
+            self.skip_whitespace();
+
+            // Check for closing brackets or EOF
+            match self.peek() {
+                Some(')') | Some(']') | Some('}') | None => break,
+                _ => {}
+            }
+
+            if let Some(token) = self.balanced_token() {
+                tokens.push(token);
+            } else {
+                break;
+            }
+        }
+
+        self.skip_whitespace();
+        let eoi = Span::new_eoi(self.cursor, self.ctx_id);
+
+        BalancedTokenSequence { tokens, closed: true, eoi }
+    }
 }

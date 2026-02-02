@@ -6,7 +6,7 @@ mod utils;
 
 mod ast;
 mod context;
-mod lexer2;
+mod lexer;
 pub mod parser;
 #[cfg(feature = "printer")]
 pub mod printer;
@@ -17,7 +17,7 @@ pub mod visitor;
 pub use ast::*;
 pub use chumsky::Parser;
 pub use context::State;
-pub use lexer2::lex;
+pub use lexer::lex;
 pub use parser::*;
 pub use report::*;
 pub use visitor::{Visitor, VisitorMut};
