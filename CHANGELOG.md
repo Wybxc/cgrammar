@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/Wybxc/cgrammar/compare/v0.8.0...v0.9.0) - 2026-02-03
+
+### Added
+
+- **`report` feature**: Error reporting via `ariadne` is now behind the optional `report` feature flag.
+
+### Changed
+
+- **Breaking**: Lexer rewritten using regex-based implementation for improved performance. The `lex()` function now returns `(BalancedTokenSequence, ContextMapping)` instead of `LexResult`. No longer returns lexing errors as part of the result (lexing errors are converted to unknown tokens instead).
+- **Breaking**: `SpanContexts` renamed to `ContextMapping` with API changes for source context tracking. Context mapping now stores source string references.
+- **Breaking**: `SourceContext` structure changed: now contains `filename: Arc<str>` and `line_offset: usize` instead of previous fields.
+
+### Removed
+
+- **Breaking**: `LexResult` type removed. Use the tuple returned by `lex()` directly.
+- **Breaking**: `lexer_utils` module and associated utilities (including public `State` for lexer) removed as part of lexer rewrite.
+
 ## [0.8.0](https://github.com/Wybxc/cgrammar/compare/v0.7.1...v0.8.0) - 2026-01-30
 
 ### Changed
