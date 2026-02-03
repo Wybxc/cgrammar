@@ -16,14 +16,14 @@ fn main() {
     init_state.ctx_mut().add_typedef_name("thm".into());
     let init_state = init_state;
 
-    let (tokens, ctx_map) = lex(src.as_str(), Some(&file));
+    let (tokens, mut ctx_map) = lex(src.as_str(), Some(&file));
 
     let parser = translation_unit();
     let ast = parser.parse_with_state(tokens.as_input(), &mut init_state.clone());
     let (ast, errors) = ast.into_output_errors();
 
     for error in errors {
-        report(error, &ctx_map);
+        report(error).eprint(&mut ctx_map).unwrap();
     }
 
     let ast = ast.expect("Parse failed!");
@@ -49,7 +49,7 @@ fn main() {
             let parsed = parser.parse_with_state(gl.as_input(), &mut init_state.clone());
             let (stmt, errors) = parsed.into_output_errors();
             for error in errors {
-                report(error, &ctx_map);
+                report(error).eprint(&mut ctx_map).unwrap();
             }
             let Some(stmt) = stmt else {
                 eprintln!("Failed to parse gl statement");

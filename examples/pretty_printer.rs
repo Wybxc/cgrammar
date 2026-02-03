@@ -11,7 +11,7 @@ fn main() {
     let file = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file.as_str()).unwrap();
 
-    let (tokens, ctx_map) = lex(src.as_str(), Some(&file));
+    let (tokens, mut ctx_map) = lex(src.as_str(), Some(&file));
 
     let parser = translation_unit();
     let mut init_state = State::new();
@@ -27,7 +27,7 @@ fn main() {
     }
     if ast.has_errors() {
         for error in ast.into_errors() {
-            report(error, &ctx_map);
+            report(error).eprint(&mut ctx_map).unwrap();
         }
         std::process::exit(1);
     }

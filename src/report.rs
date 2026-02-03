@@ -2,9 +2,8 @@
 
 use std::fmt;
 
-#[cfg(feature = "report")]
 use crate::span::Span;
-use crate::{ast::*, parser_utils::Error, span::ContextMapping};
+use crate::{ast::*, parser_utils::Error};
 
 struct DiagnosticToken(BalancedToken);
 
@@ -28,21 +27,8 @@ impl fmt::Display for DiagnosticToken {
     }
 }
 
-/// Report an error to stderr.
-pub fn report<'a>(error: Error<'a>, ctx_map: &ContextMapping) {
-    let error = error.map_token(DiagnosticToken);
-    let span = error.span();
-    let (ctx, _range) = span.at_context(ctx_map);
-    eprintln!(
-        "error[{}] {}",
-        ctx.map_or("<unknown>", |c| c.filename.as_str()),
-        error.reason()
-    );
-}
-
 /// Convert a parse error to an ariadne report for pretty printing.
-#[cfg(feature = "report")]
-pub fn report_ariadne<'a>(error: Error<'a>) -> ariadne::Report<'a, Span> {
+pub fn report<'a>(error: Error<'a>) -> ariadne::Report<'a, Span> {
     use ariadne::{Label, Report, ReportKind};
     use chumsky::error::RichReason;
 

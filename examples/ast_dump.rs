@@ -24,7 +24,7 @@ fn main() {
     }
     if ast.has_errors() {
         for error in ast.into_errors() {
-            report_ariadne(error).eprint(&mut ctx_map).unwrap();
+            report(error).eprint(&mut ctx_map).unwrap();
         }
         std::process::exit(1);
     }
