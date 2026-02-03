@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/Wybxc/cgrammar/compare/v0.8.0...v0.9.0) - 2026-02-03
+
+### Added
+
+- add lexer v2 implementation and update dependencies
+- add fuzz testing support with AFL and update lexer for improved parsing
+- make ariadne optional
+- update dependencies and improve error reporting in lexer
+
+### Fixed
+
+- update error reporting to use new context mapping structure
+
+### Other
+
+- simplify error reporting by removing context mapping
+- improve code formatting and readability across multiple files
+- update error reporting to use ariadne for better formatting
+- enhance expression and declaration handling with span information
+- clean up lexer code and improve pattern matching implementation
+- add documentation for SourceContext and ContextId structs
+- replace lexer2 with lexer module and update references
+- update lexer module to lexer2 and improve parsing logic
+- remove unused cursor state from lexer utilities
+- remove unused fuzz-lexer test configuration
+- remove AFL fuzz testing support and clean up dependencies
+- update lexer and parser to return context mapping instead of lexing errors
+
 ## [0.8.0](https://github.com/Wybxc/cgrammar/compare/v0.7.1...v0.8.0) - 2026-01-30
 
 ### Changed
