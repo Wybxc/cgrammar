@@ -573,8 +573,8 @@ pub trait Visitor<'a> {
     }
 
     /// Visits an array declarator.
-    fn visit_array_declarator(&mut self, _: &'a ArrayDeclarator) -> Self::Result {
-        Self::Result::output()
+    fn visit_array_declarator(&mut self, d: &'a ArrayDeclarator) -> Self::Result {
+        walk_array_declarator(self, d)
     }
 
     /// Visits a parameter type list.
@@ -630,9 +630,9 @@ pub fn walk_function_definition<'a, V: Visitor<'a> + ?Sized>(v: &mut V, f: &'a F
 
 /// Walk a statement.
 pub fn walk_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, s: &'a Statement) -> V::Result {
-    match s {
-        Statement::Labeled(ls) => v.visit_labeled_statement(ls),
-        Statement::Unlabeled(u) => v.visit_unlabeled_statement(u),
+    match &s.kind {
+        StatementKind::Labeled(ls) => v.visit_labeled_statement(ls),
+        StatementKind::Unlabeled(u) => v.visit_unlabeled_statement(u),
     }
 }
 
@@ -788,15 +788,15 @@ pub fn walk_jump_statement<'a, V: Visitor<'a> + ?Sized>(v: &mut V, j: &'a JumpSt
 
 /// Walk an expression.
 pub fn walk_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, e: &'a Expression) -> V::Result {
-    match e {
-        Expression::Postfix(p) => v.visit_postfix_expression(p),
-        Expression::Unary(u) => v.visit_unary_expression(u),
-        Expression::Cast(c) => v.visit_cast_expression(c),
-        Expression::Binary(b) => v.visit_binary_expression(b),
-        Expression::Conditional(c) => v.visit_conditional_expression(c),
-        Expression::Assignment(a) => v.visit_assignment_expression(a),
-        Expression::Comma(c) => v.visit_comma_expression(c),
-        Expression::Error => V::Result::output(),
+    match &e.kind {
+        ExpressionKind::Postfix(p) => v.visit_postfix_expression(p),
+        ExpressionKind::Unary(u) => v.visit_unary_expression(u),
+        ExpressionKind::Cast(c) => v.visit_cast_expression(c),
+        ExpressionKind::Binary(b) => v.visit_binary_expression(b),
+        ExpressionKind::Conditional(c) => v.visit_conditional_expression(c),
+        ExpressionKind::Assignment(a) => v.visit_assignment_expression(a),
+        ExpressionKind::Comma(c) => v.visit_comma_expression(c),
+        ExpressionKind::Error => V::Result::output(),
     }
 }
 
@@ -921,8 +921,8 @@ pub fn walk_cast_expression<'a, V: Visitor<'a> + ?Sized>(v: &mut V, c: &'a CastE
 
 /// Walk a declaration.
 pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declaration) -> V::Result {
-    match d {
-        Declaration::Normal { attributes, specifiers, declarators } => {
+    match &d.kind {
+        DeclarationKind::Normal { attributes, specifiers, declarators } => {
             for attr in attributes {
                 tr!(v.visit_attribute_specifier(attr));
             }
@@ -932,7 +932,7 @@ pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarati
             }
             V::Result::output()
         }
-        Declaration::Typedef { attributes, specifiers, declarators } => {
+        DeclarationKind::Typedef { attributes, specifiers, declarators } => {
             for attr in attributes {
                 tr!(v.visit_attribute_specifier(attr));
             }
@@ -942,14 +942,14 @@ pub fn walk_declaration<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Declarati
             }
             V::Result::output()
         }
-        Declaration::StaticAssert(sa) => v.visit_static_assert_declaration(sa),
-        Declaration::Attribute(attrs) => {
+        DeclarationKind::StaticAssert(sa) => v.visit_static_assert_declaration(sa),
+        DeclarationKind::Attribute(attrs) => {
             for attr in attrs {
                 tr!(v.visit_attribute_specifier(attr));
             }
             V::Result::output()
         }
-        Declaration::Error => V::Result::output(),
+        DeclarationKind::Error => V::Result::output(),
     }
 }
 
@@ -1198,6 +1198,34 @@ pub fn walk_direct_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a Dir
             }
             v.visit_parameter_type_list(parameters)
         }
+    }
+}
+
+/// Walk an array declarator.
+pub fn walk_array_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a ArrayDeclarator) -> V::Result {
+    match d {
+        ArrayDeclarator::Normal { type_qualifiers, size } => {
+            for tq in type_qualifiers {
+                tr!(v.visit_type_qualifier(tq));
+            }
+            if let Some(expr) = size {
+                tr!(v.visit_expression(expr));
+            }
+            V::Result::output()
+        }
+        ArrayDeclarator::Static { type_qualifiers, size } => {
+            for tq in type_qualifiers {
+                tr!(v.visit_type_qualifier(tq));
+            }
+            v.visit_expression(size)
+        }
+        ArrayDeclarator::VLA { type_qualifiers } => {
+            for tq in type_qualifiers {
+                tr!(v.visit_type_qualifier(tq));
+            }
+            V::Result::output()
+        }
+        ArrayDeclarator::Error => V::Result::output(),
     }
 }
 
@@ -1762,8 +1790,8 @@ pub trait VisitorMut<'a> {
     }
 
     /// Visits an array declarator with mutable access.
-    fn visit_array_declarator_mut(&mut self, _: &'a mut ArrayDeclarator) -> Self::Result {
-        Self::Result::output()
+    fn visit_array_declarator_mut(&mut self, d: &'a mut ArrayDeclarator) -> Self::Result {
+        walk_array_declarator_mut(self, d)
     }
 
     /// Visits a parameter type list with mutable access.
@@ -1820,9 +1848,9 @@ pub fn walk_function_definition_mut<'a, V: VisitorMut<'a> + ?Sized>(
 
 /// Walk a statement with mutable access.
 pub fn walk_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, s: &'a mut Statement) -> V::Result {
-    match s {
-        Statement::Labeled(ls) => v.visit_labeled_statement_mut(ls),
-        Statement::Unlabeled(u) => v.visit_unlabeled_statement_mut(u),
+    match &mut s.kind {
+        StatementKind::Labeled(ls) => v.visit_labeled_statement_mut(ls),
+        StatementKind::Unlabeled(u) => v.visit_unlabeled_statement_mut(u),
     }
 }
 
@@ -1996,15 +2024,15 @@ pub fn walk_jump_statement_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, j: &'a
 
 /// Walk an expression with mutable access.
 pub fn walk_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, e: &'a mut Expression) -> V::Result {
-    match e {
-        Expression::Postfix(p) => v.visit_postfix_expression_mut(p),
-        Expression::Unary(u) => v.visit_unary_expression_mut(u),
-        Expression::Cast(c) => v.visit_cast_expression_mut(c),
-        Expression::Binary(b) => v.visit_binary_expression_mut(b),
-        Expression::Conditional(c) => v.visit_conditional_expression_mut(c),
-        Expression::Assignment(a) => v.visit_assignment_expression_mut(a),
-        Expression::Comma(c) => v.visit_comma_expression_mut(c),
-        Expression::Error => V::Result::output(),
+    match &mut e.kind {
+        ExpressionKind::Postfix(p) => v.visit_postfix_expression_mut(p),
+        ExpressionKind::Unary(u) => v.visit_unary_expression_mut(u),
+        ExpressionKind::Cast(c) => v.visit_cast_expression_mut(c),
+        ExpressionKind::Binary(b) => v.visit_binary_expression_mut(b),
+        ExpressionKind::Conditional(c) => v.visit_conditional_expression_mut(c),
+        ExpressionKind::Assignment(a) => v.visit_assignment_expression_mut(a),
+        ExpressionKind::Comma(c) => v.visit_comma_expression_mut(c),
+        ExpressionKind::Error => V::Result::output(),
     }
 }
 
@@ -2143,8 +2171,8 @@ pub fn walk_cast_expression_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, c: &'
 
 /// Walk a declaration with mutable access.
 pub fn walk_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut Declaration) -> V::Result {
-    match d {
-        Declaration::Normal { attributes, specifiers, declarators } => {
+    match &mut d.kind {
+        DeclarationKind::Normal { attributes, specifiers, declarators } => {
             for attr in attributes {
                 tr!(v.visit_attribute_specifier_mut(attr));
             }
@@ -2154,7 +2182,7 @@ pub fn walk_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mu
             }
             V::Result::output()
         }
-        Declaration::Typedef { attributes, specifiers, declarators } => {
+        DeclarationKind::Typedef { attributes, specifiers, declarators } => {
             for attr in attributes {
                 tr!(v.visit_attribute_specifier_mut(attr));
             }
@@ -2164,14 +2192,14 @@ pub fn walk_declaration_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mu
             }
             V::Result::output()
         }
-        Declaration::StaticAssert(sa) => v.visit_static_assert_declaration_mut(sa),
-        Declaration::Attribute(attrs) => {
+        DeclarationKind::StaticAssert(sa) => v.visit_static_assert_declaration_mut(sa),
+        DeclarationKind::Attribute(attrs) => {
             for attr in attrs {
                 tr!(v.visit_attribute_specifier_mut(attr));
             }
             V::Result::output()
         }
-        Declaration::Error => V::Result::output(),
+        DeclarationKind::Error => V::Result::output(),
     }
 }
 
@@ -2441,6 +2469,34 @@ pub fn walk_direct_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: 
             }
             v.visit_parameter_type_list_mut(parameters)
         }
+    }
+}
+
+/// Walk an array declarator with mutable access.
+pub fn walk_array_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut ArrayDeclarator) -> V::Result {
+    match d {
+        ArrayDeclarator::Normal { type_qualifiers, size } => {
+            for tq in type_qualifiers {
+                tr!(v.visit_type_qualifier_mut(tq));
+            }
+            if let Some(expr) = size {
+                tr!(v.visit_expression_mut(expr));
+            }
+            V::Result::output()
+        }
+        ArrayDeclarator::Static { type_qualifiers, size } => {
+            for tq in type_qualifiers {
+                tr!(v.visit_type_qualifier_mut(tq));
+            }
+            v.visit_expression_mut(size)
+        }
+        ArrayDeclarator::VLA { type_qualifiers } => {
+            for tq in type_qualifiers {
+                tr!(v.visit_type_qualifier_mut(tq));
+            }
+            V::Result::output()
+        }
+        ArrayDeclarator::Error => V::Result::output(),
     }
 }
 

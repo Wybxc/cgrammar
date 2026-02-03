@@ -26,7 +26,7 @@ fn main() {
             }
         "#,
         var => Identifier("bar".into()),
-        args => Expression::Postfix(PostfixExpression::CompoundLiteral(CompoundLiteral {
+        args => Expression::dummy(ExpressionKind::Postfix(PostfixExpression::CompoundLiteral(CompoundLiteral {
             storage_class_specifiers: vec![],
             type_name: quote!(type_name: "const char*[]"),
             initializer: BracedInitializer {
@@ -34,7 +34,7 @@ fn main() {
                     quote!{designated_initializer: "@s", s => StringLiterals::from(s.to_string())}
                 }).collect()
             }
-        })),
+        }))),
         len => Constant::Integer((items.len() as i128).into()),
     };
 

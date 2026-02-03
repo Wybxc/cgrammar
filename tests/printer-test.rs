@@ -4,7 +4,7 @@ use std::{io::Write, path::PathBuf};
 
 use cgrammar::{
     printer::Context,
-    visitor::{Visitor, VisitorMut, walk_declarator_mut, walk_direct_declarator_mut, walk_expression_mut},
+    visitor::{Visitor, VisitorMut, walk_declaration_mut, walk_declarator_mut, walk_direct_declarator_mut, walk_expression_mut, walk_statement_mut},
     *,
 };
 use elegance::Printer;
@@ -49,6 +49,21 @@ impl VisitorMut<'_> for RemoveSpans {
             remove_spans(tokens);
         }
     }
+
+    fn visit_expression_mut(&mut self, e: &'_ mut Expression) -> Self::Result {
+        walk_expression_mut(self, e);
+        e.span = Default::default();
+    }
+
+    fn visit_statement_mut(&mut self, s: &'_ mut Statement) -> Self::Result {
+        walk_statement_mut(self, s);
+        s.span = Default::default();
+    }
+
+    fn visit_declaration_mut(&mut self, d: &'_ mut Declaration) -> Self::Result {
+        walk_declaration_mut(self, d);
+        d.span = Default::default();
+    }
 }
 
 struct RemoveParens;
@@ -58,8 +73,8 @@ impl VisitorMut<'_> for RemoveParens {
 
     fn visit_expression_mut(&mut self, e: &'_ mut Expression) -> Self::Result {
         walk_expression_mut(self, e);
-        if let Expression::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) = e {
-            let inner = std::mem::replace(inner.as_mut(), Expression::Error);
+        if let ExpressionKind::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) = &mut e.kind {
+            let inner = std::mem::replace(inner.as_mut(), Expression::dummy(ExpressionKind::Error));
             *e = inner;
         }
     }

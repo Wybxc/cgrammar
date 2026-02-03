@@ -30,7 +30,10 @@ fn main() {
     ast.external_declarations
         .iter()
         .filter_map(|decl| match decl {
-            ExternalDeclaration::Declaration(Declaration::Attribute(attrs)) => Some(attrs),
+            ExternalDeclaration::Declaration(decl) => match &decl.kind {
+                DeclarationKind::Attribute(attrs) => Some(attrs),
+                _ => None,
+            },
             _ => None,
         })
         .flatten()

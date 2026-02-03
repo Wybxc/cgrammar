@@ -24,6 +24,7 @@ pub struct SourceContext {
 
 /// An identifier for a source context.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct ContextId(i32);
 
 impl From<usize> for ContextId {
@@ -89,6 +90,7 @@ impl<'a> ariadne::Cache<ContextId> for ContextMapping<'a> {
 
 /// A source span.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct Span {
     start: usize,
     len: u32,
@@ -185,6 +187,43 @@ impl<T> Spanned<T> {
     pub fn new(value: T, span: Span) -> Self {
         Spanned { value, span }
     }
+
+    /// Create a new spanned value with a default span.
+    pub fn dummy(value: T) -> Self {
+        Spanned { value, span: Span::default() }
+    }
+
+    /// Map the value to a new type.
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
+        Spanned { value: f(self.value), span: self.span }
+    }
+
+    /// Map the value to a new type, keeping the span.
+    pub fn as_ref(&self) -> Spanned<&T> {
+        Spanned { value: &self.value, span: self.span }
+    }
+
+    /// Get the inner value, discarding the span.
+    pub fn into_inner(self) -> T {
+        self.value
+    }
+
+    /// Get a reference pair of value and span.
+    pub fn as_pair(&self) -> (&T, &Span) {
+        (&self.value, &self.span)
+    }
+}
+
+impl<T: Default> Default for Spanned<T> {
+    fn default() -> Self {
+        Self::dummy(T::default())
+    }
+}
+
+impl<T: std::hash::Hash> std::hash::Hash for Spanned<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+    }
 }
 
 #[cfg(feature = "dbg-pls")]
@@ -194,13 +233,6 @@ where
 {
     fn fmt(&self, f: dbg_pls::Formatter<'_>) {
         self.value.fmt(f)
-    }
-}
-
-impl<T> Spanned<T> {
-    /// Get references to the value and range separately.
-    pub fn as_ref(&self) -> (&T, &Span) {
-        (&self.value, &self.span)
     }
 }
 
@@ -216,6 +248,6 @@ pub type Tokens<'a> = MappedInput<
 impl BalancedTokenSequence {
     /// Convert this token sequence to a parser input.
     pub fn as_input(&self) -> Tokens<'_> {
-        self.tokens.as_slice().map(self.eoi, Spanned::as_ref)
+        self.tokens.as_slice().map(self.eoi, Spanned::as_pair)
     }
 }

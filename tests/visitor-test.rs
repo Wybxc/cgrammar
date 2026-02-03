@@ -356,11 +356,11 @@ impl<'a> Visitor<'a> for DeclarationTypeCounter {
             ExternalDeclaration::Function(_) => {
                 self.function_definitions += 1;
             }
-            ExternalDeclaration::Declaration(decl) => match decl {
-                Declaration::Normal { .. } => {
+            ExternalDeclaration::Declaration(decl) => match &decl.kind {
+                DeclarationKind::Normal { .. } => {
                     self.normal_declarations += 1;
                 }
-                Declaration::Typedef { .. } => {
+                DeclarationKind::Typedef { .. } => {
                     self.typedef_declarations += 1;
                 }
                 _ => {}

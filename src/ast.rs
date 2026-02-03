@@ -10,6 +10,28 @@ use ordered_float::NotNan;
 use crate::span::{Span, Spanned};
 
 // =============================================================================
+// Spanned Type Aliases
+// =============================================================================
+
+/// An expression with source span information.
+pub type Expr = Spanned<Expression>;
+
+/// A statement with source span information.
+pub type Stmt = Spanned<Statement>;
+
+/// A declaration with source span information.
+pub type Decl = Spanned<Declaration>;
+
+/// A type name with source span information.
+pub type TypeNm = Spanned<TypeName>;
+
+/// A declarator with source span information.
+pub type Declr = Spanned<Declarator>;
+
+/// An identifier with source span information.
+pub type Ident = Spanned<Identifier>;
+
+// =============================================================================
 // Lexical Elements (6.4)
 // =============================================================================
 
@@ -281,7 +303,29 @@ pub enum BalancedToken {
 /// Expression
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
-pub enum Expression {
+pub struct Expression {
+    /// The kind of expression.
+    pub kind: ExpressionKind,
+    /// The source span of the expression.
+    pub span: Span,
+}
+
+impl Expression {
+    /// Create a new expression with the given kind and span.
+    pub fn new(kind: ExpressionKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+
+    /// Create a new expression with a default span.
+    pub fn dummy(kind: ExpressionKind) -> Self {
+        Self { kind, span: Span::default() }
+    }
+}
+
+/// Expression kinds
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
+pub enum ExpressionKind {
     Postfix(PostfixExpression),
     Unary(UnaryExpression),
     Cast(CastExpression),
@@ -498,7 +542,29 @@ pub enum ConstantExpression {
 /// Declarations (6.7)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
-pub enum Declaration {
+pub struct Declaration {
+    /// The kind of declaration.
+    pub kind: DeclarationKind,
+    /// The source span of the declaration.
+    pub span: Span,
+}
+
+impl Declaration {
+    /// Create a new declaration with the given kind and span.
+    pub fn new(kind: DeclarationKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+
+    /// Create a new declaration with a default span.
+    pub fn dummy(kind: DeclarationKind) -> Self {
+        Self { kind, span: Span::default() }
+    }
+}
+
+/// Declaration kinds
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
+pub enum DeclarationKind {
     Normal {
         attributes: Vec<AttributeSpecifier>,
         specifiers: DeclarationSpecifiers,
@@ -1022,7 +1088,29 @@ impl AttributeToken {
 /// Statements (6.8)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
-pub enum Statement {
+pub struct Statement {
+    /// The kind of statement.
+    pub kind: StatementKind,
+    /// The source span of the statement.
+    pub span: Span,
+}
+
+impl Statement {
+    /// Create a new statement with the given kind and span.
+    pub fn new(kind: StatementKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+
+    /// Create a new statement with a default span.
+    pub fn dummy(kind: StatementKind) -> Self {
+        Self { kind, span: Span::default() }
+    }
+}
+
+/// Statement kinds
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
+pub enum StatementKind {
     Labeled(LabeledStatement),
     Unlabeled(UnlabeledStatement),
 }

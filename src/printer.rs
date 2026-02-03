@@ -90,15 +90,15 @@ fn binary_op_precedence(op: &BinaryOperator) -> usize {
 
 /// Get the precedence of an expression
 fn expr_precedence(e: &Expression) -> usize {
-    match e {
-        Expression::Postfix(_) => precedence::POSTFIX,
-        Expression::Unary(_) => precedence::UNARY,
-        Expression::Cast(_) => precedence::CAST,
-        Expression::Binary(b) => binary_op_precedence(&b.operator),
-        Expression::Conditional(_) => precedence::CONDITIONAL,
-        Expression::Assignment(_) => precedence::ASSIGNMENT,
-        Expression::Comma(_) => precedence::COMMA,
-        Expression::Error => precedence::POSTFIX,
+    match &e.kind {
+        ExpressionKind::Postfix(_) => precedence::POSTFIX,
+        ExpressionKind::Unary(_) => precedence::UNARY,
+        ExpressionKind::Cast(_) => precedence::CAST,
+        ExpressionKind::Binary(b) => binary_op_precedence(&b.operator),
+        ExpressionKind::Conditional(_) => precedence::CONDITIONAL,
+        ExpressionKind::Assignment(_) => precedence::ASSIGNMENT,
+        ExpressionKind::Comma(_) => precedence::COMMA,
+        ExpressionKind::Error => precedence::POSTFIX,
     }
 }
 
@@ -395,15 +395,15 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
         // Reset context for inner expression processing
         self.extra = Context::default();
 
-        match e {
-            Expression::Postfix(p) => self.visit_postfix_expression(p)?,
-            Expression::Unary(u) => self.visit_unary_expression(u)?,
-            Expression::Cast(c) => self.visit_cast_expression(c)?,
-            Expression::Binary(b) => self.visit_binary_expression(b)?,
-            Expression::Conditional(c) => self.visit_conditional_expression(c)?,
-            Expression::Assignment(a) => self.visit_assignment_expression(a)?,
-            Expression::Comma(c) => self.visit_comma_expression(c)?,
-            Expression::Error => {}
+        match &e.kind {
+            ExpressionKind::Postfix(p) => self.visit_postfix_expression(p)?,
+            ExpressionKind::Unary(u) => self.visit_unary_expression(u)?,
+            ExpressionKind::Cast(c) => self.visit_cast_expression(c)?,
+            ExpressionKind::Binary(b) => self.visit_binary_expression(b)?,
+            ExpressionKind::Conditional(c) => self.visit_conditional_expression(c)?,
+            ExpressionKind::Assignment(a) => self.visit_assignment_expression(a)?,
+            ExpressionKind::Comma(c) => self.visit_comma_expression(c)?,
+            ExpressionKind::Error => {}
         }
 
         // Restore context
@@ -569,8 +569,8 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
 
     fn visit_declaration(&mut self, d: &'a Declaration) -> Self::Result {
         self.igroup(0, |pp| {
-            match d {
-                Declaration::Normal { attributes, specifiers, declarators } => {
+            match &d.kind {
+                DeclarationKind::Normal { attributes, specifiers, declarators } => {
                     for a in attributes {
                         pp.visit_attribute_specifier(a)?;
                         pp.space()?;
@@ -594,7 +594,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                     }
                     pp.text(";")
                 }
-                Declaration::Typedef { attributes, specifiers, declarators } => {
+                DeclarationKind::Typedef { attributes, specifiers, declarators } => {
                     for a in attributes {
                         pp.visit_attribute_specifier(a)?;
                         pp.space()?;
@@ -631,7 +631,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                     }
                     pp.text(";")
                 }
-                Declaration::StaticAssert(sa) => {
+                DeclarationKind::StaticAssert(sa) => {
                     pp.text("_Static_assert")?;
                     pp.text("(")?;
                     pp.visit_constant_expression(&sa.condition)?;
@@ -648,7 +648,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                     pp.text(");")?;
                     Ok(())
                 }
-                Declaration::Attribute(attrs) => {
+                DeclarationKind::Attribute(attrs) => {
                     for (i, a) in attrs.iter().enumerate() {
                         if i > 0 {
                             pp.space()?;
@@ -657,7 +657,7 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
                     }
                     pp.text(";")
                 }
-                Declaration::Error => Ok(()),
+                DeclarationKind::Error => Ok(()),
             }
         })
     }

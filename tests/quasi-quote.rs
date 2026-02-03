@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use cgrammar::{quasi_quote::Interpolate, visitor::VisitorMut, *};
+use cgrammar::{quasi_quote::Interpolate, visitor::{VisitorMut, walk_expression_mut, walk_statement_mut, walk_declaration_mut}, *};
 use rstest::rstest;
 
 fn remove_spans(tokens: &mut BalancedTokenSequence) {
@@ -27,6 +27,21 @@ impl VisitorMut<'_> for RemoveSpans {
         if let Some(tokens) = attr.arguments.as_mut() {
             remove_spans(tokens);
         }
+    }
+
+    fn visit_expression_mut(&mut self, e: &'_ mut Expression) -> Self::Result {
+        walk_expression_mut(self, e);
+        e.span = Default::default();
+    }
+
+    fn visit_statement_mut(&mut self, s: &'_ mut Statement) -> Self::Result {
+        walk_statement_mut(self, s);
+        s.span = Default::default();
+    }
+
+    fn visit_declaration_mut(&mut self, d: &'_ mut Declaration) -> Self::Result {
+        walk_declaration_mut(self, d);
+        d.span = Default::default();
     }
 }
 
