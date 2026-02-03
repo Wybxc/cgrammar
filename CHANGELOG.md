@@ -13,29 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- add lexer v2 implementation and update dependencies
-- add fuzz testing support with AFL and update lexer for improved parsing
-- make ariadne optional
-- update dependencies and improve error reporting in lexer
+- **`report` feature**: Error reporting via `ariadne` is now behind the optional `report` feature flag.
 
-### Fixed
+### Changed
 
-- update error reporting to use new context mapping structure
+- **Breaking**: Lexer rewritten using regex-based implementation for improved performance. The `lex()` function now returns `(BalancedTokenSequence, ContextMapping)` instead of `LexResult`. No longer returns lexing errors as part of the result (lexing errors are converted to unknown tokens instead).
+- **Breaking**: `SpanContexts` renamed to `ContextMapping` with API changes for source context tracking. Context mapping now stores source string references.
+- **Breaking**: `SourceContext` structure changed: now contains `filename: Arc<str>` and `line_offset: usize` instead of previous fields.
 
-### Other
+### Removed
 
-- simplify error reporting by removing context mapping
-- improve code formatting and readability across multiple files
-- update error reporting to use ariadne for better formatting
-- enhance expression and declaration handling with span information
-- clean up lexer code and improve pattern matching implementation
-- add documentation for SourceContext and ContextId structs
-- replace lexer2 with lexer module and update references
-- update lexer module to lexer2 and improve parsing logic
-- remove unused cursor state from lexer utilities
-- remove unused fuzz-lexer test configuration
-- remove AFL fuzz testing support and clean up dependencies
-- update lexer and parser to return context mapping instead of lexing errors
+- **Breaking**: `LexResult` type removed. Use the tuple returned by `lex()` directly.
+- **Breaking**: `lexer_utils` module and associated utilities (including public `State` for lexer) removed as part of lexer rewrite.
 
 ## [0.8.0](https://github.com/Wybxc/cgrammar/compare/v0.7.1...v0.8.0) - 2026-01-30
 
