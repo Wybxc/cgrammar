@@ -4,7 +4,10 @@ use std::{io::Write, path::PathBuf};
 
 use cgrammar::{
     printer::Context,
-    visitor::{Visitor, VisitorMut, walk_declaration_mut, walk_declarator_mut, walk_direct_declarator_mut, walk_expression_mut, walk_statement_mut},
+    visitor::{
+        Visitor, VisitorMut, walk_declaration_mut, walk_declarator_mut, walk_direct_declarator_mut,
+        walk_expression_mut, walk_statement_mut,
+    },
     *,
 };
 use elegance::Printer;
@@ -73,7 +76,9 @@ impl VisitorMut<'_> for RemoveParens {
 
     fn visit_expression_mut(&mut self, e: &'_ mut Expression) -> Self::Result {
         walk_expression_mut(self, e);
-        if let ExpressionKind::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) = &mut e.kind {
+        if let ExpressionKind::Postfix(PostfixExpression::Primary(PrimaryExpression::Parenthesized(inner))) =
+            &mut e.kind
+        {
             let inner = std::mem::replace(inner.as_mut(), Expression::dummy(ExpressionKind::Error));
             *e = inner;
         }

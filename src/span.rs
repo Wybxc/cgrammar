@@ -18,7 +18,8 @@ use crate::{BalancedToken, BalancedTokenSequence, utils::Slab};
 pub struct SourceContext {
     /// The original filename.
     pub filename: String,
-    /// The offset from the line numbers in the input code to the original source file.
+    /// The offset from the line numbers in the input code to the original
+    /// source file.
     pub line_offset: i32,
 }
 

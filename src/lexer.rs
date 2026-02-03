@@ -173,7 +173,8 @@ use lexer_core::Lexer;
 impl<'a> Lexer<'a> {
     /// (6.4.2.1) identifier
     fn identifier(&mut self) -> Option<Identifier> {
-        // C identifiers can start with underscore or XID_Start, followed by XID_Continue
+        // C identifiers can start with underscore or XID_Start, followed by
+        // XID_Continue
         let ident = self.eat_if(re!(r"[_\p{XID_Start}]\p{XID_Continue}*"))?;
         Some(Identifier(ident.into()))
     }

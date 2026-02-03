@@ -131,11 +131,9 @@ pub fn generic_association<'a>() -> impl Parser<'a, Tokens<'a>, GenericAssociati
 pub fn postfix_expression<'a>() -> impl Parser<'a, Tokens<'a>, PostfixExpression, Extra<'a>> + Clone {
     let increment = punctuator(Punctuator::Increment);
     let decrement = punctuator(Punctuator::Decrement);
-    let array = allow_recover(
-        expression()
-            .bracketed()
-            .recover_with(recover_bracketed_with(|span| Expression::new(ExpressionKind::Error, span))),
-    );
+    let array = allow_recover(expression().bracketed().recover_with(recover_bracketed_with(|span| {
+        Expression::new(ExpressionKind::Error, span)
+    })));
     let function = assignment_expression()
         .map(Brand::into_inner)
         .separated_by(punctuator(Punctuator::Comma))
@@ -309,11 +307,14 @@ pub fn binary_expression<'a>() -> impl Parser<'a, Tokens<'a>, Brand<Expression, 
         ($op:expr) => {
             |left, _, right, extra: &mut _| {
                 use BinaryOperator::*;
-                Expression::new(ExpressionKind::Binary(BinaryExpression {
-                    operator: $op,
-                    left: Box::new(left),
-                    right: Box::new(right),
-                }), extra.span())
+                Expression::new(
+                    ExpressionKind::Binary(BinaryExpression {
+                        operator: $op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    }),
+                    extra.span(),
+                )
             }
         };
     }
@@ -366,11 +367,14 @@ pub fn conditional_expression<'a>()
             .then_ignore(punctuator(Punctuator::Colon))
             .then(conditional_expression().map(Brand::into_inner))
             .map_with(|((condition, then_expr), else_expr), extra| {
-                Expression::new(ExpressionKind::Conditional(ConditionalExpression {
-                    condition: Box::new(condition.into_inner()),
-                    then_expr: Box::new(then_expr),
-                    else_expr: Box::new(else_expr),
-                }), extra.span())
+                Expression::new(
+                    ExpressionKind::Conditional(ConditionalExpression {
+                        condition: Box::new(condition.into_inner()),
+                        then_expr: Box::new(then_expr),
+                        else_expr: Box::new(else_expr),
+                    }),
+                    extra.span(),
+                )
             }),
         binary_expression().map(Brand::into_inner),
     ))
@@ -404,11 +408,14 @@ pub fn assignment_expression<'a>()
             .then(assigment_opeartor)
             .then(assignment_expression().map(Brand::into_inner))
             .map_with(|((left, operator), right), extra| {
-                Expression::new(ExpressionKind::Assignment(AssignmentExpression {
-                    operator,
-                    left: Box::new(left),
-                    right: Box::new(right),
-                }), extra.span())
+                Expression::new(
+                    ExpressionKind::Assignment(AssignmentExpression {
+                        operator,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    }),
+                    extra.span(),
+                )
             }),
         conditional_expression().map(Brand::into_inner),
     ))
@@ -466,13 +473,23 @@ pub fn declaration<'a>() -> impl Parser<'a, Tokens<'a>, Declaration, Extra<'a>> 
         .then(declaration_specifiers())
         .then(init_declarator_list().or_not().map(Option::unwrap_or_default))
         .then_ignore(punctuator(Punctuator::Semicolon))
-        .map_with(|((attributes, specifiers), declarators), extra| Declaration::new(DeclarationKind::Normal { attributes, specifiers, declarators }, extra.span()));
+        .map_with(|((attributes, specifiers), declarators), extra| {
+            Declaration::new(
+                DeclarationKind::Normal { attributes, specifiers, declarators },
+                extra.span(),
+            )
+        });
 
     let typedef = attribute_specifier_sequence()
         .then(declaration_specifiers_with_typedef())
         .then(typedef_declarator_list().or_not().map(Option::unwrap_or_default))
         .then_ignore(punctuator(Punctuator::Semicolon))
-        .map_with(|((attributes, specifiers), declarators), extra| Declaration::new(DeclarationKind::Typedef { attributes, specifiers, declarators }, extra.span()));
+        .map_with(|((attributes, specifiers), declarators), extra| {
+            Declaration::new(
+                DeclarationKind::Typedef { attributes, specifiers, declarators },
+                extra.span(),
+            )
+        });
 
     let static_assert = static_assert_declaration();
 
@@ -1456,7 +1473,9 @@ pub fn selection_statement<'a>() -> impl Parser<'a, Tokens<'a>, SelectionStateme
         .ignore_then(
             expression()
                 .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| Expression::new(ExpressionKind::Error, span)))
+                .recover_with(recover_parenthesized_with(|span| {
+                    Expression::new(ExpressionKind::Error, span)
+                }))
                 .map(Box::new),
         )
         .then(statement().map(Box::new))
@@ -1467,7 +1486,9 @@ pub fn selection_statement<'a>() -> impl Parser<'a, Tokens<'a>, SelectionStateme
         .ignore_then(
             expression()
                 .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| Expression::new(ExpressionKind::Error, span)))
+                .recover_with(recover_parenthesized_with(|span| {
+                    Expression::new(ExpressionKind::Error, span)
+                }))
                 .map(Box::new),
         )
         .then(statement().map(Box::new))
@@ -1489,7 +1510,9 @@ pub fn iteration_statement<'a>() -> impl Parser<'a, Tokens<'a>, IterationStateme
         .ignore_then(
             expression()
                 .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| Expression::new(ExpressionKind::Error, span)))
+                .recover_with(recover_parenthesized_with(|span| {
+                    Expression::new(ExpressionKind::Error, span)
+                }))
                 .map(Box::new),
         )
         .then(statement().map(Box::new))
@@ -1501,7 +1524,9 @@ pub fn iteration_statement<'a>() -> impl Parser<'a, Tokens<'a>, IterationStateme
         .then(
             expression()
                 .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| Expression::new(ExpressionKind::Error, span)))
+                .recover_with(recover_parenthesized_with(|span| {
+                    Expression::new(ExpressionKind::Error, span)
+                }))
                 .map(Box::new),
         )
         .then_ignore(punctuator(Punctuator::Semicolon))

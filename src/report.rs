@@ -54,11 +54,7 @@ pub fn report_ariadne<'a>(error: Error<'a>) -> ariadne::Report<'a, Span> {
             let expected_str = if expected.is_empty() {
                 "something else".to_string()
             } else {
-                expected
-                    .iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                expected.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ")
             };
             let found_str = found
                 .as_ref()

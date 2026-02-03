@@ -2,7 +2,11 @@
 
 use std::collections::HashMap;
 
-use cgrammar::{quasi_quote::Interpolate, visitor::{VisitorMut, walk_expression_mut, walk_statement_mut, walk_declaration_mut}, *};
+use cgrammar::{
+    quasi_quote::Interpolate,
+    visitor::{VisitorMut, walk_declaration_mut, walk_expression_mut, walk_statement_mut},
+    *,
+};
 use rstest::rstest;
 
 fn remove_spans(tokens: &mut BalancedTokenSequence) {
