@@ -805,6 +805,24 @@ impl Declarator {
             Declarator::Error => None,
         }
     }
+
+    /// Get the direct declarator from the declarator. None if error inside.
+    pub fn direct_declarator(&self) -> Option<&DirectDeclarator> {
+        match self {
+            Declarator::Direct(direct) => Some(direct),
+            Declarator::Pointer { declarator, .. } => declarator.direct_declarator(),
+            Declarator::Error => None,
+        }
+    }
+
+    /// Get the direct declarator from the declarator mutably. None if error inside.
+    pub fn direct_declarator_mut(&mut self) -> Option<&mut DirectDeclarator> {
+        match self {
+            Declarator::Direct(direct) => Some(direct),
+            Declarator::Pointer { declarator, .. } => declarator.direct_declarator_mut(),
+            Declarator::Error => None,
+        }
+    }
 }
 
 /// Direct declarators (6.7.6)
