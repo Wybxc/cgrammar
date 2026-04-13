@@ -20,8 +20,10 @@ fn can_parse(file: &str, src: &str) -> ParseResult {
 
     let parser = translation_unit();
     let mut init_state = State::new();
-    init_state.ctx_mut().add_typedef_name("term".into());
-    init_state.ctx_mut().add_typedef_name("thm".into());
+    let mut ctx = init_state.ctx();
+    ctx.add_typedef_name("term".into());
+    ctx.add_typedef_name("thm".into());
+    init_state.set_ctx(ctx);
     let ast = parser.parse_with_state(tokens.as_input(), &mut init_state);
     if ast.has_errors() {
         ParseResult::ParseError

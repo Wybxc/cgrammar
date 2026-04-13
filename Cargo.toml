@@ -25,6 +25,7 @@ once_cell = "1.21.3"
 ordered-float = "5.1.0"
 regex-automata = "0.4.13"
 rustc-hash = "2.1.1"
+snapshottable = { version = "0.1.0", git = "https://github.com/Wybxc/snapshottable.git" }
 
 [features]
 dbg-pls = ["dep:dbg-pls"]

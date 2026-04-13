@@ -609,7 +609,9 @@ pub fn typedef_declarator<'a>() -> impl Parser<'a, Tokens<'a>, Declarator, Extra
         interpolation(),
         declarator().map_with(move |declarator, extra| {
             if let Some(ident) = declarator.identifier() {
-                extra.state().ctx_mut().add_typedef_name(ident.clone());
+                let mut ctx = extra.state().ctx();
+                ctx.add_typedef_name(ident.clone());
+                extra.state().set_ctx(ctx);
             }
             declarator
         }),
@@ -830,7 +832,9 @@ pub fn enumerator_list<'a>() -> impl Parser<'a, Tokens<'a>, Vec<Enumerator>, Ext
         interpolation(),
         enumerator()
             .map_with(|enumerator, extra| {
-                extra.state().ctx_mut().add_enum_constant(enumerator.name.clone());
+                let mut ctx = extra.state().ctx();
+                ctx.add_enum_constant(enumerator.name.clone());
+                extra.state().set_ctx(ctx);
                 enumerator
             })
             .separated_by(punctuator(Punctuator::Comma))
