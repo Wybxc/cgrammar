@@ -148,20 +148,22 @@ pub fn enumeration_constant<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Ext
 
 /// (6.5.1.1) generic selection
 pub fn generic_selection<'a>() -> impl Parser<'a, Tokens<'a>, GenericSelection, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        keyword("_Generic")
-            .ignore_then(
-                assignment_expression() // TODO: generic over type
-                    .map(Brand::into_inner)
-                    .map(Box::new)
-                    .then_ignore(punctuator(Punctuator::Comma))
-                    .then(generic_association_list())
-                    .parenthesized(), // TODO: error recovery
-            )
-            .map(|(controlling_expression, associations)| GenericSelection { controlling_expression, associations }),
-    ))
+    node(SyntaxKind::GenericSelection,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            keyword("_Generic")
+                .ignore_then(
+                    assignment_expression()
+                        .map(Brand::into_inner)
+                        .map(Box::new)
+                        .then_ignore(punctuator(Punctuator::Comma))
+                        .then(generic_association_list())
+                        .parenthesized(),
+                )
+                .map(|(controlling_expression, associations)| GenericSelection { controlling_expression, associations }),
+        ))
+    )
     .labelled("generic selection")
     .as_context()
 }
@@ -253,19 +255,21 @@ pub fn postfix_expression<'a>() -> impl Parser<'a, Tokens<'a>, PostfixExpression
 
 /// (6.5.2.5) compound literal
 pub fn compound_literal<'a>() -> impl Parser<'a, Tokens<'a>, CompoundLiteral, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        storage_class_specifiers()
-            .then(type_name())
-            .parenthesized() // TODO: error recovery
-            .then(braced_initializer())
-            .map(|((storage_class_specifiers, type_name), initializer)| CompoundLiteral {
-                storage_class_specifiers,
-                type_name,
-                initializer,
-            }),
-    ))
+    node(SyntaxKind::CompoundLiteral,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            storage_class_specifiers()
+                .then(type_name())
+                .parenthesized()
+                .then(braced_initializer())
+                .map(|((storage_class_specifiers, type_name), initializer)| CompoundLiteral {
+                    storage_class_specifiers,
+                    type_name,
+                    initializer,
+                }),
+        ))
+    )
     .labelled("compound literal")
     .as_context()
 }
@@ -534,14 +538,16 @@ pub fn expression<'a>() -> impl Parser<'a, Tokens<'a>, Expression, Extra<'a>> + 
 /// (6.6) constant expression
 #[apply(cached)]
 pub fn constant_expression<'a>() -> impl Parser<'a, Tokens<'a>, ConstantExpression, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        conditional_expression()
-            .map(Brand::into_inner)
-            .map(Box::new)
-            .map(ConstantExpression::Expression),
-    ))
+    node(SyntaxKind::ConstantExpr,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            conditional_expression()
+                .map(Brand::into_inner)
+                .map(Box::new)
+                .map(ConstantExpression::Expression),
+        ))
+    )
     .labelled("constant expression")
     .as_context()
 }
@@ -818,12 +824,14 @@ pub fn member_declaration<'a>() -> impl Parser<'a, Tokens<'a>, MemberDeclaration
             MemberDeclaration::Error
         }));
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        static_assert,
-        normal,
-    ))
+    node(SyntaxKind::MemberDeclaration,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            static_assert,
+            normal,
+        ))
+    )
     .labelled("member declaration")
     .as_context()
 }
@@ -1119,6 +1127,7 @@ pub fn direct_declarator<'a>() -> impl Parser<'a, Tokens<'a>, DirectDeclarator, 
 
 /// (6.7.6) array declarator
 pub fn array_declarator<'a>() -> impl Parser<'a, Tokens<'a>, ArrayDeclarator, Extra<'a>> + Clone {
+    node(SyntaxKind::ArrayDeclarator,
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
@@ -1144,7 +1153,7 @@ pub fn array_declarator<'a>() -> impl Parser<'a, Tokens<'a>, ArrayDeclarator, Ex
         ))
         .bracketed()
         .recover_with(recover_bracketed(ArrayDeclarator::Error)),
-    ))
+    )))
     .labelled("array declarator")
     .as_context()
 }
@@ -1215,6 +1224,7 @@ pub fn parameter_type_list<'a>() -> impl Parser<'a, Tokens<'a>, ParameterTypeLis
 
 /// (6.7.6) parameter declaration
 pub fn parameter_declaration<'a>() -> impl Parser<'a, Tokens<'a>, ParameterDeclaration, Extra<'a>> + Clone {
+    node(SyntaxKind::ParameterDeclaration,
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
@@ -1227,7 +1237,7 @@ pub fn parameter_declaration<'a>() -> impl Parser<'a, Tokens<'a>, ParameterDecla
                 abstract_declarator().map(ParameterDeclarationKind::Abstract).or_not(),
             )))
             .map(|((attributes, specifiers), declarator)| ParameterDeclaration { attributes, specifiers, declarator }),
-    ))
+    )))
     .labelled("parameter declaration")
     .as_context()
 }
@@ -1254,12 +1264,13 @@ pub fn abstract_declarator<'a>() -> impl Parser<'a, Tokens<'a>, AbstractDeclarat
         .then(abstract_declarator().map(Box::new).or_not())
         .map(|(pointer, abstract_declarator)| AbstractDeclarator::Pointer { pointer, abstract_declarator });
     let direct = direct_abstract_declarator().map(AbstractDeclarator::Direct);
+    node(SyntaxKind::AbstractDeclarator,
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
         pointer,
         direct,
-    ))
+    )))
     .labelled("abstract declarator")
     .as_context()
 }
