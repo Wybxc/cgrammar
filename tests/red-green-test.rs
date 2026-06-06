@@ -164,6 +164,47 @@ fn test_round_trip_comments() {
         "comments should be preserved as trivia");
 }
 
+/// Verify tree structure for a complete C function.
+#[test]
+fn test_tree_structure() {
+    let source = "int max(int a, int b) { if (a > b) { return a; } return b; }";
+    let (tree, _) = parse_tree(source);
+    let root = tree.root();
+    let mut kinds: Vec<SyntaxKind> = vec![];
+    collect_kinds(&tree, root, &mut kinds);
+
+    // Top-level structure
+    assert!(kinds.contains(&SyntaxKind::TranslationUnit));
+    assert!(kinds.contains(&SyntaxKind::ExternalDeclaration));
+    assert!(kinds.contains(&SyntaxKind::FunctionDefinition));
+
+    // Declaration components
+    assert!(kinds.contains(&SyntaxKind::DeclarationSpecifiers));
+    assert!(kinds.contains(&SyntaxKind::TypeSpecifier));
+    assert!(kinds.contains(&SyntaxKind::Declarator));
+    assert!(kinds.contains(&SyntaxKind::DirectDeclarator));
+    assert!(kinds.contains(&SyntaxKind::ParameterTypeList));
+    assert!(kinds.contains(&SyntaxKind::ParameterDeclaration));
+
+    // Statement components
+    assert!(kinds.contains(&SyntaxKind::CompoundStatement));
+    assert!(kinds.contains(&SyntaxKind::SelectionStatement));
+    assert!(kinds.contains(&SyntaxKind::IfStatement));
+    assert!(kinds.contains(&SyntaxKind::JumpStatement));
+    assert!(kinds.contains(&SyntaxKind::ReturnStatement));
+
+    // Expression components
+    assert!(kinds.contains(&SyntaxKind::Expr));
+    assert!(kinds.contains(&SyntaxKind::BinaryExpr));
+
+    // Tokens
+    assert!(kinds.contains(&SyntaxKind::Ident));
+    assert!(kinds.contains(&SyntaxKind::LeftParen));
+    assert!(kinds.contains(&SyntaxKind::RightParen));
+    assert!(kinds.contains(&SyntaxKind::LeftBrace));
+    assert!(kinds.contains(&SyntaxKind::RightBrace));
+}
+
 fn collect_kinds(tree: &SyntaxTree, node: red::SyntaxNode, kinds: &mut Vec<SyntaxKind>) {
     kinds.push(tree.kind(node));
     for child in tree.children(node) {

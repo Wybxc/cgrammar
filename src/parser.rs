@@ -1617,30 +1617,34 @@ pub fn expression_statement<'a>() -> impl Parser<'a, Tokens<'a>, ExpressionState
 
 /// (6.8.4) selection statement
 pub fn selection_statement<'a>() -> impl Parser<'a, Tokens<'a>, SelectionStatement, Extra<'a>> + Clone {
-    let if_stmt = keyword("if")
-        .ignore_then(
-            expression()
-                .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| {
-                    Expression::new(ExpressionKind::Error, span)
-                }))
-                .map(Box::new),
-        )
-        .then(statement().map(Box::new))
-        .then(keyword("else").ignore_then(statement().map(Box::new)).or_not())
-        .map(|((condition, then_stmt), else_stmt)| SelectionStatement::If { condition, then_stmt, else_stmt });
+    let if_stmt = node(SyntaxKind::IfStatement,
+        keyword("if")
+            .ignore_then(
+                expression()
+                    .parenthesized()
+                    .recover_with(recover_parenthesized_with(|span| {
+                        Expression::new(ExpressionKind::Error, span)
+                    }))
+                    .map(Box::new),
+            )
+            .then(statement().map(Box::new))
+            .then(keyword("else").ignore_then(statement().map(Box::new)).or_not())
+            .map(|((condition, then_stmt), else_stmt)| SelectionStatement::If { condition, then_stmt, else_stmt })
+    );
 
-    let switch_stmt = keyword("switch")
-        .ignore_then(
-            expression()
-                .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| {
-                    Expression::new(ExpressionKind::Error, span)
-                }))
-                .map(Box::new),
-        )
-        .then(statement().map(Box::new))
-        .map(|(expression, statement)| SelectionStatement::Switch { expression, statement });
+    let switch_stmt = node(SyntaxKind::SwitchStatement,
+        keyword("switch")
+            .ignore_then(
+                expression()
+                    .parenthesized()
+                    .recover_with(recover_parenthesized_with(|span| {
+                        Expression::new(ExpressionKind::Error, span)
+                    }))
+                    .map(Box::new),
+            )
+            .then(statement().map(Box::new))
+            .map(|(expression, statement)| SelectionStatement::Switch { expression, statement })
+    );
 
     node(SyntaxKind::SelectionStatement,
         choice((
@@ -1656,49 +1660,55 @@ pub fn selection_statement<'a>() -> impl Parser<'a, Tokens<'a>, SelectionStateme
 
 /// (6.8.5) iteration statement
 pub fn iteration_statement<'a>() -> impl Parser<'a, Tokens<'a>, IterationStatement, Extra<'a>> + Clone {
-    let while_stmt = keyword("while")
-        .ignore_then(
-            expression()
-                .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| {
-                    Expression::new(ExpressionKind::Error, span)
-                }))
-                .map(Box::new),
-        )
-        .then(statement().map(Box::new))
-        .map(|(condition, body)| IterationStatement::While { condition, body });
-
-    let do_while_stmt = keyword("do")
-        .ignore_then(statement().map(Box::new))
-        .then_ignore(keyword("while"))
-        .then(
-            expression()
-                .parenthesized()
-                .recover_with(recover_parenthesized_with(|span| {
-                    Expression::new(ExpressionKind::Error, span)
-                }))
-                .map(Box::new),
-        )
-        .then_ignore(punctuator(Punctuator::Semicolon))
-        .map(|(body, condition)| IterationStatement::DoWhile { body, condition });
-
-    let for_stmt = keyword("for")
-        .ignore_then(
-            choice((
-                declaration().map(ForInit::Declaration).map(Some),
+    let while_stmt = node(SyntaxKind::WhileStatement,
+        keyword("while")
+            .ignore_then(
                 expression()
-                    .map(Box::new)
-                    .map(ForInit::Expression)
-                    .or_not()
-                    .then_ignore(punctuator(Punctuator::Semicolon)),
-            ))
-            .then(expression().map(Box::new).or_not())
+                    .parenthesized()
+                    .recover_with(recover_parenthesized_with(|span| {
+                        Expression::new(ExpressionKind::Error, span)
+                    }))
+                    .map(Box::new),
+            )
+            .then(statement().map(Box::new))
+            .map(|(condition, body)| IterationStatement::While { condition, body })
+    );
+
+    let do_while_stmt = node(SyntaxKind::DoWhileStatement,
+        keyword("do")
+            .ignore_then(statement().map(Box::new))
+            .then_ignore(keyword("while"))
+            .then(
+                expression()
+                    .parenthesized()
+                    .recover_with(recover_parenthesized_with(|span| {
+                        Expression::new(ExpressionKind::Error, span)
+                    }))
+                    .map(Box::new),
+            )
             .then_ignore(punctuator(Punctuator::Semicolon))
-            .then(expression().map(Box::new).or_not())
-            .parenthesized(), // TODO: error recovery
-        )
-        .then(statement().map(Box::new))
-        .map(|(((init, condition), update), body)| IterationStatement::For { init, condition, update, body });
+            .map(|(body, condition)| IterationStatement::DoWhile { body, condition })
+    );
+
+    let for_stmt = node(SyntaxKind::ForStatement,
+        keyword("for")
+            .ignore_then(
+                choice((
+                    declaration().map(ForInit::Declaration).map(Some),
+                    expression()
+                        .map(Box::new)
+                        .map(ForInit::Expression)
+                        .or_not()
+                        .then_ignore(punctuator(Punctuator::Semicolon)),
+                ))
+                .then(expression().map(Box::new).or_not())
+                .then_ignore(punctuator(Punctuator::Semicolon))
+                .then(expression().map(Box::new).or_not())
+                .parenthesized(),
+            )
+            .then(statement().map(Box::new))
+            .map(|(((init, condition), update), body)| IterationStatement::For { init, condition, update, body })
+    );
 
     node(SyntaxKind::IterationStatement,
         choice((
@@ -1715,23 +1725,31 @@ pub fn iteration_statement<'a>() -> impl Parser<'a, Tokens<'a>, IterationStateme
 
 /// (6.8.6) jump statement
 pub fn jump_statement<'a>() -> impl Parser<'a, Tokens<'a>, JumpStatement, Extra<'a>> + Clone {
-    let goto_stmt = keyword("goto")
-        .ignore_then(identifier())
-        .then_ignore(punctuator(Punctuator::Semicolon))
-        .map(JumpStatement::Goto);
+    let goto_stmt = node(SyntaxKind::GotoStatement,
+        keyword("goto")
+            .ignore_then(identifier())
+            .then_ignore(punctuator(Punctuator::Semicolon))
+            .map(JumpStatement::Goto)
+    );
 
-    let continue_stmt = keyword("continue")
-        .then_ignore(punctuator(Punctuator::Semicolon))
-        .to(JumpStatement::Continue);
+    let continue_stmt = node(SyntaxKind::ContinueStatement,
+        keyword("continue")
+            .then_ignore(punctuator(Punctuator::Semicolon))
+            .to(JumpStatement::Continue)
+    );
 
-    let break_stmt = keyword("break")
-        .then_ignore(punctuator(Punctuator::Semicolon))
-        .to(JumpStatement::Break);
+    let break_stmt = node(SyntaxKind::BreakStatement,
+        keyword("break")
+            .then_ignore(punctuator(Punctuator::Semicolon))
+            .to(JumpStatement::Break)
+    );
 
-    let return_stmt = keyword("return")
-        .ignore_then(expression().or_not())
-        .then_ignore(punctuator(Punctuator::Semicolon))
-        .map(|expr| JumpStatement::Return(expr.map(Box::new)));
+    let return_stmt = node(SyntaxKind::ReturnStatement,
+        keyword("return")
+            .ignore_then(expression().or_not())
+            .then_ignore(punctuator(Punctuator::Semicolon))
+            .map(|expr| JumpStatement::Return(expr.map(Box::new)))
+    );
 
     node(SyntaxKind::JumpStatement,
         choice((
