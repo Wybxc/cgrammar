@@ -1922,10 +1922,10 @@ pub fn identifier_or_keyword<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Ex
             Token::Identifier(value) => value.clone(),
         },
     ))
-    .map_with(|id, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .validate(|id, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::Ident, len, span.leading_trivia, 0);
+        extra.state().green.token(SyntaxKind::Ident, len, 0, 0);
         id
     })
 }
@@ -1956,7 +1956,7 @@ pub fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clon
             Token::Constant(value) => value.clone(),
         },
     ))
-    .map_with(|c, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .validate(|c, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
         let kind = match &c {
@@ -1965,7 +1965,7 @@ pub fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clon
             Constant::Character(_) => SyntaxKind::CharConst,
             Constant::Predefined(_) => SyntaxKind::PredefinedConst,
         };
-        extra.state().green.token(kind, len, span.leading_trivia, 0);
+        extra.state().green.token(kind, len, 0, 0);
         c
     })
 }
@@ -1979,10 +1979,10 @@ pub fn string_literal<'a>() -> impl Parser<'a, Tokens<'a>, StringLiterals, Extra
             Token::StringLiteral(value) => value.clone(),
         },
     ))
-    .map_with(|s, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .validate(|s, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::StringLiteral, len, span.leading_trivia, 0);
+        extra.state().green.token(SyntaxKind::StringLiteral, len, 0, 0);
         s
     })
 }
@@ -1996,10 +1996,10 @@ pub fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + C
             Token::QuotedString(value) => value.clone(),
         },
     ))
-    .map_with(|s, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .validate(|s, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::QuotedString, len, span.leading_trivia, 0);
+        extra.state().green.token(SyntaxKind::QuotedString, len, 0, 0);
         s
     })
 }
@@ -2080,10 +2080,10 @@ pub fn keyword<'a>(kwd: &str) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Cl
     select_ref! {
         Token::Identifier(name) if name.as_ref() == kwd => ()
     }
-    .map_with(|_, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .validate(|_, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::Ident, len, span.leading_trivia, 0);
+        extra.state().green.token(SyntaxKind::Ident, len, 0, 0);
     })
 }
 
@@ -2093,10 +2093,10 @@ pub fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, Tokens<'a>, (), Extra
     select_ref! {
         Token::Punctuator(p) if *p == punc => ()
     }
-    .map_with(move |_, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .validate(move |_, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(kind, len, span.leading_trivia, 0);
+        extra.state().green.token(kind, len, 0, 0);
     })
 }
 
@@ -2198,7 +2198,7 @@ pub trait ParserExt<O> {
         let outer = select_ref! {
             Token::Parenthesized(tokens) => tokens.as_input()
         }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            let trivia = extra.span().leading_trivia;
+            let trivia = 0;
             extra.state().green.token(SyntaxKind::LeftParen, 1, trivia, 0);
             inner
         });
@@ -2218,7 +2218,7 @@ pub trait ParserExt<O> {
         let outer = select_ref! {
             Token::Bracketed(tokens) => tokens.as_input()
         }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            let trivia = extra.span().leading_trivia;
+            let trivia = 0;
             extra.state().green.token(SyntaxKind::LeftBracket, 1, trivia, 0);
             inner
         });
@@ -2238,7 +2238,7 @@ pub trait ParserExt<O> {
         let outer = select_ref! {
             Token::Braced(tokens) => tokens.as_input()
         }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            let trivia = extra.span().leading_trivia;
+            let trivia = 0;
             extra.state().green.token(SyntaxKind::LeftBrace, 1, trivia, 0);
             inner
         });

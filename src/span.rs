@@ -96,18 +96,11 @@ pub struct Span {
     start: usize,
     len: u32,
     ctx_id: ContextId,
-    /// Length of whitespace/comments preceding the token.
-    pub leading_trivia: u32,
 }
 
 impl Default for Span {
     fn default() -> Self {
-        Self {
-            start: 0,
-            len: 0,
-            ctx_id: ContextId::none(),
-            leading_trivia: 0,
-        }
+        Self { start: 0, len: 0, ctx_id: ContextId::none() }
     }
 }
 
@@ -118,13 +111,12 @@ impl Span {
             start: range.start,
             len: range.len().try_into().expect("Span length overflow"),
             ctx_id,
-            leading_trivia: 0,
         }
     }
 
     /// Create a new end-of-input span at the given position and context ID.
     pub fn new_eoi(pos: usize, ctx_id: ContextId) -> Self {
-        Self { start: pos, len: 0, ctx_id, leading_trivia: 0 }
+        Self { start: pos, len: 0, ctx_id }
     }
 
     /// Get the context and range of this span.
@@ -145,7 +137,6 @@ impl chumsky::span::Span for Span {
             start: range.start,
             len: range.len().try_into().expect("Span length overflow"),
             ctx_id: context,
-            leading_trivia: 0,
         }
     }
 
