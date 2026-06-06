@@ -135,6 +135,9 @@ pub enum SyntaxKind {
     // Comma expressions (6.5.17)
     CommaExpr,
 
+    /// Generic expression (6.5)
+    Expr,
+
     /// Error expression (recovery)
     ExprError,
 
@@ -421,6 +424,7 @@ impl SyntaxKind {
             SyntaxKind::ConditionalExpr => "conditional expression",
             SyntaxKind::AssignmentExpr => "assignment expression",
             SyntaxKind::CommaExpr => "comma expression",
+            SyntaxKind::Expr => "expression",
             SyntaxKind::ExprError => "error expression",
             SyntaxKind::ConstantExpr => "constant expression",
             SyntaxKind::Declaration => "declaration",

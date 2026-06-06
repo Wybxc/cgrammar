@@ -515,22 +515,24 @@ pub fn assignment_expression<'a>()
 /// (6.5.17) expression
 #[apply(cached)]
 pub fn expression<'a>() -> impl Parser<'a, Tokens<'a>, Expression, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        assignment_expression()
-            .map(Brand::into_inner)
-            .separated_by(punctuator(Punctuator::Comma))
-            .at_least(1)
-            .collect::<Vec<Expression>>()
-            .map_with(|expressions, extra| {
-                if expressions.len() == 1 {
-                    expressions.into_iter().next().unwrap()
-                } else {
-                    Expression::new(ExpressionKind::Comma(CommaExpression { expressions }), extra.span())
-                }
-            }),
-    ))
+    node(SyntaxKind::Expr,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            assignment_expression()
+                .map(Brand::into_inner)
+                .separated_by(punctuator(Punctuator::Comma))
+                .at_least(1)
+                .collect::<Vec<Expression>>()
+                .map_with(|expressions, extra| {
+                    if expressions.len() == 1 {
+                        expressions.into_iter().next().unwrap()
+                    } else {
+                        Expression::new(ExpressionKind::Comma(CommaExpression { expressions }), extra.span())
+                    }
+                }),
+        ))
+    )
     .labelled("expression")
     .as_context()
 }
