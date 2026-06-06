@@ -40,8 +40,10 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
 
     let (tokens, _) = lex(&input, None);
 
+    let mut state = ParseState::new();
+    state.green.set_source_len(input.len() as u32);
     let parser = translation_unit();
-    let result = parser.parse(tokens.as_input());
+    let result = parser.parse_with_state(tokens.as_input(), &mut state);
     if result.has_errors() {
         let mut file = std::fs::OpenOptions::new()
             .append(true)
@@ -60,5 +62,18 @@ fn test_parser(#[files("tests/test-cases/**/*.c")] path: PathBuf) {
             println!("{error:?}");
         }
         panic!("Parsing failed with errors");
+    }
+
+    // Verify lossless round-trip
+    let tree = SyntaxTree::new(state.green.build());
+    let reconstructed = print_lossless(&tree, &input);
+    if reconstructed != input {
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(FAILED_TESTS)
+            .unwrap();
+        writeln!(file, "{} (round-trip)", path.to_string_lossy()).unwrap();
+        panic!("Round-trip mismatch");
     }
 }
