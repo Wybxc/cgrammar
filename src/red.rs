@@ -29,8 +29,6 @@ const NONE: u32 = u32::MAX;
 /// traversal.
 #[derive(Debug, Clone)]
 pub struct SyntaxTree {
-    #[allow(dead_code)]
-    root: GreenNode,
     nodes: Vec<SyntaxNodeData>,
 }
 
@@ -65,7 +63,7 @@ impl SyntaxTree {
     pub fn new(root: GreenNode) -> Self {
         let mut nodes = Vec::new();
         build_recursive(&root, NONE, NONE, 0, &mut nodes);
-        SyntaxTree { root, nodes }
+        SyntaxTree { nodes }
     }
 
     /// Returns the root node.
