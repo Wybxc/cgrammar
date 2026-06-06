@@ -322,22 +322,25 @@ impl GreenBuilder {
         struct Frame {
             kind: SyntaxKind,
             children: Vec<GreenChild>,
+            token_end: u32,
         }
 
         let mut stack: Vec<Frame> = Vec::new();
-        let mut current: Frame = Frame { kind: SyntaxKind::Error, children: Vec::new() };
+        let mut current: Frame = Frame { kind: SyntaxKind::Error, children: Vec::new(), token_end: 0 };
         let mut root: Option<GreenNode> = None;
 
         for event in self.events {
             match event {
                 GreenEvent::StartNode { kind } => {
-                    let frame = Frame { kind, children: Vec::new() };
+                    let frame = Frame { kind, children: Vec::new(), token_end: current.token_end };
                     let old = std::mem::replace(&mut current, frame);
                     stack.push(old);
                 }
                 GreenEvent::FinishNode => {
                     let frame = std::mem::replace(&mut current, stack.pop().expect("unmatched FinishNode"));
                     let node = GreenNode::new(frame.kind, frame.children);
+                    // Propagate token_end from child frame to parent
+                    current.token_end = current.token_end.max(frame.token_end);
                     if stack.is_empty() && current.kind == SyntaxKind::Error && current.children.is_empty() {
                         // This is the root node
                         root = Some(node);
@@ -345,10 +348,10 @@ impl GreenBuilder {
                         current.children.push(GreenChild::Node(node));
                     }
                 }
-                GreenEvent::Token { kind, len, start: _ } => {
-                    // Trivia computation from position gaps deferred.
-                    // start field preserved in event for future use.
-                    let token = GreenToken { kind, len, leading_trivia: 0, trailing_trivia: 0 };
+                GreenEvent::Token { kind, len, start } => {
+                    let trivia = start.saturating_sub(current.token_end);
+                    let token = GreenToken { kind, len, leading_trivia: trivia, trailing_trivia: 0 };
+                    current.token_end = start + len;
                     current.children.push(GreenChild::Token(token));
                 }
                 GreenEvent::Mark => {

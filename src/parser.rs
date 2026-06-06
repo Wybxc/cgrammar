@@ -2204,7 +2204,7 @@ pub trait ParserExt<O> {
         });
         self.nested_in(outer)
             .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-                let start = extra.span().start() as u32; extra.state().green.token(SyntaxKind::RightParen, 1, start);
+                let span = extra.span(); let start = (span.end() - 1) as u32; extra.state().green.token(SyntaxKind::RightParen, 1, start);
                 val
             })
     }
@@ -2224,7 +2224,7 @@ pub trait ParserExt<O> {
         });
         self.nested_in(outer)
             .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-                let start = extra.span().start() as u32; extra.state().green.token(SyntaxKind::RightBracket, 1, start);
+                let span = extra.span(); let start = (span.end() - 1) as u32; extra.state().green.token(SyntaxKind::RightBracket, 1, start);
                 val
             })
     }
@@ -2244,7 +2244,7 @@ pub trait ParserExt<O> {
         });
         self.nested_in(outer)
             .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-                let start = extra.span().start() as u32; extra.state().green.token(SyntaxKind::RightBrace, 1, start);
+                let span = extra.span(); let start = (span.end() - 1) as u32; extra.state().green.token(SyntaxKind::RightBrace, 1, start);
                 val
             })
     }
