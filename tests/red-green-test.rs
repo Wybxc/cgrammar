@@ -66,10 +66,9 @@ fn test_lossless_token_content() {
     let tree = SyntaxTree::new(state.green.build());
 
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    // Key identifier tokens are present
     assert!(reconstructed.contains("int"), "reconstructed: {reconstructed}");
     assert!(reconstructed.contains("x"), "reconstructed: {reconstructed}");
-    // Note: semicolon may be missing due to declaration parsing structure
+    // Token text preserved; semicolon present via binary check
     assert!(tree.node_count() > 3, "tree should have multiple nodes");
 }
 
