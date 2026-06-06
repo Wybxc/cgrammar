@@ -13,7 +13,7 @@ fn main() {
     let (tokens, mut ctx_map) = lex(src.as_str(), Some(&file));
 
     let parser = translation_unit();
-    let mut init_state = State::new();
+    let mut init_state = ParseState::new();
     init_state.ctx_mut().add_typedef_name("term".into());
     init_state.ctx_mut().add_typedef_name("thm".into());
     let ast = parser.parse_with_state(tokens.as_input(), &mut init_state);

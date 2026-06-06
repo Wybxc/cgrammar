@@ -11,7 +11,7 @@ fn main() {
     let file = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file.as_str()).unwrap();
 
-    let mut init_state = State::new();
+    let mut init_state = ParseState::new();
     init_state.ctx_mut().add_typedef_name("term".into());
     init_state.ctx_mut().add_typedef_name("thm".into());
     let init_state = init_state;
