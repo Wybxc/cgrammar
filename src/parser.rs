@@ -735,6 +735,7 @@ pub fn storage_class_specifier<'a>() -> impl Parser<'a, Tokens<'a>, StorageClass
 
 /// (6.7.2) type specifier
 pub fn type_specifier<'a>() -> impl Parser<'a, Tokens<'a>, TypeSpecifier, Extra<'a>> + Clone {
+    node(SyntaxKind::TypeSpecifier,
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
@@ -763,8 +764,8 @@ pub fn type_specifier<'a>() -> impl Parser<'a, Tokens<'a>, TypeSpecifier, Extra<
         struct_or_union_specifier().map(TypeSpecifier::Struct),
         enum_specifier().map(TypeSpecifier::Enum),
         typeof_specifier().map(TypeSpecifier::Typeof),
-        typedef_name().map(TypeSpecifier::TypedefName), // Must be last to avoid conflicts
-    ))
+        typedef_name().map(TypeSpecifier::TypedefName),
+    )))
     .labelled("type specifier")
     .as_context()
 }
