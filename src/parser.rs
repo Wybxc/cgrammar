@@ -946,18 +946,20 @@ pub fn enumerator_list<'a>() -> impl Parser<'a, Tokens<'a>, Vec<Enumerator>, Ext
 
 /// (6.7.2.2) enumerator
 pub fn enumerator<'a>() -> impl Parser<'a, Tokens<'a>, Enumerator, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        identifier()
-            .then(attribute_specifier_sequence())
-            .then(
-                punctuator(Punctuator::Assign)
-                    .ignore_then(constant_expression())
-                    .or_not(),
-            )
-            .map(|((name, attributes), value)| Enumerator { name, attributes, value }),
-    ))
+    node(SyntaxKind::Enumerator,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            identifier()
+                .then(attribute_specifier_sequence())
+                .then(
+                    punctuator(Punctuator::Assign)
+                        .ignore_then(constant_expression())
+                        .or_not(),
+                )
+                .map(|((name, attributes), value)| Enumerator { name, attributes, value }),
+        ))
+    )
     .labelled("enumerator")
     .as_context()
 }
@@ -1380,14 +1382,16 @@ pub fn initializer<'a>() -> impl Parser<'a, Tokens<'a>, Initializer, Extra<'a>> 
 
 /// (6.7.10) designated initializer
 pub fn designated_initializer<'a>() -> impl Parser<'a, Tokens<'a>, DesignatedInitializer, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        designation()
-            .or_not()
-            .then(initializer())
-            .map(|(designation, initializer)| DesignatedInitializer { designation, initializer }),
-    ))
+    node(SyntaxKind::DesignatedInitializer,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            designation()
+                .or_not()
+                .then(initializer())
+                .map(|(designation, initializer)| DesignatedInitializer { designation, initializer }),
+        ))
+    )
     .labelled("designated initializer")
     .as_context()
 }
@@ -1414,36 +1418,40 @@ pub fn designation<'a>() -> impl Parser<'a, Tokens<'a>, Designation, Extra<'a>> 
 
 /// (6.7.10) designator
 pub fn designator<'a>() -> impl Parser<'a, Tokens<'a>, Designator, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        constant_expression()
-            .bracketed()
-            .recover_with(recover_bracketed(ConstantExpression::Error))
-            .map(Designator::Array),
-        punctuator(Punctuator::Dot)
-            .ignore_then(identifier())
-            .map(Designator::Member),
-    ))
+    node(SyntaxKind::Designator,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            constant_expression()
+                .bracketed()
+                .recover_with(recover_bracketed(ConstantExpression::Error))
+                .map(Designator::Array),
+            punctuator(Punctuator::Dot)
+                .ignore_then(identifier())
+                .map(Designator::Member),
+        ))
+    )
     .labelled("designator")
     .as_context()
 }
 
 /// (6.7.11) static assert declaration
 pub fn static_assert_declaration<'a>() -> impl Parser<'a, Tokens<'a>, StaticAssertDeclaration, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        keyword("static_assert")
-            .or(keyword("_Static_assert"))
-            .ignore_then(
-                constant_expression()
-                    .then(punctuator(Punctuator::Comma).ignore_then(string_literal()).or_not())
-                    .parenthesized(), // TODO: error recovery
-            )
-            .then_ignore(punctuator(Punctuator::Semicolon))
-            .map(|(condition, message)| StaticAssertDeclaration { condition, message }),
-    ))
+    node(SyntaxKind::StaticAssertDecl,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            keyword("static_assert")
+                .or(keyword("_Static_assert"))
+                .ignore_then(
+                    constant_expression()
+                        .then(punctuator(Punctuator::Comma).ignore_then(string_literal()).or_not())
+                        .parenthesized(),
+                )
+                .then_ignore(punctuator(Punctuator::Semicolon))
+                .map(|(condition, message)| StaticAssertDeclaration { condition, message }),
+        ))
+    )
     .labelled("static assert declaration")
     .as_context()
 }
@@ -1563,13 +1571,15 @@ pub fn compound_statement<'a>() -> impl Parser<'a, Tokens<'a>, CompoundStatement
 
 /// (6.8.2) block item
 pub fn block_item<'a>() -> impl Parser<'a, Tokens<'a>, BlockItem, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        declaration().map(BlockItem::Declaration),
-        label().map(BlockItem::Label),
-        unlabeled_statement().map(BlockItem::Statement),
-    ))
+    node(SyntaxKind::BlockItem,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            declaration().map(BlockItem::Declaration),
+            label().map(BlockItem::Label),
+            unlabeled_statement().map(BlockItem::Statement),
+        ))
+    )
     .labelled("block item")
     .as_context()
 }
@@ -2188,7 +2198,8 @@ pub trait ParserExt<O> {
         let outer = select_ref! {
             Token::Parenthesized(tokens) => tokens.as_input()
         }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            extra.state().green.token(SyntaxKind::LeftParen, 1, 0, 0);
+            let trivia = extra.span().leading_trivia;
+            extra.state().green.token(SyntaxKind::LeftParen, 1, trivia, 0);
             inner
         });
         self.nested_in(outer)
@@ -2207,7 +2218,8 @@ pub trait ParserExt<O> {
         let outer = select_ref! {
             Token::Bracketed(tokens) => tokens.as_input()
         }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            extra.state().green.token(SyntaxKind::LeftBracket, 1, 0, 0);
+            let trivia = extra.span().leading_trivia;
+            extra.state().green.token(SyntaxKind::LeftBracket, 1, trivia, 0);
             inner
         });
         self.nested_in(outer)
@@ -2226,7 +2238,8 @@ pub trait ParserExt<O> {
         let outer = select_ref! {
             Token::Braced(tokens) => tokens.as_input()
         }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            extra.state().green.token(SyntaxKind::LeftBrace, 1, 0, 0);
+            let trivia = extra.span().leading_trivia;
+            extra.state().green.token(SyntaxKind::LeftBrace, 1, trivia, 0);
             inner
         });
         self.nested_in(outer)
