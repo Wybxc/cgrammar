@@ -66,10 +66,8 @@ fn test_lossless_token_content() {
     let tree = SyntaxTree::new(state.green.build());
 
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert!(reconstructed.contains("int"), "reconstructed: {reconstructed}");
-    assert!(reconstructed.contains("x"), "reconstructed: {reconstructed}");
-    // Token content verified; trivia (spaces, semicolons) preserved by syntax tree
-    assert!(tree.node_count() > 3);
+    assert_eq!(reconstructed, "int x;",
+        "lossless print should reconstruct source exactly");
 }
 
 /// Verify function body tokens.
@@ -82,7 +80,8 @@ fn test_lossless_function_tokens() {
     assert!(result.has_output());
     let tree = SyntaxTree::new(state.green.build());
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert!(reconstructed.contains("f"), "reconstructed: {reconstructed}");
+    assert_eq!(reconstructed, "int f(void){}",
+        "lossless print should reconstruct source exactly");
 }
 
 fn collect_kinds(tree: &SyntaxTree, node: red::SyntaxNode, kinds: &mut Vec<SyntaxKind>) {
