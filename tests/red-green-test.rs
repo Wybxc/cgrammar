@@ -84,6 +84,71 @@ fn test_lossless_function_tokens() {
         "lossless print should reconstruct source exactly");
 }
 
+/// Round-trip with if/else.
+#[test]
+fn test_round_trip_if_else() {
+    let source = "int f(int x) { if (x) { return 1; } else { return 0; } }";
+    let (tokens, ctx_map) = lex(source, Some("test.c"));
+    let mut state = ParseState::new();
+    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
+    assert!(result.has_output());
+    let tree = SyntaxTree::new(state.green.build());
+    let reconstructed = print_lossless(&tree, ctx_map.source);
+    assert_eq!(reconstructed, source,
+        "lossless print should reconstruct source exactly");
+}
+
+/// Round-trip with while loop.
+#[test]
+fn test_round_trip_while() {
+    let source = "int f(int n) { int x = 0; while (x < n) { x = x + 1; } return x; }";
+    let (tokens, ctx_map) = lex(source, Some("test.c"));
+    let mut state = ParseState::new();
+    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
+    assert!(result.has_output());
+    let tree = SyntaxTree::new(state.green.build());
+    let reconstructed = print_lossless(&tree, ctx_map.source);
+    assert_eq!(reconstructed, source,
+        "lossless print should reconstruct source exactly");
+}
+
+/// Round-trip with for loop.
+#[test]
+fn test_round_trip_for() {
+    let source = "int f() { int s = 0; for (int i = 0; i < 10; i = i + 1) { s = s + i; } return s; }";
+    let (tokens, ctx_map) = lex(source, Some("test.c"));
+    let mut state = ParseState::new();
+    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
+    assert!(result.has_output());
+    let tree = SyntaxTree::new(state.green.build());
+    let reconstructed = print_lossless(&tree, ctx_map.source);
+    assert_eq!(reconstructed, source,
+        "lossless print should reconstruct source exactly");
+}
+
+/// Round-trip with struct and pointer.
+#[test]
+fn test_round_trip_struct() {
+    let source = "struct point { int x; int y; }; int f(struct point *p) { return p->x + p->y; }";
+    let (tokens, ctx_map) = lex(source, Some("test.c"));
+    let mut state = ParseState::new();
+    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
+    assert!(result.has_output());
+    let tree = SyntaxTree::new(state.green.build());
+    let reconstructed = print_lossless(&tree, ctx_map.source);
+    assert_eq!(reconstructed, source,
+        "lossless print should reconstruct source exactly");
+}
+
+/// Test convenience API parse_tree.
+#[test]
+fn test_convenience_api() {
+    let (tree, ast) = parse_tree("int x;");
+    assert!(ast.is_some());
+    assert_eq!(tree.kind(tree.root()), SyntaxKind::TranslationUnit);
+    assert!(tree.node_count() > 1);
+}
+
 fn collect_kinds(tree: &SyntaxTree, node: red::SyntaxNode, kinds: &mut Vec<SyntaxKind>) {
     kinds.push(tree.kind(node));
     for child in tree.children(node) {

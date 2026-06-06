@@ -11,8 +11,10 @@ fn main() {
 
     let (tree, ctx_map, ast) = parse_tree_with_map(src.as_str());
 
-    println!("=== AST ===");
-    println!("{}", dbg_pls::pretty(&ast));
+    if let Some(ref ast) = ast {
+        println!("=== AST ===");
+        println!("{}", dbg_pls::pretty(ast));
+    }
 
     println!("\n=== Green Tree ===");
     println!("Node count: {}", tree.node_count());

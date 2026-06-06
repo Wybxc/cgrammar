@@ -32,32 +32,22 @@ pub use visitor::{Visitor, VisitorMut};
 
 /// Parse C source code into a lossless [`SyntaxTree`].
 ///
-/// This is the primary entry point for obtaining a red-green tree. It combines
-/// lexing, parsing, and green tree construction into a single call.
-///
-/// # Example
-///
-/// ```ignore
-/// let tree = cgrammar::parse_tree("int x;");
-/// let root = tree.root();
-/// assert_eq!(tree.kind(root), cgrammar::SyntaxKind::TranslationUnit);
-/// ```
-pub fn parse_tree(source: &str) -> (SyntaxTree, TranslationUnit) {
+/// Returns the tree and the typed AST. If parsing fails, the tree still
+/// contains all tokens consumed before the failure.
+pub fn parse_tree(source: &str) -> (SyntaxTree, Option<TranslationUnit>) {
     let (tokens, _ctx_map) = lex(source, None);
     let mut state = ParseState::new();
     let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
-    let ast = result.output().cloned().expect("parse should produce output");
     let green = state.green.build();
-    (SyntaxTree::new(green), ast)
+    (SyntaxTree::new(green), result.output().cloned())
 }
 
-/// Parse C source code and return the [`SyntaxTree`] and [`ContextMapping`]
-/// (for source text access needed by [`print_lossless`]).
-pub fn parse_tree_with_map<'a>(source: &'a str) -> (SyntaxTree, span::ContextMapping<'a>, TranslationUnit) {
+/// Parse C source code and return the [`SyntaxTree`], [`ContextMapping`]
+/// (for [`print_lossless`]), and typed AST.
+pub fn parse_tree_with_map<'a>(source: &'a str) -> (SyntaxTree, span::ContextMapping<'a>, Option<TranslationUnit>) {
     let (tokens, ctx_map) = lex(source, None);
     let mut state = ParseState::new();
     let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
-    let ast = result.output().cloned().expect("parse should produce output");
     let green = state.green.build();
-    (SyntaxTree::new(green), ctx_map, ast)
+    (SyntaxTree::new(green), ctx_map, result.output().cloned())
 }
