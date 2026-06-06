@@ -970,17 +970,19 @@ pub fn enumerator<'a>() -> impl Parser<'a, Tokens<'a>, Enumerator, Extra<'a>> + 
 
 /// (6.7.2.4) atomic type specifier
 pub fn atomic_type_specifier<'a>() -> impl Parser<'a, Tokens<'a>, AtomicTypeSpecifier, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        keyword("_Atomic")
-            .ignore_then(
-                type_name()
-                    .parenthesized()
-                    .recover_with(recover_parenthesized(TypeName::Error)),
-            )
-            .map(|type_name| AtomicTypeSpecifier { type_name }),
-    ))
+    node(SyntaxKind::AtomicTypeSpecifier,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            keyword("_Atomic")
+                .ignore_then(
+                    type_name()
+                        .parenthesized()
+                        .recover_with(recover_parenthesized(TypeName::Error)),
+                )
+                .map(|type_name| AtomicTypeSpecifier { type_name }),
+        ))
+    )
     .labelled("atomic type specifier")
     .as_context()
 }
@@ -994,7 +996,7 @@ pub fn typeof_specifier<'a>() -> impl Parser<'a, Tokens<'a>, TypeofSpecifier, Ex
     .parenthesized()
     .recover_with(recover_parenthesized(TypeofSpecifierArgument::Error));
 
-    choice((
+    node(SyntaxKind::TypeofSpecifier, choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
         keyword("typeof")
@@ -1004,7 +1006,7 @@ pub fn typeof_specifier<'a>() -> impl Parser<'a, Tokens<'a>, TypeofSpecifier, Ex
         keyword("typeof_unqual")
             .ignore_then(typeof_arg)
             .map(TypeofSpecifier::TypeofUnqual),
-    ))
+    )))
     .labelled("typeof specifier")
     .as_context()
 }
