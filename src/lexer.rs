@@ -707,67 +707,78 @@ impl<'a> Lexer<'a> {
 
     /// (6.7.12.1) balanced token
     fn balanced_token(&mut self) -> Option<Spanned<BalancedToken>> {
+        let trivia_start = self.cursor();
         self.skip_whitespace();
+        let leading_trivia = (self.cursor() - trivia_start) as u32;
 
         let start = self.cursor();
 
+        // Helper to add trivia to a span
+        let add_trivia = |span: &mut Span| {
+            span.leading_trivia = leading_trivia;
+        };
+
+        macro_rules! make_spanned {
+            ($token:expr) => {{
+                let mut span = self.make_span(start);
+                span.leading_trivia = leading_trivia;
+                Spanned::new($token, span)
+            }};
+        }
+
         // Parenthesized: ( balanced-token-sequence? )
-        if let Some(token) = self.parse_bracketed('(', ')', BalancedToken::Parenthesized) {
+        if let Some(mut token) = self.parse_bracketed('(', ')', BalancedToken::Parenthesized) {
+            add_trivia(&mut token.span);
             return Some(token);
         }
 
         // Bracketed: [ balanced-token-sequence? ]
-        if let Some(token) = self.parse_bracketed('[', ']', BalancedToken::Bracketed) {
+        if let Some(mut token) = self.parse_bracketed('[', ']', BalancedToken::Bracketed) {
+            add_trivia(&mut token.span);
             return Some(token);
         }
 
         // Braced: { balanced-token-sequence? }
-        if let Some(token) = self.parse_bracketed('{', '}', BalancedToken::Braced) {
+        if let Some(mut token) = self.parse_bracketed('{', '}', BalancedToken::Braced) {
+            add_trivia(&mut token.span);
             return Some(token);
         }
 
         // String literal
         if let Some(sl) = self.string_literal() {
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::StringLiteral(sl), span));
+            return Some(make_spanned!(BalancedToken::StringLiteral(sl)));
         }
 
         // Quoted string (backtick)
         if let Some(qs) = self.quoted_string() {
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::QuotedString(qs), span));
+            return Some(make_spanned!(BalancedToken::QuotedString(qs)));
         }
 
         // Template (quasi-quote)
         #[cfg(feature = "quasi-quote")]
         if let Some(t) = self.template() {
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Template(t), span));
+            return Some(make_spanned!(BalancedToken::Template(t)));
         }
 
         // Constant (must try before identifier for true/false/nullptr)
         if let Some(c) = self.constant() {
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Constant(c), span));
+            return Some(make_spanned!(BalancedToken::Constant(c)));
         }
 
         // Identifier
         if let Some(id) = self.identifier() {
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Identifier(id), span));
+            return Some(make_spanned!(BalancedToken::Identifier(id)));
         }
 
         // Punctuator
         if let Some(p) = self.punctuator() {
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Punctuator(p), span));
+            return Some(make_spanned!(BalancedToken::Punctuator(p)));
         }
 
         // Unknown token - any single character that doesn't match anything
         if !self.is_eof() && self.peek().is_some_and(|c| !c.is_whitespace()) {
             self.eat();
-            let span = self.make_span(start);
-            return Some(Spanned::new(BalancedToken::Unknown, span));
+            return Some(make_spanned!(BalancedToken::Unknown));
         }
 
         None

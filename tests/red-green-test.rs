@@ -93,8 +93,10 @@ fn test_compound_statement_structure() {
     let mut kinds: Vec<SyntaxKind> = vec![];
     collect_kinds(&tree, root, &mut kinds);
 
-    // Verify we have key tokens (bracket tokens not yet recorded for balanced groups)
+    // Verify we have key tokens including bracket tokens
     assert!(kinds.contains(&SyntaxKind::Ident), "should contain identifiers");
+    assert!(kinds.contains(&SyntaxKind::LeftBrace), "should contain left brace");
+    assert!(kinds.contains(&SyntaxKind::RightBrace), "should contain right brace");
 }
 
 /// Test with binary expression.

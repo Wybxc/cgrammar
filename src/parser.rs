@@ -5,7 +5,7 @@ use macro_rules_attribute::apply;
 
 use chumsky::{
     extension::v1::{Ext, ExtParser},
-    input::InputRef,
+    input::{InputRef, MapExtra},
 };
 
 use crate::{ast::*, context::ParseState, span::*, syntax::SyntaxKind, utils::*};
@@ -239,12 +239,14 @@ pub fn postfix_expression<'a>() -> impl Parser<'a, Tokens<'a>, PostfixExpression
         |acc, f| f(acc),
     );
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        compound_literal().map(PostfixExpression::CompoundLiteral),
-        postfix,
-    ))
+    node(SyntaxKind::PostfixExpr,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            compound_literal().map(PostfixExpression::CompoundLiteral),
+            postfix,
+        ))
+    )
     .labelled("postfix expression")
     .as_context()
 }
@@ -311,18 +313,20 @@ pub fn unary_expression<'a>() -> impl Parser<'a, Tokens<'a>, UnaryExpression, Ex
 
     let postfix = postfix_expression();
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        pre_increment.map(UnaryExpression::PreIncrement),
-        pre_decrement.map(UnaryExpression::PreDecrement),
-        unary.map(|(operator, operand)| UnaryExpression::Unary { operator, operand: Box::new(operand) }),
-        no_recover(sizeof_type.clone()).map(UnaryExpression::SizeofType), // sizeof type must be before sizeof expr
-        sizeof_expr.map(UnaryExpression::Sizeof),
-        sizeof_type.map(UnaryExpression::SizeofType),
-        alignof_type.map(UnaryExpression::Alignof),
-        postfix.map(UnaryExpression::Postfix),
-    ))
+    node(SyntaxKind::UnaryExpr,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            pre_increment.map(UnaryExpression::PreIncrement),
+            pre_decrement.map(UnaryExpression::PreDecrement),
+            unary.map(|(operator, operand)| UnaryExpression::Unary { operator, operand: Box::new(operand) }),
+            no_recover(sizeof_type.clone()).map(UnaryExpression::SizeofType),
+            sizeof_expr.map(UnaryExpression::Sizeof),
+            sizeof_type.map(UnaryExpression::SizeofType),
+            alignof_type.map(UnaryExpression::Alignof),
+            postfix.map(UnaryExpression::Postfix),
+        ))
+    )
     .labelled("unary expression")
     .as_context()
 }
@@ -336,14 +340,16 @@ pub fn cast_expression<'a>() -> impl Parser<'a, Tokens<'a>, CastExpression, Extr
         .then(allow_recover(cast_expression().map(Box::new)))
         .map(|(type_name, expression)| CastExpression::Cast { type_name, expression });
     let unary = unary_expression().map(CastExpression::Unary);
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        no_recover(cast.clone()),
-        no_recover(unary.clone()),
-        cast,
-        unary,
-    ))
+    node(SyntaxKind::CastExpr,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            no_recover(cast.clone()),
+            no_recover(unary.clone()),
+            cast,
+            unary,
+        ))
+    )
 }
 
 /// (6.5.5) multiplicative expression
@@ -392,35 +398,37 @@ pub fn binary_expression<'a>() -> impl Parser<'a, Tokens<'a>, Brand<Expression, 
     }
 
     // Suppose precedence is X, use 1000 - 10*X as the associativity level
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
+    node(SyntaxKind::BinaryExpr,
         choice((
-            cast_expression().map_with(|c, e| Expression::new(ExpressionKind::Cast(c), e.span())),
-            unary_expression().map_with(|u, e| Expression::new(ExpressionKind::Unary(u), e.span())),
-            postfix_expression().map_with(|p, e| Expression::new(ExpressionKind::Postfix(p), e.span())),
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            choice((
+                cast_expression().map_with(|c, e| Expression::new(ExpressionKind::Cast(c), e.span())),
+                unary_expression().map_with(|u, e| Expression::new(ExpressionKind::Unary(u), e.span())),
+                postfix_expression().map_with(|p, e| Expression::new(ExpressionKind::Postfix(p), e.span())),
+            ))
+            .pratt((
+                infix(left(1000 - 30), op!(Star), binary!(Multiply)),
+                infix(left(1000 - 30), op!(Slash), binary!(Divide)),
+                infix(left(1000 - 30), op!(Percent), binary!(Modulo)),
+                infix(left(1000 - 40), op!(Plus), binary!(Add)),
+                infix(left(1000 - 40), op!(Minus), binary!(Subtract)),
+                infix(left(1000 - 50), op!(LeftShift), binary!(LeftShift)),
+                infix(left(1000 - 50), op!(RightShift), binary!(RightShift)),
+                infix(left(1000 - 60), op!(Less), binary!(Less)),
+                infix(left(1000 - 60), op!(LessEqual), binary!(LessEqual)),
+                infix(left(1000 - 60), op!(Greater), binary!(Greater)),
+                infix(left(1000 - 60), op!(GreaterEqual), binary!(GreaterEqual)),
+                infix(left(1000 - 70), op!(Equal), binary!(Equal)),
+                infix(left(1000 - 70), op!(NotEqual), binary!(NotEqual)),
+                infix(left(1000 - 80), op!(Ampersand), binary!(BitwiseAnd)),
+                infix(left(1000 - 90), op!(Caret), binary!(BitwiseXor)),
+                infix(left(1000 - 100), op!(Pipe), binary!(BitwiseOr)),
+                infix(left(1000 - 110), op!(LogicalAnd), binary!(LogicalAnd)),
+                infix(left(1000 - 120), op!(LogicalOr), binary!(LogicalOr)),
+            )),
         ))
-        .pratt((
-            infix(left(1000 - 30), op!(Star), binary!(Multiply)),
-            infix(left(1000 - 30), op!(Slash), binary!(Divide)),
-            infix(left(1000 - 30), op!(Percent), binary!(Modulo)),
-            infix(left(1000 - 40), op!(Plus), binary!(Add)),
-            infix(left(1000 - 40), op!(Minus), binary!(Subtract)),
-            infix(left(1000 - 50), op!(LeftShift), binary!(LeftShift)),
-            infix(left(1000 - 50), op!(RightShift), binary!(RightShift)),
-            infix(left(1000 - 60), op!(Less), binary!(Less)),
-            infix(left(1000 - 60), op!(LessEqual), binary!(LessEqual)),
-            infix(left(1000 - 60), op!(Greater), binary!(Greater)),
-            infix(left(1000 - 60), op!(GreaterEqual), binary!(GreaterEqual)),
-            infix(left(1000 - 70), op!(Equal), binary!(Equal)),
-            infix(left(1000 - 70), op!(NotEqual), binary!(NotEqual)),
-            infix(left(1000 - 80), op!(Ampersand), binary!(BitwiseAnd)),
-            infix(left(1000 - 90), op!(Caret), binary!(BitwiseXor)),
-            infix(left(1000 - 100), op!(Pipe), binary!(BitwiseOr)),
-            infix(left(1000 - 110), op!(LogicalAnd), binary!(LogicalAnd)),
-            infix(left(1000 - 120), op!(LogicalOr), binary!(LogicalOr)),
-        )),
-    ))
+    )
     .map(Brand::new)
     .labelled("binary expression")
     .as_context()
@@ -430,26 +438,28 @@ pub fn binary_expression<'a>() -> impl Parser<'a, Tokens<'a>, Brand<Expression, 
 #[apply(cached)]
 pub fn conditional_expression<'a>()
 -> impl Parser<'a, Tokens<'a>, Brand<Expression, ConditionalExpression>, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        binary_expression()
-            .then_ignore(punctuator(Punctuator::Question))
-            .then(expression())
-            .then_ignore(punctuator(Punctuator::Colon))
-            .then(conditional_expression().map(Brand::into_inner))
-            .map_with(|((condition, then_expr), else_expr), extra| {
-                Expression::new(
-                    ExpressionKind::Conditional(ConditionalExpression {
-                        condition: Box::new(condition.into_inner()),
-                        then_expr: Box::new(then_expr),
-                        else_expr: Box::new(else_expr),
-                    }),
-                    extra.span(),
-                )
-            }),
-        binary_expression().map(Brand::into_inner),
-    ))
+    node(SyntaxKind::ConditionalExpr,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            binary_expression()
+                .then_ignore(punctuator(Punctuator::Question))
+                .then(expression())
+                .then_ignore(punctuator(Punctuator::Colon))
+                .then(conditional_expression().map(Brand::into_inner))
+                .map_with(|((condition, then_expr), else_expr), extra| {
+                    Expression::new(
+                        ExpressionKind::Conditional(ConditionalExpression {
+                            condition: Box::new(condition.into_inner()),
+                            then_expr: Box::new(then_expr),
+                            else_expr: Box::new(else_expr),
+                        }),
+                        extra.span(),
+                    )
+                }),
+            binary_expression().map(Brand::into_inner),
+        ))
+    )
     .map(Brand::new)
     .labelled("conditional expression")
     .as_context()
@@ -472,25 +482,27 @@ pub fn assignment_expression<'a>()
         Token::Punctuator(Punctuator::LeftShiftAssign) => AssignmentOperator::LeftShiftAssign,
         Token::Punctuator(Punctuator::RightShiftAssign) => AssignmentOperator::RightShiftAssign,
     };
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        unary_expression()
-            .map_with(|u, e| Expression::new(ExpressionKind::Unary(u), e.span()))
-            .then(assigment_opeartor)
-            .then(assignment_expression().map(Brand::into_inner))
-            .map_with(|((left, operator), right), extra| {
-                Expression::new(
-                    ExpressionKind::Assignment(AssignmentExpression {
-                        operator,
-                        left: Box::new(left),
-                        right: Box::new(right),
-                    }),
-                    extra.span(),
-                )
-            }),
-        conditional_expression().map(Brand::into_inner),
-    ))
+    node(SyntaxKind::AssignmentExpr,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            unary_expression()
+                .map_with(|u, e| Expression::new(ExpressionKind::Unary(u), e.span()))
+                .then(assigment_opeartor)
+                .then(assignment_expression().map(Brand::into_inner))
+                .map_with(|((left, operator), right), extra| {
+                    Expression::new(
+                        ExpressionKind::Assignment(AssignmentExpression {
+                            operator,
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        }),
+                        extra.span(),
+                    )
+                }),
+            conditional_expression().map(Brand::into_inner),
+        ))
+    )
     .map(Brand::new)
     .labelled("assignment expression")
     .as_context()
@@ -589,16 +601,18 @@ pub fn declaration<'a>() -> impl Parser<'a, Tokens<'a>, Declaration, Extra<'a>> 
 
 /// (6.7) declaration specifiers (without typedef)
 pub fn declaration_specifiers<'a>() -> impl Parser<'a, Tokens<'a>, DeclarationSpecifiers, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        declaration_specifier()
-            .repeated()
-            .at_least(1)
-            .collect::<Vec<DeclarationSpecifier>>()
-            .then(attribute_specifier_sequence())
-            .map(|(specifiers, attributes)| DeclarationSpecifiers { specifiers, attributes }),
-    ))
+    node(SyntaxKind::DeclarationSpecifiers,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            declaration_specifier()
+                .repeated()
+                .at_least(1)
+                .collect::<Vec<DeclarationSpecifier>>()
+                .then(attribute_specifier_sequence())
+                .map(|(specifiers, attributes)| DeclarationSpecifiers { specifiers, attributes }),
+        ))
+    )
     .labelled("declaration specifiers")
     .as_context()
 }
@@ -606,6 +620,7 @@ pub fn declaration_specifiers<'a>() -> impl Parser<'a, Tokens<'a>, DeclarationSp
 /// (6.7) declaration specifiers (with typedef)
 pub fn declaration_specifiers_with_typedef<'a>() -> impl Parser<'a, Tokens<'a>, DeclarationSpecifiers, Extra<'a>> + Clone
 {
+    node(SyntaxKind::DeclarationSpecifiers,
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
@@ -616,7 +631,7 @@ pub fn declaration_specifiers_with_typedef<'a>() -> impl Parser<'a, Tokens<'a>, 
             .collect::<Vec<DeclarationSpecifier>>()
             .then(attribute_specifier_sequence())
             .map(|(specifiers, attributes)| DeclarationSpecifiers { specifiers, attributes }),
-    ))
+    )))
     .labelled("declaration specifiers")
     .as_context()
 }
@@ -651,13 +666,15 @@ pub fn init_declarator_list<'a>() -> impl Parser<'a, Tokens<'a>, Vec<InitDeclara
 
 /// (6.7) init declarator
 pub fn init_declarator<'a>() -> impl Parser<'a, Tokens<'a>, InitDeclarator, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        declarator()
-            .then(punctuator(Punctuator::Assign).ignore_then(initializer()).or_not())
-            .map(|(declarator, initializer)| InitDeclarator { declarator, initializer }),
-    ))
+    node(SyntaxKind::InitDeclarator,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            declarator()
+                .then(punctuator(Punctuator::Assign).ignore_then(initializer()).or_not())
+                .map(|(declarator, initializer)| InitDeclarator { declarator, initializer }),
+        ))
+    )
     .labelled("init declarator")
     .as_context()
 }
@@ -753,20 +770,22 @@ pub fn struct_or_union_specifier<'a>() -> impl Parser<'a, Tokens<'a>, StructOrUn
         keyword("union").to(StructOrUnion::Union),
     ));
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        struct_or_union
-            .then(attribute_specifier_sequence())
-            .then(identifier().or_not())
-            .then(member_declaration_list().braced().or_not())
-            .map(|(((kind, attributes), identifier), members)| StructOrUnionSpecifier {
-                kind,
-                attributes,
-                identifier,
-                members,
-            }),
-    ))
+    node(SyntaxKind::StructSpecifier,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            struct_or_union
+                .then(attribute_specifier_sequence())
+                .then(identifier().or_not())
+                .then(member_declaration_list().braced().or_not())
+                .map(|(((kind, attributes), identifier), members)| StructOrUnionSpecifier {
+                    kind,
+                    attributes,
+                    identifier,
+                    members,
+                }),
+        ))
+    )
     .labelled("struct or union specifier")
     .as_context()
 }
@@ -872,27 +891,29 @@ pub fn member_declarator<'a>() -> impl Parser<'a, Tokens<'a>, MemberDeclarator, 
 
 /// (6.7.2.2) enum specifier
 pub fn enum_specifier<'a>() -> impl Parser<'a, Tokens<'a>, EnumSpecifier, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        keyword("enum")
-            .ignore_then(attribute_specifier_sequence())
-            .then(identifier().or_not())
-            .then(
-                punctuator(Punctuator::Colon)
-                    .ignore_then(specifier_qualifier_list())
-                    .or_not(),
-            )
-            .then(enumerator_list().braced().or_not())
-            .map(
-                |(((attributes, identifier), type_specifier), enumerators)| EnumSpecifier {
-                    attributes,
-                    identifier,
-                    type_specifier,
-                    enumerators,
-                },
-            ),
-    ))
+    node(SyntaxKind::EnumSpecifier,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            keyword("enum")
+                .ignore_then(attribute_specifier_sequence())
+                .then(identifier().or_not())
+                .then(
+                    punctuator(Punctuator::Colon)
+                        .ignore_then(specifier_qualifier_list())
+                        .or_not(),
+                )
+                .then(enumerator_list().braced().or_not())
+                .map(
+                    |(((attributes, identifier), type_specifier), enumerators)| EnumSpecifier {
+                        attributes,
+                        identifier,
+                        type_specifier,
+                        enumerators,
+                    },
+                ),
+        ))
+    )
     .labelled("enum specifier")
     .as_context()
 }
@@ -1034,12 +1055,14 @@ pub fn declarator<'a>() -> impl Parser<'a, Tokens<'a>, Declarator, Extra<'a>> + 
         .then(declarator().map(Box::new))
         .map(|(pointer, declarator)| Declarator::Pointer { pointer, declarator });
     let direct = direct_declarator().map(Declarator::Direct);
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        pointer,
-        direct,
-    ))
+    node(SyntaxKind::Declarator,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            pointer,
+            direct,
+        ))
+    )
     .labelled("declarator")
     .as_context()
 }
@@ -1059,35 +1082,37 @@ pub fn direct_declarator<'a>() -> impl Parser<'a, Tokens<'a>, DirectDeclarator, 
 
     type DirectDeclaratorFn = Box<dyn FnOnce(DirectDeclarator) -> DirectDeclarator>;
     let base = choice((identifier_decl, parenthesized));
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        base.foldl(
-            choice((
-                array_declarator().then(attribute_specifier_sequence()).map(
-                    |(array_declarator, attributes)| -> DirectDeclaratorFn {
-                        Box::new(move |declarator| DirectDeclarator::Array {
-                            declarator: Box::new(declarator),
-                            attributes,
-                            array_declarator,
-                        })
-                    },
-                ),
-                parameter_type_list()
-                    .parenthesized() // TODO: error recovery
-                    .then(attribute_specifier_sequence())
-                    .map(|(parameters, attributes)| -> DirectDeclaratorFn {
-                        Box::new(move |declarator| DirectDeclarator::Function {
-                            declarator: Box::new(declarator),
-                            attributes,
-                            parameters,
-                        })
-                    }),
-            ))
-            .repeated(),
-            |acc, f| f(acc),
-        ),
-    ))
+    node(SyntaxKind::DirectDeclarator,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            base.foldl(
+                choice((
+                    array_declarator().then(attribute_specifier_sequence()).map(
+                        |(array_declarator, attributes)| -> DirectDeclaratorFn {
+                            Box::new(move |declarator| DirectDeclarator::Array {
+                                declarator: Box::new(declarator),
+                                attributes,
+                                array_declarator,
+                            })
+                        },
+                    ),
+                    parameter_type_list()
+                        .parenthesized()
+                        .then(attribute_specifier_sequence())
+                        .map(|(parameters, attributes)| -> DirectDeclaratorFn {
+                            Box::new(move |declarator| DirectDeclarator::Function {
+                                declarator: Box::new(declarator),
+                                attributes,
+                                parameters,
+                            })
+                        }),
+                ))
+                .repeated(),
+                |acc, f| f(acc),
+            ),
+        ))
+    )
     .labelled("direct declarator")
     .as_context()
 }
@@ -1127,21 +1152,23 @@ pub fn array_declarator<'a>() -> impl Parser<'a, Tokens<'a>, ArrayDeclarator, Ex
 /// (6.7.6) pointer
 #[apply(cached)]
 pub fn pointer<'a>() -> impl Parser<'a, Tokens<'a>, Pointer, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
+    node(SyntaxKind::Pointer,
         choice((
-            punctuator(Punctuator::Star).to(PointerOrBlock::Pointer),
-            punctuator(Punctuator::Caret).to(PointerOrBlock::Block),
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            choice((
+                punctuator(Punctuator::Star).to(PointerOrBlock::Pointer),
+                punctuator(Punctuator::Caret).to(PointerOrBlock::Block),
+            ))
+            .then(attribute_specifier_sequence())
+            .then(type_qualifier_list().or_not().map(Option::unwrap_or_default))
+            .map(|((pointer_or_block, attributes), type_qualifiers)| Pointer {
+                pointer_or_block,
+                attributes,
+                type_qualifiers,
+            }),
         ))
-        .then(attribute_specifier_sequence())
-        .then(type_qualifier_list().or_not().map(Option::unwrap_or_default))
-        .map(|((pointer_or_block, attributes), type_qualifiers)| Pointer {
-            pointer_or_block,
-            attributes,
-            type_qualifiers,
-        }),
-    ))
+    )
     .labelled("pointer")
     .as_context()
 }
@@ -1161,6 +1188,7 @@ pub fn type_qualifier_list<'a>() -> impl Parser<'a, Tokens<'a>, Vec<TypeQualifie
 /// (6.7.6) parameter type list
 #[apply(cached)]
 pub fn parameter_type_list<'a>() -> impl Parser<'a, Tokens<'a>, ParameterTypeList, Extra<'a>> + Clone {
+    node(SyntaxKind::ParameterTypeList,
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
@@ -1180,7 +1208,7 @@ pub fn parameter_type_list<'a>() -> impl Parser<'a, Tokens<'a>, ParameterTypeLis
                     ParameterTypeList::Parameters(params)
                 }
             }),
-    ))
+    )))
     .labelled("parameter type list")
     .as_context()
 }
@@ -1207,13 +1235,14 @@ pub fn parameter_declaration<'a>() -> impl Parser<'a, Tokens<'a>, ParameterDecla
 /// (6.7.7) type name
 #[apply(cached)]
 pub fn type_name<'a>() -> impl Parser<'a, Tokens<'a>, TypeName, Extra<'a>> + Clone {
+    node(SyntaxKind::TypeName,
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
         specifier_qualifier_list()
             .then(abstract_declarator().or_not())
             .map(|(specifiers, abstract_declarator)| TypeName::TypeName { specifiers, abstract_declarator }),
-    ))
+    )))
     .labelled("type name")
     .as_context()
 }
@@ -1304,16 +1333,18 @@ pub fn typedef_name<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Extra<'a>> 
 /// (6.7.10) braced initializer
 #[apply(cached)]
 pub fn braced_initializer<'a>() -> impl Parser<'a, Tokens<'a>, BracedInitializer, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        designated_initializer()
-            .separated_by(punctuator(Punctuator::Comma))
-            .allow_trailing()
-            .collect::<Vec<DesignatedInitializer>>()
-            .braced()
-            .map(|initializers| BracedInitializer { initializers }),
-    ))
+    node(SyntaxKind::BracedInitializer,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            designated_initializer()
+                .separated_by(punctuator(Punctuator::Comma))
+                .allow_trailing()
+                .collect::<Vec<DesignatedInitializer>>()
+                .braced()
+                .map(|initializers| BracedInitializer { initializers }),
+        ))
+    )
     .labelled("braced initializer")
     .as_context()
 }
@@ -1321,15 +1352,17 @@ pub fn braced_initializer<'a>() -> impl Parser<'a, Tokens<'a>, BracedInitializer
 /// (6.7.10) initializer
 #[apply(cached)]
 pub fn initializer<'a>() -> impl Parser<'a, Tokens<'a>, Initializer, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        braced_initializer().map(Initializer::Braced),
-        assignment_expression()
-            .map(Brand::into_inner)
-            .map(Box::new)
-            .map(Initializer::Expression),
-    ))
+    node(SyntaxKind::Initializer,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            braced_initializer().map(Initializer::Braced),
+            assignment_expression()
+                .map(Brand::into_inner)
+                .map(Box::new)
+                .map(Initializer::Expression),
+        ))
+    )
     .labelled("initializer")
     .as_context()
 }
@@ -1440,13 +1473,15 @@ pub fn unlabeled_statement<'a>() -> impl Parser<'a, Tokens<'a>, UnlabeledStateme
 
     let expr = expression_statement().map(UnlabeledStatement::Expression);
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        primary_block,
-        jump,
-        expr,
-    ))
+    node(SyntaxKind::UnlabeledStatement,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            primary_block,
+            jump,
+            expr,
+        ))
+    )
     .labelled("unlabeled statement")
     .as_context()
 }
@@ -1469,26 +1504,30 @@ pub fn label<'a>() -> impl Parser<'a, Tokens<'a>, Label, Extra<'a>> + Clone {
         .then_ignore(punctuator(Punctuator::Colon))
         .map(|(attributes, identifier)| Label::Identifier { attributes, identifier });
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        case_label,
-        default_label,
-        ident_label,
-    ))
+    node(SyntaxKind::Label,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            case_label,
+            default_label,
+            ident_label,
+        ))
+    )
     .labelled("label")
     .as_context()
 }
 
 /// (6.8.1) labeled statement
 pub fn labelled_statement<'a>() -> impl Parser<'a, Tokens<'a>, LabeledStatement, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        label()
-            .then(statement().map(Box::new))
-            .map(|(label, statement)| LabeledStatement { label, statement }),
-    ))
+    node(SyntaxKind::LabeledStatement,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            label()
+                .then(statement().map(Box::new))
+                .map(|(label, statement)| LabeledStatement { label, statement }),
+        ))
+    )
     .labelled("labeled statement")
     .as_context()
 }
@@ -1526,21 +1565,23 @@ pub fn block_item<'a>() -> impl Parser<'a, Tokens<'a>, BlockItem, Extra<'a>> + C
 
 /// (6.8.3) expression statement
 pub fn expression_statement<'a>() -> impl Parser<'a, Tokens<'a>, ExpressionStatement, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        attribute_specifier_sequence()
-            .then(
-                expression()
-                    .map(Box::new)
-                    .or_not()
-                    .then_ignore(punctuator(Punctuator::Semicolon))
-                    .recover_with(skip_until(any().ignored(), punctuator(Punctuator::Semicolon), || {
-                        Some(Box::new(Expression::dummy(ExpressionKind::Error)))
-                    })),
-            )
-            .map(|(attributes, expression)| ExpressionStatement { attributes, expression }),
-    ))
+    node(SyntaxKind::ExpressionStatement,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            attribute_specifier_sequence()
+                .then(
+                    expression()
+                        .map(Box::new)
+                        .or_not()
+                        .then_ignore(punctuator(Punctuator::Semicolon))
+                        .recover_with(skip_until(any().ignored(), punctuator(Punctuator::Semicolon), || {
+                            Some(Box::new(Expression::dummy(ExpressionKind::Error)))
+                        })),
+                )
+                .map(|(attributes, expression)| ExpressionStatement { attributes, expression }),
+        ))
+    )
     .labelled("expression statement")
     .as_context()
 }
@@ -1572,12 +1613,14 @@ pub fn selection_statement<'a>() -> impl Parser<'a, Tokens<'a>, SelectionStateme
         .then(statement().map(Box::new))
         .map(|(expression, statement)| SelectionStatement::Switch { expression, statement });
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        if_stmt,
-        switch_stmt,
-    ))
+    node(SyntaxKind::SelectionStatement,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            if_stmt,
+            switch_stmt,
+        ))
+    )
     .labelled("selection statement")
     .as_context()
 }
@@ -1628,13 +1671,15 @@ pub fn iteration_statement<'a>() -> impl Parser<'a, Tokens<'a>, IterationStateme
         .then(statement().map(Box::new))
         .map(|(((init, condition), update), body)| IterationStatement::For { init, condition, update, body });
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        while_stmt,
-        do_while_stmt,
-        for_stmt,
-    ))
+    node(SyntaxKind::IterationStatement,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            while_stmt,
+            do_while_stmt,
+            for_stmt,
+        ))
+    )
     .labelled("iteration statement")
     .as_context()
 }
@@ -1659,14 +1704,16 @@ pub fn jump_statement<'a>() -> impl Parser<'a, Tokens<'a>, JumpStatement, Extra<
         .then_ignore(punctuator(Punctuator::Semicolon))
         .map(|expr| JumpStatement::Return(expr.map(Box::new)));
 
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        goto_stmt,
-        continue_stmt,
-        break_stmt,
-        return_stmt,
-    ))
+    node(SyntaxKind::JumpStatement,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            goto_stmt,
+            continue_stmt,
+            break_stmt,
+            return_stmt,
+        ))
+    )
     .labelled("jump statement")
     .as_context()
 }
@@ -1854,10 +1901,10 @@ pub fn identifier_or_keyword<'a>() -> impl Parser<'a, Tokens<'a>, Identifier, Ex
             Token::Identifier(value) => value.clone(),
         },
     ))
-    .map_with(|id, extra: &mut chumsky::input::MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .map_with(|id, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::Ident, len, 0, 0);
+        extra.state().green.token(SyntaxKind::Ident, len, span.leading_trivia, 0);
         id
     })
 }
@@ -1888,7 +1935,7 @@ pub fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clon
             Token::Constant(value) => value.clone(),
         },
     ))
-    .map_with(|c, extra: &mut chumsky::input::MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .map_with(|c, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
         let kind = match &c {
@@ -1897,7 +1944,7 @@ pub fn constant<'a>() -> impl Parser<'a, Tokens<'a>, Constant, Extra<'a>> + Clon
             Constant::Character(_) => SyntaxKind::CharConst,
             Constant::Predefined(_) => SyntaxKind::PredefinedConst,
         };
-        extra.state().green.token(kind, len, 0, 0);
+        extra.state().green.token(kind, len, span.leading_trivia, 0);
         c
     })
 }
@@ -1911,10 +1958,10 @@ pub fn string_literal<'a>() -> impl Parser<'a, Tokens<'a>, StringLiterals, Extra
             Token::StringLiteral(value) => value.clone(),
         },
     ))
-    .map_with(|s, extra: &mut chumsky::input::MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .map_with(|s, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::StringLiteral, len, 0, 0);
+        extra.state().green.token(SyntaxKind::StringLiteral, len, span.leading_trivia, 0);
         s
     })
 }
@@ -1928,10 +1975,10 @@ pub fn quoted_string<'a>() -> impl Parser<'a, Tokens<'a>, String, Extra<'a>> + C
             Token::QuotedString(value) => value.clone(),
         },
     ))
-    .map_with(|s, extra: &mut chumsky::input::MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .map_with(|s, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::QuotedString, len, 0, 0);
+        extra.state().green.token(SyntaxKind::QuotedString, len, span.leading_trivia, 0);
         s
     })
 }
@@ -2012,10 +2059,10 @@ pub fn keyword<'a>(kwd: &str) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Cl
     select_ref! {
         Token::Identifier(name) if name.as_ref() == kwd => ()
     }
-    .map_with(|_, extra: &mut chumsky::input::MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .map_with(|_, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(SyntaxKind::Ident, len, 0, 0);
+        extra.state().green.token(SyntaxKind::Ident, len, span.leading_trivia, 0);
     })
 }
 
@@ -2025,10 +2072,10 @@ pub fn punctuator<'a>(punc: Punctuator) -> impl Parser<'a, Tokens<'a>, (), Extra
     select_ref! {
         Token::Punctuator(p) if *p == punc => ()
     }
-    .map_with(move |_, extra: &mut chumsky::input::MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+    .map_with(move |_, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
         let span = extra.span();
         let len = (span.end() - span.start()) as u32;
-        extra.state().green.token(kind, len, 0, 0);
+        extra.state().green.token(kind, len, span.leading_trivia, 0);
     })
 }
 
@@ -2127,9 +2174,17 @@ pub trait ParserExt<O> {
         Self: Sized,
         Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
-        self.nested_in(select_ref! {
+        let outer = select_ref! {
             Token::Parenthesized(tokens) => tokens.as_input()
-        })
+        }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+            extra.state().green.token(SyntaxKind::LeftParen, 1, 0, 0);
+            inner
+        });
+        self.nested_in(outer)
+            .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+                extra.state().green.token(SyntaxKind::RightParen, 1, 0, 0);
+                val
+            })
     }
 
     /// Parse the content within square brackets.
@@ -2138,9 +2193,17 @@ pub trait ParserExt<O> {
         Self: Sized,
         Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
-        self.nested_in(select_ref! {
+        let outer = select_ref! {
             Token::Bracketed(tokens) => tokens.as_input()
-        })
+        }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+            extra.state().green.token(SyntaxKind::LeftBracket, 1, 0, 0);
+            inner
+        });
+        self.nested_in(outer)
+            .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+                extra.state().green.token(SyntaxKind::RightBracket, 1, 0, 0);
+                val
+            })
     }
 
     /// Parse the content within curly braces.
@@ -2149,9 +2212,17 @@ pub trait ParserExt<O> {
         Self: Sized,
         Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
-        self.nested_in(select_ref! {
+        let outer = select_ref! {
             Token::Braced(tokens) => tokens.as_input()
-        })
+        }.map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+            extra.state().green.token(SyntaxKind::LeftBrace, 1, 0, 0);
+            inner
+        });
+        self.nested_in(outer)
+            .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
+                extra.state().green.token(SyntaxKind::RightBrace, 1, 0, 0);
+                val
+            })
     }
 }
 
