@@ -1,33 +1,25 @@
-//! Dump the AST of a C source file.
+//! Dump the AST and green tree of a C source file.
 //!
 //! Usage: `cargo run --example ast_dump --all-features -- path/to/source.c`
 
 #[cfg(feature = "dbg-pls")]
 fn main() {
     use cgrammar::*;
-    use chumsky::Parser;
 
     let file = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file.as_str()).unwrap();
 
-    let (tokens, mut ctx_map) = lex(src.as_str(), Some(&file));
+    let (tree, ctx_map, ast) = parse_tree_with_map(src.as_str());
 
-    let parser = translation_unit();
-    let mut init_state = ParseState::new();
-    init_state.ctx_mut().add_typedef_name("term".into());
-    init_state.ctx_mut().add_typedef_name("thm".into());
-    let ast = parser.parse_with_state(tokens.as_input(), &mut init_state);
-    if ast.has_output() {
-        println!("{}", dbg_pls::pretty(&ast.output().unwrap()));
-    } else {
-        eprintln!("Parse failed!");
-    }
-    if ast.has_errors() {
-        for error in ast.into_errors() {
-            report(error).eprint(&mut ctx_map).unwrap();
-        }
-        std::process::exit(1);
-    }
+    println!("=== AST ===");
+    println!("{}", dbg_pls::pretty(&ast));
+
+    println!("\n=== Green Tree ===");
+    println!("Node count: {}", tree.node_count());
+    println!("Root kind: {:?}", tree.kind(tree.root()));
+
+    println!("\n=== Lossless Reconstructed ===");
+    println!("{}", print_lossless(&tree, ctx_map.source));
 }
 
 #[cfg(not(feature = "dbg-pls"))]
