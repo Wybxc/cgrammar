@@ -1055,7 +1055,7 @@ pub fn alignment_specifier<'a>() -> impl Parser<'a, Tokens<'a>, AlignmentSpecifi
         choice((
             #[cfg(feature = "quasi-quote")]
             interpolation(),
-            keyword("alignas").ignore_then(choice((
+            keyword("_Alignas").or(keyword("alignas")).ignore_then(choice((
                 no_recover(typ.clone()).map(AlignmentSpecifier::Type),
                 expr.map(AlignmentSpecifier::Expression),
                 typ.map(AlignmentSpecifier::Type),
