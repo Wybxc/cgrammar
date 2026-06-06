@@ -2169,7 +2169,13 @@ pub fn recover_parenthesized<'a, O: Clone>(
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(select_ref! {
         Token::Parenthesized(_) => error.clone()
-    })
+    }.validate(|o, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
+        let span = extra.span();
+        let s = span.start() as u32;
+        extra.state().green.token(SyntaxKind::LeftParen, 1, s);
+        extra.state().green.token(SyntaxKind::RightParen, 1, (span.end() - 1) as u32);
+        o
+    }))
 }
 
 /// Create a recovery strategy that consumes a parenthesized token and returns
@@ -2187,7 +2193,13 @@ pub fn recover_bracketed<'a, O: Clone>(
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(select_ref! {
         Token::Bracketed(_) => error.clone()
-    })
+    }.validate(|o, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
+        let span = extra.span();
+        let s = span.start() as u32;
+        extra.state().green.token(SyntaxKind::LeftBracket, 1, s);
+        extra.state().green.token(SyntaxKind::RightBracket, 1, (span.end() - 1) as u32);
+        o
+    }))
 }
 
 /// Create a recovery strategy that consumes a bracketed token and returns the
