@@ -718,17 +718,18 @@ pub fn typedef_declarator<'a>() -> impl Parser<'a, Tokens<'a>, Declarator, Extra
 /// (6.7.1) storage class specifier (without typedef)
 #[apply(cached)]
 pub fn storage_class_specifier<'a>() -> impl Parser<'a, Tokens<'a>, StorageClassSpecifier, Extra<'a>> + Clone {
-    choice((
-        #[cfg(feature = "quasi-quote")]
-        interpolation(),
-        keyword("auto").to(StorageClassSpecifier::Auto),
-        keyword("constexpr").to(StorageClassSpecifier::Constexpr),
-        keyword("extern").to(StorageClassSpecifier::Extern),
-        keyword("register").to(StorageClassSpecifier::Register),
-        keyword("static").to(StorageClassSpecifier::Static),
-        keyword("thread_local").to(StorageClassSpecifier::ThreadLocal),
-        // keyword("typedef").to(StorageClassSpecifier::Typedef),
-    ))
+    node(SyntaxKind::StorageClassSpecifier,
+        choice((
+            #[cfg(feature = "quasi-quote")]
+            interpolation(),
+            keyword("auto").to(StorageClassSpecifier::Auto),
+            keyword("constexpr").to(StorageClassSpecifier::Constexpr),
+            keyword("extern").to(StorageClassSpecifier::Extern),
+            keyword("register").to(StorageClassSpecifier::Register),
+            keyword("static").to(StorageClassSpecifier::Static),
+            keyword("thread_local").to(StorageClassSpecifier::ThreadLocal),
+        ))
+    )
     .labelled("storage class specifier")
     .as_context()
 }
