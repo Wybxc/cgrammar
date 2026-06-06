@@ -152,16 +152,11 @@ fn test_convenience_api() {
 /// Round-trip with comments preserved as trivia.
 #[test]
 fn test_round_trip_comments() {
-    let source = "/* block comment */ int x; // line comment\nint y;";
-    let (tokens, ctx_map) = lex(source, Some("test.c"));
-    let mut state = ParseState::new();
-    state.green.set_source_len(source.len() as u32);
-    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
-    assert!(result.has_output());
-    let tree = SyntaxTree::new(state.green.build());
+    let source = "/* block comment */ int x; // line comment\nint y;\n";
+    let (tree, ctx_map, _) = parse_tree_with_map(source);
     let reconstructed = print_lossless(&tree, ctx_map.source);
     assert_eq!(reconstructed, source,
-        "comments should be preserved as trivia");
+        "comments and trailing newline should be preserved");
 }
 
 /// Verify tree structure for a complete C function.

@@ -344,13 +344,6 @@ impl GreenBuilder {
                     stack.push(old);
                 }
                 GreenEvent::FinishNode => {
-                    // If this is the outermost frame, set trailing trivia to EOF
-                    if stack.is_empty() {
-                        if let Some(GreenChild::Token(t)) = current.children.last_mut() {
-                            let gap = self.source_len.saturating_sub(current.token_end);
-                            if gap > 0 { t.trailing_trivia = gap; }
-                        }
-                    }
                     let frame = std::mem::replace(&mut current, stack.pop().expect("unmatched FinishNode"));
                     let node = GreenNode::new(frame.kind, frame.children);
                     // Propagate token_end from child frame to parent
@@ -374,7 +367,36 @@ impl GreenBuilder {
             }
         }
 
-        root.expect("no root node built (unbalanced events)")
+        let mut root = root.expect("no root node built (unbalanced events)");
+        // Set trailing trivia on the last token (gap to EOF)
+        let last_end = current.token_end;
+        if self.source_len > last_end {
+            set_last_trailing_trivia(&mut root, self.source_len - last_end);
+        }
+        root
+    }
+}
+
+/// Recursively find the last token and set its trailing trivia.
+fn set_last_trailing_trivia(node: &mut GreenNode, trailing: u32) {
+    match &mut node.children {
+        GreenChildren::Node { children } => {
+            if let Some(last) = Arc::make_mut(children).last_mut() {
+                match last {
+                    GreenChild::Token(t) => t.trailing_trivia = trailing,
+                    GreenChild::Node(_) => set_last_trailing_trivia_in_child(last, trailing),
+                }
+            }
+        }
+        GreenChildren::Token(t) => t.trailing_trivia = trailing,
+        GreenChildren::Empty => {}
+    }
+}
+
+fn set_last_trailing_trivia_in_child(child: &mut GreenChild, trailing: u32) {
+    match child {
+        GreenChild::Token(t) => t.trailing_trivia = trailing,
+        GreenChild::Node(n) => set_last_trailing_trivia(n, trailing),
     }
 }
 
