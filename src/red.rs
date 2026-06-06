@@ -26,10 +26,10 @@ const NONE: u32 = u32::MAX;
 /// A position-aware syntax tree built from a green tree.
 ///
 /// Stores pre-computed offsets and parent/sibling indices for efficient
-/// traversal. The green tree is kept alive as long as the [`SyntaxTree`]
-/// exists.
+/// traversal.
 #[derive(Debug, Clone)]
 pub struct SyntaxTree {
+    #[allow(dead_code)]
     root: GreenNode,
     nodes: Vec<SyntaxNodeData>,
 }
@@ -398,11 +398,7 @@ fn print_node_lossless(tree: &SyntaxTree, node: SyntaxNode, source: &str, output
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::green::{GreenBuilder, GreenChild as GC, GreenToken as GT};
-
-    fn token(kind: SyntaxKind, len: u32) -> GC {
-        GC::Token(GT { kind, len, leading_trivia: 0, trailing_trivia: 0 })
-    }
+    use crate::green::GreenBuilder;
 
     #[test]
     fn test_syntax_tree_navigation() {

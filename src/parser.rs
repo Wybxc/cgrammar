@@ -49,7 +49,7 @@ use parser_utils::*;
 /// [`StartNode`]: crate::green::GreenEvent::StartNode
 /// [`FinishNode`]: crate::green::GreenEvent::FinishNode
 #[derive(Clone)]
-pub(crate) struct Node<P> {
+pub struct Node<P> {
     kind: SyntaxKind,
     inner: P,
 }
