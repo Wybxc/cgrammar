@@ -47,6 +47,7 @@ pub fn parse_tree_with_typedefs(source: &str, typedefs: &[&str]) -> (SyntaxTree,
     for name in typedefs {
         state.ctx_mut().add_typedef_name((*name).into());
     }
+    state.green.set_source_len(source.len() as u32);
     let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
     let green = state.green.build();
     (SyntaxTree::new(green), result.output().cloned())
@@ -57,6 +58,7 @@ pub fn parse_tree_with_typedefs(source: &str, typedefs: &[&str]) -> (SyntaxTree,
 pub fn parse_tree_with_map<'a>(source: &'a str) -> (SyntaxTree, span::ContextMapping<'a>, Option<TranslationUnit>) {
     let (tokens, ctx_map) = lex(source, None);
     let mut state = ParseState::new();
+    state.green.set_source_len(source.len() as u32);
     let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
     let green = state.green.build();
     (SyntaxTree::new(green), ctx_map, result.output().cloned())

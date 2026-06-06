@@ -149,6 +149,21 @@ fn test_convenience_api() {
     assert!(tree.node_count() > 1);
 }
 
+/// Round-trip with comments preserved as trivia.
+#[test]
+fn test_round_trip_comments() {
+    let source = "/* block comment */ int x; // line comment\nint y;";
+    let (tokens, ctx_map) = lex(source, Some("test.c"));
+    let mut state = ParseState::new();
+    state.green.set_source_len(source.len() as u32);
+    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
+    assert!(result.has_output());
+    let tree = SyntaxTree::new(state.green.build());
+    let reconstructed = print_lossless(&tree, ctx_map.source);
+    assert_eq!(reconstructed, source,
+        "comments should be preserved as trivia");
+}
+
 fn collect_kinds(tree: &SyntaxTree, node: red::SyntaxNode, kinds: &mut Vec<SyntaxKind>) {
     kinds.push(tree.kind(node));
     for child in tree.children(node) {

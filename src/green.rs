@@ -236,12 +236,19 @@ pub enum GreenEvent {
 #[derive(Debug, Default, Clone)]
 pub struct GreenBuilder {
     events: Vec<GreenEvent>,
+    source_len: u32,
 }
 
 impl GreenBuilder {
     /// Create a new empty builder.
     pub fn new() -> Self {
-        GreenBuilder { events: Vec::new() }
+        GreenBuilder { events: Vec::new(), source_len: 0 }
+    }
+
+    /// Set the total source length for trailing trivia computation.
+    /// Call before [`build`](GreenBuilder::build) to capture trailing whitespace.
+    pub fn set_source_len(&mut self, len: u32) {
+        self.source_len = len;
     }
 
     /// Start a new interior node.
@@ -337,6 +344,13 @@ impl GreenBuilder {
                     stack.push(old);
                 }
                 GreenEvent::FinishNode => {
+                    // If this is the outermost frame, set trailing trivia to EOF
+                    if stack.is_empty() {
+                        if let Some(GreenChild::Token(t)) = current.children.last_mut() {
+                            let gap = self.source_len.saturating_sub(current.token_end);
+                            if gap > 0 { t.trailing_trivia = gap; }
+                        }
+                    }
                     let frame = std::mem::replace(&mut current, stack.pop().expect("unmatched FinishNode"));
                     let node = GreenNode::new(frame.kind, frame.children);
                     // Propagate token_end from child frame to parent
@@ -349,8 +363,8 @@ impl GreenBuilder {
                     }
                 }
                 GreenEvent::Token { kind, len, start } => {
-                    let trivia = start.saturating_sub(current.token_end);
-                    let token = GreenToken { kind, len, leading_trivia: trivia, trailing_trivia: 0 };
+                    let leading = start.saturating_sub(current.token_end);
+                    let token = GreenToken { kind, len, leading_trivia: leading, trailing_trivia: 0 };
                     current.token_end = start + len;
                     current.children.push(GreenChild::Token(token));
                 }
