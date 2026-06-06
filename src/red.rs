@@ -409,9 +409,9 @@ mod tests {
         let mut b = GreenBuilder::new();
         b.start_node(SyntaxKind::TranslationUnit);
         b.start_node(SyntaxKind::BinaryExpr);
-        b.token(SyntaxKind::Ident, 1, 0, 0);
-        b.token(SyntaxKind::Plus, 1, 0, 0);
-        b.token(SyntaxKind::Ident, 1, 0, 0);
+        b.token(SyntaxKind::Ident, 1, 0);
+        b.token(SyntaxKind::Plus, 1, 1);
+        b.token(SyntaxKind::Ident, 1, 2);
         b.finish_node();
         b.finish_node();
 

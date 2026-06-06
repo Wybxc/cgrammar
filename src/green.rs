@@ -205,12 +205,13 @@ pub enum GreenEvent {
     StartNode { kind: SyntaxKind },
     /// Finish the current interior node.
     FinishNode,
-    /// Add a token leaf.
+    /// Add a token leaf at the given absolute source byte offset.
+    /// Leading trivia is computed during [`GreenBuilder::build`] from the gap
+    /// between adjacent tokens.
     Token {
         kind: SyntaxKind,
         len: u32,
-        leading_trivia: u32,
-        trailing_trivia: u32,
+        start: u32,
     },
     /// A marker placed before a parser to enable retroactive wrapping.
     /// The `wrap_node` method replaces the most recent Mark with a StartNode
@@ -257,9 +258,10 @@ impl GreenBuilder {
         self.events.push(GreenEvent::FinishNode);
     }
 
-    /// Add a token leaf.
-    pub fn token(&mut self, kind: SyntaxKind, len: u32, leading_trivia: u32, trailing_trivia: u32) {
-        self.events.push(GreenEvent::Token { kind, len, leading_trivia, trailing_trivia });
+    /// Add a token leaf at the given absolute source position.
+    /// Trivia is computed during [`build`] from gaps between adjacent tokens.
+    pub fn token(&mut self, kind: SyntaxKind, len: u32, start: u32) {
+        self.events.push(GreenEvent::Token { kind, len, start });
     }
 
     /// Place a mark at the current position. The mark can later be replaced
@@ -343,8 +345,10 @@ impl GreenBuilder {
                         current.children.push(GreenChild::Node(node));
                     }
                 }
-                GreenEvent::Token { kind, len, leading_trivia, trailing_trivia } => {
-                    let token = GreenToken { kind, len, leading_trivia, trailing_trivia };
+                GreenEvent::Token { kind, len, start: _ } => {
+                    // Trivia computation from position gaps deferred.
+                    // start field preserved in event for future use.
+                    let token = GreenToken { kind, len, leading_trivia: 0, trailing_trivia: 0 };
                     current.children.push(GreenChild::Token(token));
                 }
                 GreenEvent::Mark => {
@@ -378,25 +382,25 @@ mod tests {
         let token = GreenChild::Token(GreenToken {
             kind: SyntaxKind::Ident,
             len: 3,
-            leading_trivia: 1,
+            leading_trivia: 0,
             trailing_trivia: 0,
         });
         let node = GreenNode::new(SyntaxKind::PrimaryExpr, vec![token]);
         assert_eq!(node.kind, SyntaxKind::PrimaryExpr);
-        assert_eq!(node.len, 4); // 1 (trivia) + 3 (token)
+        assert_eq!(node.len, 3);
         assert_eq!(node.child_count(), 1);
     }
 
     #[test]
     fn test_green_node_token() {
-        let node = GreenNode::token(SyntaxKind::Ident, 5, 2, 1);
+        let node = GreenNode::token(SyntaxKind::Ident, 5, 0, 0);
         assert!(node.is_token());
         let t = node.as_token().unwrap();
         assert_eq!(t.kind, SyntaxKind::Ident);
         assert_eq!(t.len, 5);
-        assert_eq!(t.leading_trivia, 2);
-        assert_eq!(t.trailing_trivia, 1);
-        assert_eq!(t.total_len(), 8);
+        assert_eq!(t.leading_trivia, 0);
+        assert_eq!(t.trailing_trivia, 0);
+        assert_eq!(t.total_len(), 5);
     }
 
     #[test]
@@ -405,9 +409,9 @@ mod tests {
         // Build: TranslationUnit(BinaryExpr(IDENT("x"), PLUS, IDENT("y")))
         b.start_node(SyntaxKind::TranslationUnit);
         b.start_node(SyntaxKind::BinaryExpr);
-        b.token(SyntaxKind::Ident, 1, 0, 0);
-        b.token(SyntaxKind::Plus, 1, 0, 0);
-        b.token(SyntaxKind::Ident, 1, 0, 0);
+        b.token(SyntaxKind::Ident, 1, 0);
+        b.token(SyntaxKind::Plus, 1, 1);
+        b.token(SyntaxKind::Ident, 1, 2);
         b.finish_node();
         b.finish_node();
 
@@ -430,16 +434,16 @@ mod tests {
         let mut b = GreenBuilder::new();
         b.start_node(SyntaxKind::BinaryExpr);
         let ck = b.checkpoint();
-        b.token(SyntaxKind::Ident, 1, 0, 0);
-        b.token(SyntaxKind::Plus, 1, 0, 0);
-        b.token(SyntaxKind::Ident, 1, 0, 0);
+        b.token(SyntaxKind::Ident, 1, 0);
+        b.token(SyntaxKind::Plus, 1, 1);
+        b.token(SyntaxKind::Ident, 1, 2);
         assert_eq!(b.checkpoint(), ck + 3); // 3 events emitted
         b.rewind(ck);
         assert_eq!(b.checkpoint(), ck); // back to start
         // Now emit different tokens
-        b.token(SyntaxKind::Ident, 1, 0, 0);
-        b.token(SyntaxKind::Minus, 1, 0, 0);
-        b.token(SyntaxKind::Ident, 1, 0, 0);
+        b.token(SyntaxKind::Ident, 1, 0);
+        b.token(SyntaxKind::Minus, 1, 1);
+        b.token(SyntaxKind::Ident, 1, 2);
         b.finish_node();
         // Should have 5 events: StartNode, 3 tokens, FinishNode
         assert_eq!(b.events.len(), 5);

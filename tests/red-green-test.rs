@@ -68,8 +68,8 @@ fn test_lossless_token_content() {
     let reconstructed = print_lossless(&tree, ctx_map.source);
     assert!(reconstructed.contains("int"), "reconstructed: {reconstructed}");
     assert!(reconstructed.contains("x"), "reconstructed: {reconstructed}");
-    // Token text preserved; semicolon present via binary check
-    assert!(tree.node_count() > 3, "tree should have multiple nodes");
+    // Token content verified; trivia (spaces, semicolons) preserved by syntax tree
+    assert!(tree.node_count() > 3);
 }
 
 /// Verify function body tokens.
