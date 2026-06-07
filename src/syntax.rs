@@ -94,6 +94,11 @@ pub enum SyntaxKind {
     // =========================================================================
     // Expressions (6.5)
     // =========================================================================
+    // Bracket grouping nodes
+    ParenGroup,
+    BracketGroup,
+    BraceGroup,
+
     // Primary expressions (6.5.1)
     PrimaryExpr,
     GenericSelection,
@@ -406,6 +411,9 @@ impl SyntaxKind {
             SyntaxKind::Comma => ",",
             SyntaxKind::Hash => "#",
             SyntaxKind::HashHash => "##",
+            SyntaxKind::ParenGroup => "parenthesized group",
+            SyntaxKind::BracketGroup => "bracketed group",
+            SyntaxKind::BraceGroup => "braced group",
             SyntaxKind::PrimaryExpr => "primary expression",
             SyntaxKind::GenericSelection => "generic selection",
             SyntaxKind::GenericAssociationType => "generic association (type)",

@@ -4,62 +4,57 @@
 #[macro_use]
 mod utils;
 
-mod ast;
+mod astrold;
 mod context;
 pub mod green;
 mod lexer;
 pub mod parser;
-#[cfg(feature = "printer")]
-pub mod printer;
+
 pub mod red;
-#[cfg(feature = "report")]
-mod report;
 pub mod span;
 pub mod syntax;
-pub mod visitor;
+pub mod token;
 
-pub use ast::*;
 pub use chumsky::Parser;
 pub use context::{ParseState, State};
 pub use green::GreenNode;
 pub use lexer::lex;
 pub use parser::*;
 pub use red::{SyntaxTree, TreeVisitor, print_lossless};
-#[cfg(feature = "report")]
-pub use report::*;
 pub use syntax::SyntaxKind;
-pub use visitor::{Visitor, VisitorMut};
+pub use token::*;
+
+#[cfg(feature = "quasi-quote")]
+pub use token::quasi_quote;
 
 /// Parse C source code into a lossless [`SyntaxTree`].
 ///
-/// Returns the tree and the typed AST. If parsing fails, the tree still
-/// contains all tokens consumed before the failure.
-pub fn parse_tree(source: &str) -> (SyntaxTree, Option<TranslationUnit>) {
+/// If parsing fails, the tree still contains all tokens consumed before the
+/// failure. Use [`print_lossless`] to reconstruct the original source text.
+pub fn parse_tree(source: &str) -> SyntaxTree {
     parse_tree_with_typedefs(source, &[])
 }
 
 /// Parse C source code with initial typedef names registered.
-/// C parsers need typedef names to distinguish type names from identifiers
-/// in declarations.
-pub fn parse_tree_with_typedefs(source: &str, typedefs: &[&str]) -> (SyntaxTree, Option<TranslationUnit>) {
+pub fn parse_tree_with_typedefs(source: &str, typedefs: &[&str]) -> SyntaxTree {
     let (tokens, _ctx_map) = lex(source, None);
     let mut state = ParseState::new();
     for name in typedefs {
         state.ctx_mut().add_typedef_name((*name).into());
     }
     state.green.set_source_len(source.len() as u32);
-    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
+    let _ = translation_unit().parse_with_state(tokens.as_input(), &mut state);
     let green = state.green.build();
-    (SyntaxTree::new(green), result.output().cloned())
+    SyntaxTree::new(green)
 }
 
-/// Parse C source code and return the [`SyntaxTree`], [`ContextMapping`]
-/// (for [`print_lossless`]), and typed AST. Accepts initial typedef names.
-pub fn parse_tree_with_map<'a>(source: &'a str) -> (SyntaxTree, span::ContextMapping<'a>, Option<TranslationUnit>) {
+/// Parse C source code and return the [`SyntaxTree`] and [`ContextMapping`]
+/// (for [`print_lossless`]).
+pub fn parse_tree_with_map<'a>(source: &'a str) -> (SyntaxTree, span::ContextMapping<'a>) {
     let (tokens, ctx_map) = lex(source, None);
     let mut state = ParseState::new();
     state.green.set_source_len(source.len() as u32);
-    let result = translation_unit().parse_with_state(tokens.as_input(), &mut state);
+    let _ = translation_unit().parse_with_state(tokens.as_input(), &mut state);
     let green = state.green.build();
-    (SyntaxTree::new(green), ctx_map, result.output().cloned())
+    (SyntaxTree::new(green), ctx_map)
 }

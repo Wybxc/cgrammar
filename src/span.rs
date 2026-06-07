@@ -10,7 +10,7 @@ use chumsky::input::{Input, MappedInput};
 #[cfg(feature = "dbg-pls")]
 use dbg_pls::DebugPls;
 
-use crate::{BalancedToken, BalancedTokenSequence, utils::Slab};
+use crate::{token::BalancedToken, token::BalancedTokenSequence, utils::Slab};
 
 /// Source context information for error reporting.
 #[derive(Debug, Clone, PartialEq, Eq)]

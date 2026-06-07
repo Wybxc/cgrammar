@@ -8,7 +8,7 @@ use chumsky::{
     input::{InputRef, MapExtra},
 };
 
-use crate::{ast::*, context::ParseState, span::*, syntax::SyntaxKind, utils::*};
+use crate::{astrold::*, context::ParseState, span::*, syntax::SyntaxKind, utils::*};
 
 /// Utilities for the parser.
 pub mod parser_utils {
@@ -1941,9 +1941,15 @@ pub fn attribute_token<'a>() -> impl Parser<'a, Tokens<'a>, AttributeToken, Extr
 
 /// (6.7.12.1) attribute argument clause
 pub fn attribute_argument_clause<'a>() -> impl Parser<'a, Tokens<'a>, TokenStream, Extra<'a>> + Clone {
-    select_ref! {
-        Token::Parenthesized(tokens) => tokens.clone(),
-    }
+    punctuator(Punctuator::LeftParen)
+        .ignore_then(
+            any()
+                .and_is(select_ref! { Token::Punctuator(Punctuator::RightParen) => () }.not())
+                .repeated()
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(punctuator(Punctuator::RightParen))
+        .to(BalancedTokenSequence { tokens: vec![], eoi: Span::default() })
 }
 
 // =============================================================================
@@ -2234,68 +2240,47 @@ where
     ))
 }
 
-/// Create a recovery strategy that consumes a parenthesized token and returns
-/// the given error value.
+/// Skip tokens until a closing bracket is found. Used for error recovery.
+fn skip_to<'a>(close: Punctuator) -> impl Parser<'a, Tokens<'a>, (), Extra<'a>> + Clone {
+    any()
+        .and_is(select_ref! { Token::Punctuator(p) if *p == close => () }.not())
+        .repeated()
+        .ignored()
+}
+
+/// Create a recovery strategy that skips to the next `)` and returns the error.
 pub fn recover_parenthesized<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(
-        select_ref! {
-            Token::Parenthesized(_) => error.clone()
-        }
-        .validate(|o, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
-            let span = extra.span();
-            let s = span.start() as u32;
-            extra.state().green.token(SyntaxKind::LeftParen, 1, s);
-            extra
-                .state()
-                .green
-                .token(SyntaxKind::RightParen, 1, (span.end() - 1) as u32);
-            o
-        }),
+        skip_to(Punctuator::RightParen)
+            .then_ignore(select_ref! { Token::Punctuator(Punctuator::RightParen) => () })
+            .to(error.clone()),
     )
 }
 
-/// Create a recovery strategy that consumes a parenthesized token and returns
-/// the result of the given closure with the span.
 pub fn recover_parenthesized_with<'a, O: Clone>(
     f: impl Fn(Span) -> O + Clone,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(any().map_with(move |_, extra| f(extra.span())).parenthesized())
 }
 
-/// Create a recovery strategy that consumes a bracketed token and returns the
-/// given error value.
 pub fn recover_bracketed<'a, O: Clone>(
     error: O,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(
-        select_ref! {
-            Token::Bracketed(_) => error.clone()
-        }
-        .validate(|o, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>, _| {
-            let span = extra.span();
-            let s = span.start() as u32;
-            extra.state().green.token(SyntaxKind::LeftBracket, 1, s);
-            extra
-                .state()
-                .green
-                .token(SyntaxKind::RightBracket, 1, (span.end() - 1) as u32);
-            o
-        }),
+        skip_to(Punctuator::RightBracket)
+            .then_ignore(select_ref! { Token::Punctuator(Punctuator::RightBracket) => () })
+            .to(error.clone()),
     )
 }
 
-/// Create a recovery strategy that consumes a bracketed token and returns the
-/// result of the given closure with the span.
 pub fn recover_bracketed_with<'a, O: Clone>(
     f: impl Fn(Span) -> O + Clone,
 ) -> impl chumsky::recovery::Strategy<'a, Tokens<'a>, O, Extra<'a>> + Clone {
     recover_via_parser(any().map_with(move |_, extra| f(extra.span())).bracketed())
 }
 
-/// Create a rich error indicating what was expected and what was found at a
-/// given span.
 pub fn expected_found<'a, L>(
     expected: impl IntoIterator<Item = L>,
     found: Option<BalancedToken>,
@@ -2308,76 +2293,27 @@ where
     LabelError::<Tokens<'a>, L>::expected_found(expected, found.map(MaybeRef::Val), span)
 }
 
-/// Extension trait for parsers to add convenience methods for parsing nested
-/// token sequences.
 pub trait ParserExt<O> {
-    /// Parse the content within parentheses.
     fn parenthesized<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
-        Self: Sized,
-        Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
+        Self: Sized, Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
-        let outer = select_ref! {
-            Token::Parenthesized(tokens) => tokens.as_input()
-        }
-        .map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            let start = extra.span().start() as u32;
-            extra.state().green.token(SyntaxKind::LeftParen, 1, start);
-            inner
-        });
-        self.nested_in(outer)
-            .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-                let span = extra.span();
-                let start = (span.end() - 1) as u32;
-                extra.state().green.token(SyntaxKind::RightParen, 1, start);
-                val
-            })
+        node(SyntaxKind::ParenGroup,
+            punctuator(Punctuator::LeftParen).ignore_then(self).then_ignore(punctuator(Punctuator::RightParen)))
     }
-
-    /// Parse the content within square brackets.
     fn bracketed<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
-        Self: Sized,
-        Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
+        Self: Sized, Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
-        let outer = select_ref! {
-            Token::Bracketed(tokens) => tokens.as_input()
-        }
-        .map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            let start = extra.span().start() as u32;
-            extra.state().green.token(SyntaxKind::LeftBracket, 1, start);
-            inner
-        });
-        self.nested_in(outer)
-            .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-                let span = extra.span();
-                let start = (span.end() - 1) as u32;
-                extra.state().green.token(SyntaxKind::RightBracket, 1, start);
-                val
-            })
+        node(SyntaxKind::BracketGroup,
+            punctuator(Punctuator::LeftBracket).ignore_then(self).then_ignore(punctuator(Punctuator::RightBracket)))
     }
-
-    /// Parse the content within curly braces.
     fn braced<'a>(self) -> impl Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone
     where
-        Self: Sized,
-        Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
+        Self: Sized, Self: Parser<'a, Tokens<'a>, O, Extra<'a>> + Clone,
     {
-        let outer = select_ref! {
-            Token::Braced(tokens) => tokens.as_input()
-        }
-        .map_with(|inner, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-            let start = extra.span().start() as u32;
-            extra.state().green.token(SyntaxKind::LeftBrace, 1, start);
-            inner
-        });
-        self.nested_in(outer)
-            .map_with(|val, extra: &mut MapExtra<'a, '_, Tokens<'a>, Extra<'a>>| {
-                let span = extra.span();
-                let start = (span.end() - 1) as u32;
-                extra.state().green.token(SyntaxKind::RightBrace, 1, start);
-                val
-            })
+        node(SyntaxKind::BraceGroup,
+            punctuator(Punctuator::LeftBrace).ignore_then(self).then_ignore(punctuator(Punctuator::RightBrace)))
     }
 }
 

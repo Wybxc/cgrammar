@@ -149,9 +149,142 @@ impl SyntaxTree {
         self.nodes.len()
     }
 
+    /// Reconstruct a flat [`BalancedTokenSequence`] from the subtree rooted at
+    /// `node`. Walks the tree pre-order, mapping each token's [`SyntaxKind`]
+    /// and source text back to a [`BalancedToken`].
+    ///
+    /// Interior nodes are traversed transparently — only token leaves appear
+    /// in the output. The result can be fed back to the parser via
+    /// [`BalancedTokenSequence::as_input`].
+    pub fn to_token_sequence(&self, node: SyntaxNode, source: &str) -> crate::token::BalancedTokenSequence {
+        let mut tokens: Vec<crate::span::Spanned<crate::token::BalancedToken>> = Vec::new();
+        collect_tokens(self, node, source, &mut tokens);
+        let eoi_pos = self.offset(node) as usize + self.len(node) as usize;
+        let eoi = crate::span::Span::new_eoi(eoi_pos, crate::span::ContextId::from(0usize));
+        crate::token::BalancedTokenSequence { tokens, eoi }
+    }
+
     fn data(&self, node: SyntaxNode) -> &SyntaxNodeData {
         &self.nodes[node.idx as usize]
     }
+}
+
+/// Recursively collect tokens from a syntax subtree.
+fn collect_tokens(
+    tree: &SyntaxTree,
+    node: SyntaxNode,
+    source: &str,
+    tokens: &mut Vec<crate::span::Spanned<crate::token::BalancedToken>>,
+) {
+    use crate::token::{BalancedToken, Constant, Identifier, IntegerConstant, StringLiterals};
+    use crate::span::Spanned;
+
+    if tree.is_token(node) {
+        let kind = tree.kind(node);
+        let offset = tree.offset(node) as usize;
+        let text = tree.text(node, source).unwrap_or("");
+        let ctx = crate::span::ContextId::from(0usize);
+        let span = crate::span::Span::new(offset..offset + text.len(), ctx);
+
+        let token = match kind {
+            crate::syntax::SyntaxKind::Ident => {
+                BalancedToken::Identifier(Identifier(text.into()))
+            }
+            crate::syntax::SyntaxKind::IntegerConst => {
+                BalancedToken::Constant(Constant::Integer(IntegerConstant::from(0)))
+            }
+            crate::syntax::SyntaxKind::FloatConst => {
+                BalancedToken::Constant(Constant::Floating(Default::default()))
+            }
+            crate::syntax::SyntaxKind::CharConst => {
+                BalancedToken::Constant(Constant::Character(Default::default()))
+            }
+            crate::syntax::SyntaxKind::PredefinedConst => {
+                BalancedToken::Constant(Constant::Predefined(match text {
+                    "true" => crate::token::PredefinedConstant::True,
+                    "false" => crate::token::PredefinedConstant::False,
+                    _ => crate::token::PredefinedConstant::Nullptr,
+                }))
+            }
+            crate::syntax::SyntaxKind::StringLiteral => {
+                BalancedToken::StringLiteral(StringLiterals::from(text.to_string()))
+            }
+            crate::syntax::SyntaxKind::QuotedString => {
+                BalancedToken::QuotedString(text.to_string())
+            }
+            crate::syntax::SyntaxKind::Unknown => BalancedToken::Unknown,
+            _ => {
+                // Must be a punctuator
+                if let Some(p) = syntax_kind_to_punctuator(kind) {
+                    BalancedToken::Punctuator(p)
+                } else {
+                    return; // Skip non-token, non-punctuator kinds (trivia, etc.)
+                }
+            }
+        };
+        tokens.push(Spanned::new(token, span));
+    } else {
+        for child in tree.children(node) {
+            collect_tokens(tree, child, source, tokens);
+        }
+    }
+}
+
+/// Map a [`SyntaxKind`] to its corresponding [`Punctuator`].
+fn syntax_kind_to_punctuator(kind: crate::syntax::SyntaxKind) -> Option<crate::token::Punctuator> {
+    use crate::{syntax::SyntaxKind, token::Punctuator};
+    Some(match kind {
+        SyntaxKind::LeftParen => Punctuator::LeftParen,
+        SyntaxKind::RightParen => Punctuator::RightParen,
+        SyntaxKind::LeftBracket => Punctuator::LeftBracket,
+        SyntaxKind::RightBracket => Punctuator::RightBracket,
+        SyntaxKind::LeftBrace => Punctuator::LeftBrace,
+        SyntaxKind::RightBrace => Punctuator::RightBrace,
+        SyntaxKind::Dot => Punctuator::Dot,
+        SyntaxKind::Arrow => Punctuator::Arrow,
+        SyntaxKind::Increment => Punctuator::Increment,
+        SyntaxKind::Decrement => Punctuator::Decrement,
+        SyntaxKind::Ampersand => Punctuator::Ampersand,
+        SyntaxKind::Star => Punctuator::Star,
+        SyntaxKind::Plus => Punctuator::Plus,
+        SyntaxKind::Minus => Punctuator::Minus,
+        SyntaxKind::Tilde => Punctuator::Tilde,
+        SyntaxKind::Bang => Punctuator::Bang,
+        SyntaxKind::Slash => Punctuator::Slash,
+        SyntaxKind::Percent => Punctuator::Percent,
+        SyntaxKind::LeftShift => Punctuator::LeftShift,
+        SyntaxKind::RightShift => Punctuator::RightShift,
+        SyntaxKind::Less => Punctuator::Less,
+        SyntaxKind::Greater => Punctuator::Greater,
+        SyntaxKind::LessEqual => Punctuator::LessEqual,
+        SyntaxKind::GreaterEqual => Punctuator::GreaterEqual,
+        SyntaxKind::Equal => Punctuator::Equal,
+        SyntaxKind::NotEqual => Punctuator::NotEqual,
+        SyntaxKind::Caret => Punctuator::Caret,
+        SyntaxKind::Pipe => Punctuator::Pipe,
+        SyntaxKind::LogicalAnd => Punctuator::LogicalAnd,
+        SyntaxKind::LogicalOr => Punctuator::LogicalOr,
+        SyntaxKind::Question => Punctuator::Question,
+        SyntaxKind::Colon => Punctuator::Colon,
+        SyntaxKind::Scope => Punctuator::Scope,
+        SyntaxKind::Semicolon => Punctuator::Semicolon,
+        SyntaxKind::Ellipsis => Punctuator::Ellipsis,
+        SyntaxKind::Assign => Punctuator::Assign,
+        SyntaxKind::MulAssign => Punctuator::MulAssign,
+        SyntaxKind::DivAssign => Punctuator::DivAssign,
+        SyntaxKind::ModAssign => Punctuator::ModAssign,
+        SyntaxKind::AddAssign => Punctuator::AddAssign,
+        SyntaxKind::SubAssign => Punctuator::SubAssign,
+        SyntaxKind::LeftShiftAssign => Punctuator::LeftShiftAssign,
+        SyntaxKind::RightShiftAssign => Punctuator::RightShiftAssign,
+        SyntaxKind::AndAssign => Punctuator::AndAssign,
+        SyntaxKind::XorAssign => Punctuator::XorAssign,
+        SyntaxKind::OrAssign => Punctuator::OrAssign,
+        SyntaxKind::Comma => Punctuator::Comma,
+        SyntaxKind::Hash => Punctuator::Hash,
+        SyntaxKind::HashHash => Punctuator::HashHash,
+        _ => return None,
+    })
 }
 
 /// Iterator over the children of a [`SyntaxNode`].
@@ -258,7 +391,12 @@ fn build_recursive_green_child(
 ///
 /// The default [`visit`](TreeVisitor::visit) method dispatches on
 /// [`SyntaxKind`] and delegates to the appropriate `visit_*` method.
-/// The default `visit_*` methods walk all children.
+/// Every default `visit_*` method walks all children via [`visit_children`].
+///
+/// # Identifier hooks
+///
+/// Override [`visit_ident`](TreeVisitor::visit_ident) to handle identifier
+/// tokens. The default dispatches to [`visit_children`].
 pub trait TreeVisitor {
     /// The result type produced by visitation.
     type Result;
@@ -267,26 +405,137 @@ pub trait TreeVisitor {
     fn visit(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
         let kind = tree.kind(node);
         match kind {
+            // Top-level
             SyntaxKind::TranslationUnit => self.visit_translation_unit(tree, node),
             SyntaxKind::ExternalDeclaration => self.visit_external_declaration(tree, node),
             SyntaxKind::FunctionDefinition => self.visit_function_definition(tree, node),
+
+            // Bracket groups
+            SyntaxKind::ParenGroup => self.visit_paren_group(tree, node),
+            SyntaxKind::BracketGroup => self.visit_bracket_group(tree, node),
+            SyntaxKind::BraceGroup => self.visit_brace_group(tree, node),
+
+            // Expressions
+            SyntaxKind::Expr => self.visit_expr(tree, node),
+            SyntaxKind::ExprError => self.visit_expr_error(tree, node),
+            SyntaxKind::ConstantExpr => self.visit_constant_expr(tree, node),
             SyntaxKind::PrimaryExpr => self.visit_primary_expr(tree, node),
+            SyntaxKind::GenericSelection => self.visit_generic_selection(tree, node),
+            SyntaxKind::GenericAssociationType => self.visit_generic_association_type(tree, node),
+            SyntaxKind::GenericAssociationDefault => self.visit_generic_association_default(tree, node),
             SyntaxKind::PostfixExpr => self.visit_postfix_expr(tree, node),
+            SyntaxKind::ArrayAccess => self.visit_array_access(tree, node),
+            SyntaxKind::FunctionCall => self.visit_function_call(tree, node),
+            SyntaxKind::MemberAccess => self.visit_member_access(tree, node),
+            SyntaxKind::MemberAccessPtr => self.visit_member_access_ptr(tree, node),
+            SyntaxKind::PostIncrement => self.visit_post_increment(tree, node),
+            SyntaxKind::PostDecrement => self.visit_post_decrement(tree, node),
+            SyntaxKind::CompoundLiteral => self.visit_compound_literal(tree, node),
             SyntaxKind::UnaryExpr => self.visit_unary_expr(tree, node),
+            SyntaxKind::PreIncrement => self.visit_pre_increment(tree, node),
+            SyntaxKind::PreDecrement => self.visit_pre_decrement(tree, node),
+            SyntaxKind::UnaryOp => self.visit_unary_op(tree, node),
+            SyntaxKind::SizeofExpr => self.visit_sizeof_expr(tree, node),
+            SyntaxKind::SizeofType => self.visit_sizeof_type(tree, node),
+            SyntaxKind::Alignof => self.visit_alignof(tree, node),
             SyntaxKind::CastExpr => self.visit_cast_expr(tree, node),
+            SyntaxKind::Cast => self.visit_cast(tree, node),
             SyntaxKind::BinaryExpr => self.visit_binary_expr(tree, node),
             SyntaxKind::ConditionalExpr => self.visit_conditional_expr(tree, node),
             SyntaxKind::AssignmentExpr => self.visit_assignment_expr(tree, node),
             SyntaxKind::CommaExpr => self.visit_comma_expr(tree, node),
+
+            // Declarations
             SyntaxKind::Declaration | SyntaxKind::NormalDecl | SyntaxKind::TypedefDecl => {
                 self.visit_declaration(tree, node)
             }
+            SyntaxKind::StaticAssertDecl => self.visit_static_assert_decl(tree, node),
+            SyntaxKind::AttributeDecl => self.visit_attribute_decl(tree, node),
+            SyntaxKind::DeclError => self.visit_decl_error(tree, node),
+            SyntaxKind::DeclarationSpecifiers => self.visit_declaration_specifiers(tree, node),
+            SyntaxKind::DeclarationSpecifier => self.visit_declaration_specifier(tree, node),
+            SyntaxKind::InitDeclarator => self.visit_init_declarator(tree, node),
+            SyntaxKind::TypeSpecifier => self.visit_type_specifier(tree, node),
+            SyntaxKind::StructSpecifier => self.visit_struct_specifier(tree, node),
+            SyntaxKind::EnumSpecifier => self.visit_enum_specifier(tree, node),
+            SyntaxKind::AtomicTypeSpecifier => self.visit_atomic_type_specifier(tree, node),
+            SyntaxKind::TypeofSpecifier => self.visit_typeof_specifier(tree, node),
+            SyntaxKind::TypeofSpecifierArg => self.visit_typeof_specifier_arg(tree, node),
+            SyntaxKind::TypeQualifier => self.visit_type_qualifier(tree, node),
+            SyntaxKind::StorageClassSpecifier => self.visit_storage_class_specifier(tree, node),
+            SyntaxKind::FunctionSpecifier => self.visit_function_specifier(tree, node),
+            SyntaxKind::AlignmentSpecifier => self.visit_alignment_specifier(tree, node),
+            SyntaxKind::TypeSpecifierQualifier => self.visit_type_specifier_qualifier(tree, node),
+            SyntaxKind::MemberDeclaration => self.visit_member_declaration(tree, node),
+            SyntaxKind::SpecifierQualifierList => self.visit_specifier_qualifier_list(tree, node),
+            SyntaxKind::MemberDeclarator => self.visit_member_declarator(tree, node),
+            SyntaxKind::MemberBitField => self.visit_member_bit_field(tree, node),
+            SyntaxKind::StructOrUnion => self.visit_struct_or_union(tree, node),
+            SyntaxKind::Enumerator => self.visit_enumerator(tree, node),
+            SyntaxKind::Declarator => self.visit_declarator(tree, node),
+            SyntaxKind::DirectDeclarator => self.visit_direct_declarator(tree, node),
+            SyntaxKind::DirectDeclaratorIdent => self.visit_direct_declarator_ident(tree, node),
+            SyntaxKind::DirectDeclaratorParen => self.visit_direct_declarator_paren(tree, node),
+            SyntaxKind::DirectDeclaratorArray => self.visit_direct_declarator_array(tree, node),
+            SyntaxKind::DirectDeclaratorFunc => self.visit_direct_declarator_func(tree, node),
+            SyntaxKind::Pointer => self.visit_pointer(tree, node),
+            SyntaxKind::PointerOrBlock => self.visit_pointer_or_block(tree, node),
+            SyntaxKind::ArrayDeclarator => self.visit_array_declarator(tree, node),
+            SyntaxKind::ArrayDeclaratorNormal => self.visit_array_declarator_normal(tree, node),
+            SyntaxKind::ArrayDeclaratorStatic => self.visit_array_declarator_static(tree, node),
+            SyntaxKind::ArrayDeclaratorVLA => self.visit_array_declarator_vla(tree, node),
+            SyntaxKind::ParameterTypeList => self.visit_parameter_type_list(tree, node),
+            SyntaxKind::ParameterDeclaration => self.visit_parameter_declaration(tree, node),
+            SyntaxKind::ParameterDeclarationKind => self.visit_parameter_declaration_kind(tree, node),
+            SyntaxKind::TypeName => self.visit_type_name(tree, node),
+            SyntaxKind::AbstractDeclarator => self.visit_abstract_declarator(tree, node),
+            SyntaxKind::DirectAbstractDeclarator => self.visit_direct_abstract_declarator(tree, node),
+            SyntaxKind::DirectAbstractDeclaratorParen => self.visit_direct_abstract_declarator_paren(tree, node),
+            SyntaxKind::DirectAbstractDeclaratorArray => self.visit_direct_abstract_declarator_array(tree, node),
+            SyntaxKind::DirectAbstractDeclaratorFunc => self.visit_direct_abstract_declarator_func(tree, node),
+            SyntaxKind::Initializer => self.visit_initializer(tree, node),
+            SyntaxKind::BracedInitializer => self.visit_braced_initializer(tree, node),
+            SyntaxKind::DesignatedInitializer => self.visit_designated_initializer(tree, node),
+            SyntaxKind::Designation => self.visit_designation(tree, node),
+            SyntaxKind::Designator => self.visit_designator(tree, node),
+            SyntaxKind::AttributeSpecifier => self.visit_attribute_specifier(tree, node),
+            SyntaxKind::Attribute => self.visit_attribute(tree, node),
+            SyntaxKind::AttributeToken => self.visit_attribute_token(tree, node),
+            SyntaxKind::AsmAttribute => self.visit_asm_attribute(tree, node),
+
+            // Statements
+            SyntaxKind::Statement => self.visit_statement(tree, node),
+            SyntaxKind::LabeledStatement => self.visit_labeled_statement(tree, node),
+            SyntaxKind::UnlabeledStatement => self.visit_unlabeled_statement(tree, node),
+            SyntaxKind::Label => self.visit_label(tree, node),
+            SyntaxKind::ExpressionStatement => self.visit_expression_statement(tree, node),
+            SyntaxKind::PrimaryBlock => self.visit_primary_block(tree, node),
             SyntaxKind::CompoundStatement => self.visit_compound_statement(tree, node),
+            SyntaxKind::BlockItem => self.visit_block_item(tree, node),
+            SyntaxKind::SelectionStatement => self.visit_selection_statement(tree, node),
             SyntaxKind::IfStatement => self.visit_if_statement(tree, node),
+            SyntaxKind::SwitchStatement => self.visit_switch_statement(tree, node),
+            SyntaxKind::IterationStatement => self.visit_iteration_statement(tree, node),
             SyntaxKind::WhileStatement => self.visit_while_statement(tree, node),
+            SyntaxKind::DoWhileStatement => self.visit_do_while_statement(tree, node),
             SyntaxKind::ForStatement => self.visit_for_statement(tree, node),
+            SyntaxKind::ForInit => self.visit_for_init(tree, node),
+            SyntaxKind::JumpStatement => self.visit_jump_statement(tree, node),
+            SyntaxKind::GotoStatement => self.visit_goto_statement(tree, node),
+            SyntaxKind::ContinueStatement => self.visit_continue_statement(tree, node),
+            SyntaxKind::BreakStatement => self.visit_break_statement(tree, node),
             SyntaxKind::ReturnStatement => self.visit_return_statement(tree, node),
-            _ => self.visit_default(tree, node),
+            SyntaxKind::IterError => self.visit_iter_error(tree, node),
+            SyntaxKind::StmtError => self.visit_stmt_error(tree, node),
+
+            // Identifiers and tokens
+            SyntaxKind::Ident => self.visit_ident(tree, node),
+
+            // Error
+            SyntaxKind::Error => self.visit_error(tree, node),
+
+            // Trivia and tokens — skip (caught by visit_children in parent)
+            _ => self.visit_token_default(tree, node),
         }
     }
 
@@ -301,61 +550,126 @@ pub trait TreeVisitor {
     /// Default result value.
     fn default_result(&self) -> Self::Result;
 
-    // Default visit methods
-    fn visit_translation_unit(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
+    /// Fallback for token kinds not explicitly dispatched.
+    fn visit_token_default(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
         self.visit_children(tree, node)
     }
-    fn visit_external_declaration(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_function_definition(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_primary_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_postfix_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_unary_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_cast_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_binary_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_conditional_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_assignment_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_comma_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_declaration(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_compound_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_if_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_while_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_for_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_return_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
-    fn visit_default(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result {
-        self.visit_children(tree, node)
-    }
+
+    // --- Default visit methods ---
+
+    fn visit_translation_unit(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_external_declaration(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_function_definition(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_paren_group(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_bracket_group(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_brace_group(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_expr_error(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_constant_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_primary_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_generic_selection(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_generic_association_type(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_generic_association_default(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_postfix_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_array_access(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_function_call(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_member_access(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_member_access_ptr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_post_increment(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_post_decrement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_compound_literal(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_unary_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_pre_increment(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_pre_decrement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_unary_op(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_sizeof_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_sizeof_type(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_alignof(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_cast_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_cast(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_binary_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_conditional_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_assignment_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_comma_expr(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_declaration(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_static_assert_decl(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_attribute_decl(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_decl_error(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_declaration_specifiers(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_declaration_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_init_declarator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_type_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_struct_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_enum_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_atomic_type_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_typeof_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_typeof_specifier_arg(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_type_qualifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_storage_class_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_function_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_alignment_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_type_specifier_qualifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_member_declaration(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_specifier_qualifier_list(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_member_declarator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_member_bit_field(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_struct_or_union(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_enumerator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_declarator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_declarator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_declarator_ident(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_declarator_paren(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_declarator_array(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_declarator_func(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_pointer(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_pointer_or_block(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_array_declarator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_array_declarator_normal(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_array_declarator_static(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_array_declarator_vla(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_parameter_type_list(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_parameter_declaration(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_parameter_declaration_kind(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_type_name(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_abstract_declarator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_abstract_declarator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_abstract_declarator_paren(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_abstract_declarator_array(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_direct_abstract_declarator_func(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_initializer(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_braced_initializer(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_designated_initializer(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_designation(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_designator(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_attribute_specifier(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_attribute(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_attribute_token(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_asm_attribute(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_labeled_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_unlabeled_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_label(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_expression_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_primary_block(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_compound_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_block_item(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_selection_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_if_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_switch_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_iteration_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_while_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_do_while_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_for_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_for_init(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_jump_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_goto_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_continue_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_break_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_return_statement(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_iter_error(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_stmt_error(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_ident(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
+    fn visit_error(&mut self, tree: &SyntaxTree, node: SyntaxNode) -> Self::Result { self.visit_children(tree, node) }
 }
 
 // =============================================================================

@@ -155,8 +155,7 @@ fn test_round_trip_struct() {
 /// Test convenience API parse_tree.
 #[test]
 fn test_convenience_api() {
-    let (tree, ast) = parse_tree("int x;");
-    assert!(ast.is_some());
+    let tree = parse_tree("int x;");
     assert_eq!(tree.kind(tree.root()), SyntaxKind::TranslationUnit);
     assert!(tree.node_count() > 1);
 }
@@ -165,7 +164,7 @@ fn test_convenience_api() {
 #[test]
 fn test_round_trip_comments() {
     let source = "/* block comment */ int x; // line comment\nint y;\n";
-    let (tree, ctx_map, _) = parse_tree_with_map(source);
+    let (tree, ctx_map) = parse_tree_with_map(source);
     let reconstructed = print_lossless(&tree, ctx_map.source);
     assert_eq!(
         reconstructed, source,
@@ -177,7 +176,7 @@ fn test_round_trip_comments() {
 #[test]
 fn test_tree_structure() {
     let source = "int max(int a, int b) { if (a > b) { return a; } return b; }";
-    let (tree, _) = parse_tree(source);
+    let tree = parse_tree(source);
     let root = tree.root();
     let mut kinds: Vec<SyntaxKind> = vec![];
     collect_kinds(&tree, root, &mut kinds);

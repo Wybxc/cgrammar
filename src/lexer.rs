@@ -3,10 +3,10 @@
 use ordered_float::NotNan;
 
 #[cfg(feature = "quasi-quote")]
-use crate::quasi_quote::Template;
+use crate::token::quasi_quote::Template;
 use crate::{
-    ast::*,
     span::{ContextMapping, SourceContext, Span, Spanned},
+    token::*,
 };
 
 /// Lexes the input source code into a balanced token sequence.
@@ -500,7 +500,7 @@ impl<'a> Lexer<'a> {
         Some(content)
     }
 
-    /// (6.4.6) punctuator (excluding parentheses and brackets)
+    /// (6.4.6) punctuator
     fn punctuator(&mut self) -> Option<Punctuator> {
         // Helper macro to try patterns and return punctuator
         macro_rules! try_punct {
@@ -561,6 +561,12 @@ impl<'a> Lexer<'a> {
             '=' => Punctuator::Assign,
             ',' => Punctuator::Comma,
             '#' => Punctuator::Hash,
+            '(' => Punctuator::LeftParen,
+            ')' => Punctuator::RightParen,
+            '[' => Punctuator::LeftBracket,
+            ']' => Punctuator::RightBracket,
+            '{' => Punctuator::LeftBrace,
+            '}' => Punctuator::RightBrace,
         }
 
         None
@@ -688,43 +694,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Helper method to parse parenthesized/bracketed/braced sequences
-    fn parse_bracketed<F>(&mut self, open: char, close: char, make_token: F) -> Option<Spanned<BalancedToken>>
-    where
-        F: Fn(BalancedTokenSequence) -> BalancedToken,
-    {
-        let start = self.cursor();
-        if self.eat_if(open).is_some() {
-            let mut inner = self.balanced_token_sequence();
-            if self.eat_if(close).is_none() {
-                inner.closed = false;
-            }
-            let span = self.make_span(start);
-            return Some(Spanned::new(make_token(inner), span));
-        }
-        None
-    }
-
     /// (6.7.12.1) balanced token
     fn balanced_token(&mut self) -> Option<Spanned<BalancedToken>> {
         self.skip_whitespace();
 
         let start = self.cursor();
-
-        // Parenthesized: ( balanced-token-sequence? )
-        if let Some(token) = self.parse_bracketed('(', ')', BalancedToken::Parenthesized) {
-            return Some(token);
-        }
-
-        // Bracketed: [ balanced-token-sequence? ]
-        if let Some(token) = self.parse_bracketed('[', ']', BalancedToken::Bracketed) {
-            return Some(token);
-        }
-
-        // Braced: { balanced-token-sequence? }
-        if let Some(token) = self.parse_bracketed('{', '}', BalancedToken::Braced) {
-            return Some(token);
-        }
 
         // String literal
         if let Some(sl) = self.string_literal() {
@@ -773,19 +747,11 @@ impl<'a> Lexer<'a> {
         None
     }
 
-    /// (6.7.12.1) balanced token sequence
+    /// Lex all remaining tokens into a flat sequence.
     fn balanced_token_sequence(&mut self) -> BalancedTokenSequence {
         let mut tokens = Vec::new();
 
         loop {
-            self.skip_whitespace();
-
-            // Check for closing brackets or EOF
-            match self.peek() {
-                Some(')') | Some(']') | Some('}') | None => break,
-                _ => {}
-            }
-
             if let Some(token) = self.balanced_token() {
                 tokens.push(token);
             } else {
@@ -796,6 +762,6 @@ impl<'a> Lexer<'a> {
         self.skip_whitespace();
         let eoi = Span::new_eoi(self.cursor(), self.ctx_id());
 
-        BalancedTokenSequence { tokens, closed: true, eoi }
+        BalancedTokenSequence { tokens, eoi }
     }
 }
