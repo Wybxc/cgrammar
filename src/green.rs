@@ -104,22 +104,43 @@ impl GreenNode {
     pub fn new(kind: SyntaxKind, children: Vec<GreenChild>) -> Self {
         let len: u32 = children.iter().map(|c| c.len()).sum();
         if children.is_empty() {
-            GreenNode { kind, len, children: GreenChildren::Empty }
+            GreenNode {
+                kind,
+                len,
+                children: GreenChildren::Empty,
+            }
         } else {
-            GreenNode { kind, len, children: GreenChildren::Node { children: children.into() } }
+            GreenNode {
+                kind,
+                len,
+                children: GreenChildren::Node { children: children.into() },
+            }
         }
     }
 
     /// Create a new token node.
     pub fn token(kind: SyntaxKind, len: u32, leading_trivia: u32, trailing_trivia: u32) -> Self {
-        let token = GreenToken { kind, len, leading_trivia, trailing_trivia };
+        let token = GreenToken {
+            kind,
+            len,
+            leading_trivia,
+            trailing_trivia,
+        };
         let total = token.total_len();
-        GreenNode { kind, len: total, children: GreenChildren::Token(token) }
+        GreenNode {
+            kind,
+            len: total,
+            children: GreenChildren::Token(token),
+        }
     }
 
     /// Create an empty node (zero-width).
     pub fn empty(kind: SyntaxKind) -> Self {
-        GreenNode { kind, len: 0, children: GreenChildren::Empty }
+        GreenNode {
+            kind,
+            len: 0,
+            children: GreenChildren::Empty,
+        }
     }
 
     /// Returns the children of this node as an iterator.
@@ -208,11 +229,7 @@ pub enum GreenEvent {
     /// Add a token leaf at the given absolute source byte offset.
     /// Leading trivia is computed during [`GreenBuilder::build`] from the gap
     /// between adjacent tokens.
-    Token {
-        kind: SyntaxKind,
-        len: u32,
-        start: u32,
-    },
+    Token { kind: SyntaxKind, len: u32, start: u32 },
     /// A marker placed before a parser to enable retroactive wrapping.
     /// The `wrap_node` method replaces the most recent Mark with a StartNode
     /// and appends a FinishNode at the current position.
@@ -333,13 +350,21 @@ impl GreenBuilder {
         }
 
         let mut stack: Vec<Frame> = Vec::new();
-        let mut current: Frame = Frame { kind: SyntaxKind::Error, children: Vec::new(), token_end: 0 };
+        let mut current: Frame = Frame {
+            kind: SyntaxKind::Error,
+            children: Vec::new(),
+            token_end: 0,
+        };
         let mut root: Option<GreenNode> = None;
 
         for event in self.events {
             match event {
                 GreenEvent::StartNode { kind } => {
-                    let frame = Frame { kind, children: Vec::new(), token_end: current.token_end };
+                    let frame = Frame {
+                        kind,
+                        children: Vec::new(),
+                        token_end: current.token_end,
+                    };
                     let old = std::mem::replace(&mut current, frame);
                     stack.push(old);
                 }
@@ -357,7 +382,12 @@ impl GreenBuilder {
                 }
                 GreenEvent::Token { kind, len, start } => {
                     let leading = start.saturating_sub(current.token_end);
-                    let token = GreenToken { kind, len, leading_trivia: leading, trailing_trivia: 0 };
+                    let token = GreenToken {
+                        kind,
+                        len,
+                        leading_trivia: leading,
+                        trailing_trivia: 0,
+                    };
                     current.token_end = start + len;
                     current.children.push(GreenChild::Token(token));
                 }

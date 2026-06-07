@@ -1,7 +1,7 @@
 //! End-to-end tests for the red-green tree pipeline.
 
-use chumsky::Parser;
 use cgrammar::*;
+use chumsky::Parser;
 
 fn parse_source(source: &str) -> SyntaxTree {
     let (tokens, _) = lex(source, Some("test.c"));
@@ -66,8 +66,10 @@ fn test_lossless_token_content() {
     let tree = SyntaxTree::new(state.green.build());
 
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert_eq!(reconstructed, "int x;",
-        "lossless print should reconstruct source exactly");
+    assert_eq!(
+        reconstructed, "int x;",
+        "lossless print should reconstruct source exactly"
+    );
 }
 
 /// Verify function body tokens.
@@ -80,8 +82,10 @@ fn test_lossless_function_tokens() {
     assert!(result.has_output());
     let tree = SyntaxTree::new(state.green.build());
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert_eq!(reconstructed, "int f(void){}",
-        "lossless print should reconstruct source exactly");
+    assert_eq!(
+        reconstructed, "int f(void){}",
+        "lossless print should reconstruct source exactly"
+    );
 }
 
 /// Round-trip with if/else.
@@ -94,8 +98,10 @@ fn test_round_trip_if_else() {
     assert!(result.has_output());
     let tree = SyntaxTree::new(state.green.build());
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert_eq!(reconstructed, source,
-        "lossless print should reconstruct source exactly");
+    assert_eq!(
+        reconstructed, source,
+        "lossless print should reconstruct source exactly"
+    );
 }
 
 /// Round-trip with while loop.
@@ -108,8 +114,10 @@ fn test_round_trip_while() {
     assert!(result.has_output());
     let tree = SyntaxTree::new(state.green.build());
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert_eq!(reconstructed, source,
-        "lossless print should reconstruct source exactly");
+    assert_eq!(
+        reconstructed, source,
+        "lossless print should reconstruct source exactly"
+    );
 }
 
 /// Round-trip with for loop.
@@ -122,8 +130,10 @@ fn test_round_trip_for() {
     assert!(result.has_output());
     let tree = SyntaxTree::new(state.green.build());
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert_eq!(reconstructed, source,
-        "lossless print should reconstruct source exactly");
+    assert_eq!(
+        reconstructed, source,
+        "lossless print should reconstruct source exactly"
+    );
 }
 
 /// Round-trip with struct and pointer.
@@ -136,8 +146,10 @@ fn test_round_trip_struct() {
     assert!(result.has_output());
     let tree = SyntaxTree::new(state.green.build());
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert_eq!(reconstructed, source,
-        "lossless print should reconstruct source exactly");
+    assert_eq!(
+        reconstructed, source,
+        "lossless print should reconstruct source exactly"
+    );
 }
 
 /// Test convenience API parse_tree.
@@ -155,8 +167,10 @@ fn test_round_trip_comments() {
     let source = "/* block comment */ int x; // line comment\nint y;\n";
     let (tree, ctx_map, _) = parse_tree_with_map(source);
     let reconstructed = print_lossless(&tree, ctx_map.source);
-    assert_eq!(reconstructed, source,
-        "comments and trailing newline should be preserved");
+    assert_eq!(
+        reconstructed, source,
+        "comments and trailing newline should be preserved"
+    );
 }
 
 /// Verify tree structure for a complete C function.

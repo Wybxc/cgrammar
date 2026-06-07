@@ -334,7 +334,14 @@ impl SyntaxKind {
 
     /// Returns `true` if this kind represents an error.
     pub fn is_error(self) -> bool {
-        matches!(self, SyntaxKind::Error | SyntaxKind::ExprError | SyntaxKind::DeclError | SyntaxKind::StmtError | SyntaxKind::IterError)
+        matches!(
+            self,
+            SyntaxKind::Error
+                | SyntaxKind::ExprError
+                | SyntaxKind::DeclError
+                | SyntaxKind::StmtError
+                | SyntaxKind::IterError
+        )
     }
 
     /// Returns a human-readable name for this syntax kind.

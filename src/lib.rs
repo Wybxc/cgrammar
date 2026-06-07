@@ -24,10 +24,10 @@ pub use context::{ParseState, State};
 pub use green::GreenNode;
 pub use lexer::lex;
 pub use parser::*;
-pub use red::{print_lossless, SyntaxTree, TreeVisitor};
-pub use syntax::SyntaxKind;
+pub use red::{SyntaxTree, TreeVisitor, print_lossless};
 #[cfg(feature = "report")]
 pub use report::*;
+pub use syntax::SyntaxKind;
 pub use visitor::{Visitor, VisitorMut};
 
 /// Parse C source code into a lossless [`SyntaxTree`].

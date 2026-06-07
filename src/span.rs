@@ -100,7 +100,11 @@ pub struct Span {
 
 impl Default for Span {
     fn default() -> Self {
-        Self { start: 0, len: 0, ctx_id: ContextId::none() }
+        Self {
+            start: 0,
+            len: 0,
+            ctx_id: ContextId::none(),
+        }
     }
 }
 

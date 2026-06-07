@@ -206,7 +206,10 @@ pub struct ParseState {
 impl ParseState {
     /// Create a new combined state.
     pub fn new() -> Self {
-        ParseState { state: State::new(), green: GreenBuilder::new() }
+        ParseState {
+            state: State::new(),
+            green: GreenBuilder::new(),
+        }
     }
 
     /// Get a reference to the current semantic context.

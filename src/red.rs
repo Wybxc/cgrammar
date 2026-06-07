@@ -246,9 +246,7 @@ fn build_recursive_green_child(
             }
             my_idx
         }
-        GreenChild::Node(green_node) => {
-            build_recursive(green_node, parent, prev_sibling, offset, nodes)
-        }
+        GreenChild::Node(green_node) => build_recursive(green_node, parent, prev_sibling, offset, nodes),
     }
 }
 
