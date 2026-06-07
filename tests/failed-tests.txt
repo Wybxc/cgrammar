@@ -26,6 +26,3 @@ tests/test-cases/unit-tests/edge_unicode_identifiers.c
 tests/test-cases/unit-tests/edge_string_literals.c
 tests/test-cases/unit-tests/edge_wide_chars.c
 tests/test-cases/unit-tests/edge_character_literals.c
-tests/test-cases/en-cpp-reference-c/cCode120.c (round-trip)
-tests/test-cases/unit-tests/gen_c99_bool.c (round-trip)
-tests/test-cases/unit-tests/pre_if_line.c (round-trip)
