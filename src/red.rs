@@ -114,6 +114,13 @@ impl SyntaxTree {
         if s == NONE { None } else { Some(SyntaxNode { idx: s }) }
     }
 
+    /// Reconstruct the original source text from the green tree.
+    ///
+    /// This is a convenience wrapper around [`print_lossless`].
+    pub fn lossless_text<'a>(&self, source: &'a str) -> String {
+        print_lossless(self, source)
+    }
+
     /// Returns an iterator over the children of a node.
     pub fn children(&self, node: SyntaxNode) -> SyntaxChildren<'_> {
         SyntaxChildren {
