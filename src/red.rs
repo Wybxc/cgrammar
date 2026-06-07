@@ -117,7 +117,7 @@ impl SyntaxTree {
     /// Reconstruct the original source text from the green tree.
     ///
     /// This is a convenience wrapper around [`print_lossless`].
-    pub fn lossless_text<'a>(&self, source: &'a str) -> String {
+    pub fn lossless_text(&self, source: &str) -> String {
         print_lossless(self, source)
     }
 
