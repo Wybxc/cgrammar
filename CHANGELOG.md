@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2](https://github.com/Wybxc/cgrammar/compare/v0.9.1...v0.9.2) - 2026-06-07
+
+### Added
+
+- add SyntaxTree::lossless_text convenience method
+- record bracket tokens during error recovery
+- wrap if/switch/while/do-while/for/goto/continue/break/return (59 wrappers)
+- wrap typeof_specifier and atomic_type_specifier (50 wrappers total)
+- wrap alignment_specifier with node() (48 wrappers total)
+- wrap expression() with node(Expr) and add Expr SyntaxKind
+- add trailing trivia support and comment round-trip test
+- wrap storage_class_specifier and add parse_tree_with_typedefs
+- wrap type_specifier with node() (45 wrappers total)
+- add complex round-trip tests and improve parse_tree error handling
+- add parse_tree/parse_tree_with_map convenience API
+- compute trivia from token start positions in green tree
+- add token start position to GreenEvent for future trivia support
+- 44 node wrappers covering all major grammar structures
+- wrap 5 more composite parsers and fix bracket token trivia
+- wrap 7 more composite parsers with node() (39 total)
+- complete lossless green tree with bracket tokens, trivia, and 32 node wrappers
+- build green tree directly during parsing via custom chumsky combinator
+
+### Fixed
+
+- accept _Alignas keyword in alignment_specifier
+- compute trailing trivia from accumulated token_end after build
+- use validate() instead of map_with() for green token recording
+
+### Other
+
+- restore edge_asm_statements.c to failed list
+- fix round-trip check for comment-only and directive-only files
+- add lossless round-trip verification to parse-test
+- remove unused root field from SyntaxTree
+- cleanup warnings (public Node, remove unused code)
+- enable exact lossless print assertions
+
 ## [0.9.1](https://github.com/Wybxc/cgrammar/compare/v0.9.0...v0.9.1) - 2026-03-17
 
 ### Added
