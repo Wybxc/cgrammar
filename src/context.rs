@@ -9,7 +9,7 @@ use chumsky::{
 };
 use rustc_hash::FxHashSet;
 
-use crate::{Identifier, utils::Slab};
+use crate::{Identifier, green::GreenBuilder, utils::Slab};
 
 /// Parsing state.
 #[derive(Clone)]
@@ -47,6 +47,16 @@ impl State {
             handle: &mut self.current,
             contexts: &self.contexts,
         }
+    }
+
+    /// Save the current state for backtracking.
+    pub fn save_checkpoint(&self) -> usize {
+        self.current
+    }
+
+    /// Restore state to a previously saved checkpoint.
+    pub fn restore_checkpoint(&mut self, checkpoint: usize) {
+        self.current = checkpoint;
     }
 }
 
@@ -177,5 +187,60 @@ impl Namespace {
 
     pub fn add_enum_constant(&mut self, name: Identifier) {
         Rc::make_mut(&mut self.enum_constants).insert(name);
+    }
+}
+
+// =============================================================================
+// ParseState — combined state for green tree construction
+// =============================================================================
+
+/// Combined parser state: semantic context + green tree builder.
+#[derive(Clone)]
+pub struct ParseState {
+    /// Semantic parser state (typedef/enum constant tracking).
+    pub state: State,
+    /// Green tree builder (records syntax events during parsing).
+    pub green: GreenBuilder,
+}
+
+impl ParseState {
+    /// Create a new combined state.
+    pub fn new() -> Self {
+        ParseState { state: State::new(), green: GreenBuilder::new() }
+    }
+
+    /// Get a reference to the current semantic context.
+    pub fn ctx(&self) -> ContextRef<'_> {
+        self.state.ctx()
+    }
+
+    /// Get a mutable reference to the current semantic context.
+    pub fn ctx_mut(&mut self) -> ContextRefMut<'_> {
+        self.state.ctx_mut()
+    }
+}
+
+impl Default for ParseState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'src, I> Inspector<'src, I> for ParseState
+where
+    I: Input<'src>,
+{
+    type Checkpoint = (usize, usize);
+
+    fn on_token(&mut self, _token: &I::Token) {}
+
+    fn on_save<'parse>(&self, _cursor: &Cursor<'src, 'parse, I>) -> Self::Checkpoint {
+        (self.state.save_checkpoint(), self.green.checkpoint())
+    }
+
+    fn on_rewind<'parse>(&mut self, marker: &Checkpoint<'src, 'parse, I, Self::Checkpoint>) {
+        let &(state_ck, green_ck) = marker.inspector();
+        self.state.restore_checkpoint(state_ck);
+        self.green.rewind(green_ck);
     }
 }
