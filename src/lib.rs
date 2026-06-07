@@ -20,7 +20,7 @@ pub use context::{ParseState, State};
 pub use green::GreenNode;
 pub use lexer::lex;
 pub use parser::*;
-pub use red::{SyntaxTree, TreeVisitor, print_lossless};
+pub use red::{SyntaxNode, SyntaxTree, TreeVisitor, print_lossless};
 pub use syntax::SyntaxKind;
 pub use token::*;
 
