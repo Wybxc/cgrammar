@@ -83,8 +83,8 @@ impl VisitorMut<'_> for RemoveSpans {
 
     fn visit_direct_declarator_mut(&mut self, d: &'_ mut DirectDeclarator) -> Self::Result {
         walk_direct_declarator_mut(self, d);
-        if let DirectDeclarator::Identifier { identifier_span, .. } = d {
-            *identifier_span = Default::default();
+        if let DirectDeclarator::Identifier { identifier, .. } = d {
+            identifier.span = Default::default();
         }
     }
 }

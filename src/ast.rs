@@ -845,10 +845,9 @@ impl Declarator {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DirectDeclarator {
     Identifier {
-        identifier: Identifier,
-        /// Span of just the identifier token (its start offset locates the
-        /// variable name, e.g. for hover anchoring).
-        identifier_span: Span,
+        /// The declared identifier (the variable name), carrying its own span;
+        /// the span's start offset locates the name, e.g. for hover anchoring.
+        identifier: Ident,
         attributes: Vec<AttributeSpecifier>,
     },
     Parenthesized(Box<Declarator>),
@@ -868,7 +867,7 @@ impl DirectDeclarator {
     /// Get the identifier from the direct declarator. None if error inside.
     pub fn identifier(&self) -> Option<&Identifier> {
         match self {
-            DirectDeclarator::Identifier { identifier, .. } => Some(identifier),
+            DirectDeclarator::Identifier { identifier, .. } => Some(&identifier.value),
             DirectDeclarator::Parenthesized(declarator) => declarator.identifier(),
             DirectDeclarator::Array { declarator, .. } => declarator.identifier(),
             DirectDeclarator::Function { declarator, .. } => declarator.identifier(),
@@ -879,7 +878,7 @@ impl DirectDeclarator {
     /// inside.
     pub fn identifier_span(&self) -> Option<Span> {
         match self {
-            DirectDeclarator::Identifier { identifier_span, .. } => Some(*identifier_span),
+            DirectDeclarator::Identifier { identifier, .. } => Some(identifier.span),
             DirectDeclarator::Parenthesized(declarator) => declarator.identifier_span(),
             DirectDeclarator::Array { declarator, .. } => declarator.identifier_span(),
             DirectDeclarator::Function { declarator, .. } => declarator.identifier_span(),
@@ -1218,7 +1217,8 @@ pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
     /// Span of the opening `{` (carries the `#line` context at the brace).
     pub lbrace: Span,
-    /// Span of the closing `}` (carries the `#line` context at the brace).
+    /// Zero-length span at the closing `}` (carries the `#line` context there);
+    /// it locates the brace but does not cover it.
     pub rbrace: Span,
 }
 
@@ -1320,9 +1320,11 @@ pub struct FunctionDefinition {
     pub specifiers: DeclarationSpecifiers,
     pub declarator: Declarator,
     pub body: CompoundStatement,
-    /// Span of the signature (specifiers through the declarator), used to locate
-    /// the function start. Single `#line` region, unlike a whole-definition span
-    /// that would cross preprocessor line directives into the body.
+    /// Span of the function's first token (the leading attribute if present,
+    /// otherwise the first specifier) — an anchor for the function's start, not
+    /// a range covering the signature. A single token keeps the correct `#line`
+    /// context, whereas a combined span through the declarator would carry the
+    /// far end's context across preprocessor line directives.
     pub signature_span: Span,
 }
 

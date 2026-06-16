@@ -139,8 +139,11 @@ impl Span {
         Self { start: pos, len: 0, ctx_id }
     }
 
-    /// A zero-length span pinned at this span's start (e.g. the opening `{` of a
-    /// block, or the first token of a function definition).
+    /// A zero-length span pinned at this span's start, keeping this span's
+    /// `ctx_id`. Note the inherited `ctx_id` reflects *this* span's context, not
+    /// necessarily the one active at the start offset — if the span crosses a
+    /// `#line` directive, resolve the start offset with
+    /// [`ContextMapping::context_at_offset`] instead.
     pub fn start_point(self) -> Self {
         Self {
             start: self.start,
@@ -149,8 +152,10 @@ impl Span {
         }
     }
 
-    /// A zero-length span pinned at this span's end (e.g. the closing `}` of a
-    /// block or function body).
+    /// A zero-length span pinned at this span's end, keeping this span's
+    /// `ctx_id`. As with [`Span::start_point`], the inherited `ctx_id` may not
+    /// match the context active at the end offset across a `#line` directive;
+    /// use [`ContextMapping::context_at_offset`] when that matters.
     pub fn end_point(self) -> Self {
         Self {
             start: self.start + self.len as usize,
