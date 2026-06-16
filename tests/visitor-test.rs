@@ -433,7 +433,7 @@ impl<'a> Visitor<'a> for FirstFunctionFinder {
 
     fn visit_function_definition(&mut self, f: &'a FunctionDefinition) -> Self::Result {
         // Extract function name from declarator
-        if let Some(name) = extract_declarator_name(&f.declarator) {
+        if let Some(name) = extract_declarator_name(&f.declarator.value) {
             self.found_name = Some(name.clone());
             return ControlFlow::Break(());
         }

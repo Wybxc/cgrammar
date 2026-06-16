@@ -159,9 +159,9 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
             }
             pp.visit_declaration_specifiers(&f.specifiers)?;
             pp.space()?;
-            pp.visit_declarator(&f.declarator)?;
+            pp.visit_declarator(&f.declarator.value)?;
             pp.space()?;
-            pp.visit_compound_statement(&f.body)?;
+            pp.visit_compound_statement(&f.body.value)?;
             Ok(())
         })
     }

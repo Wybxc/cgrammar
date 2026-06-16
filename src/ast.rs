@@ -266,11 +266,6 @@ pub enum Punctuator {
 pub struct BalancedTokenSequence {
     pub tokens: Vec<Spanned<BalancedToken>>,
     pub closed: bool,
-    /// Span of the opening delimiter (`{`/`[`/`(`), carrying the `#line` context
-    /// active at the open — distinct from `eoi`'s context when the delimited
-    /// region crosses preprocessor line directives. Default for the top-level
-    /// sequence, which has no opening delimiter.
-    pub open: Span,
     pub eoi: Span,
 }
 
@@ -845,8 +840,6 @@ impl Declarator {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DirectDeclarator {
     Identifier {
-        /// The declared identifier (the variable name), carrying its own span;
-        /// the span's start offset locates the name, e.g. for hover anchoring.
         identifier: Ident,
         attributes: Vec<AttributeSpecifier>,
     },
@@ -1215,11 +1208,6 @@ pub struct LabeledStatement {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
-    /// Span of the opening `{` (carries the `#line` context at the brace).
-    pub lbrace: Span,
-    /// Zero-length span at the closing `}` (carries the `#line` context there);
-    /// it locates the brace but does not cover it.
-    pub rbrace: Span,
 }
 
 /// Block items (6.8.2)
@@ -1318,14 +1306,8 @@ pub enum ExternalDeclaration {
 pub struct FunctionDefinition {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
-    pub declarator: Declarator,
-    pub body: CompoundStatement,
-    /// Span of the function's first token (the leading attribute if present,
-    /// otherwise the first specifier) — an anchor for the function's start, not
-    /// a range covering the signature. A single token keeps the correct `#line`
-    /// context, whereas a combined span through the declarator would carry the
-    /// far end's context across preprocessor line directives.
-    pub signature_span: Span,
+    pub declarator: Declr,
+    pub body: Spanned<CompoundStatement>,
 }
 
 #[cfg(feature = "quasi-quote")]

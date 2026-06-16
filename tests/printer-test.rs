@@ -5,9 +5,8 @@ use std::{io::Write, path::PathBuf};
 use cgrammar::{
     printer::Context,
     visitor::{
-        Visitor, VisitorMut, walk_compound_statement_mut, walk_declaration_mut,
-        walk_declarator_mut, walk_direct_declarator_mut, walk_expression_mut,
-        walk_function_definition_mut, walk_statement_mut,
+        Visitor, VisitorMut, walk_declaration_mut, walk_declarator_mut, walk_direct_declarator_mut,
+        walk_expression_mut, walk_statement_mut,
     },
     *,
 };
@@ -31,7 +30,6 @@ fn print_ast(ast: &TranslationUnit) -> String {
 }
 
 fn remove_spans(tokens: &mut BalancedTokenSequence) {
-    tokens.open = Default::default();
     tokens.eoi = Default::default();
     for token in &mut tokens.tokens {
         token.span = Default::default();
@@ -68,24 +66,6 @@ impl VisitorMut<'_> for RemoveSpans {
     fn visit_declaration_mut(&mut self, d: &'_ mut Declaration) -> Self::Result {
         walk_declaration_mut(self, d);
         d.span = Default::default();
-    }
-
-    fn visit_compound_statement_mut(&mut self, c: &'_ mut CompoundStatement) -> Self::Result {
-        walk_compound_statement_mut(self, c);
-        c.lbrace = Default::default();
-        c.rbrace = Default::default();
-    }
-
-    fn visit_function_definition_mut(&mut self, f: &'_ mut FunctionDefinition) -> Self::Result {
-        walk_function_definition_mut(self, f);
-        f.signature_span = Default::default();
-    }
-
-    fn visit_direct_declarator_mut(&mut self, d: &'_ mut DirectDeclarator) -> Self::Result {
-        walk_direct_declarator_mut(self, d);
-        if let DirectDeclarator::Identifier { identifier, .. } = d {
-            identifier.span = Default::default();
-        }
     }
 }
 
