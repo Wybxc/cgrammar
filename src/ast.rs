@@ -266,6 +266,11 @@ pub enum Punctuator {
 pub struct BalancedTokenSequence {
     pub tokens: Vec<Spanned<BalancedToken>>,
     pub closed: bool,
+    /// Span of the opening delimiter (`{`/`[`/`(`), carrying the `#line` context
+    /// active at the open — distinct from `eoi`'s context when the delimited
+    /// region crosses preprocessor line directives. Default for the top-level
+    /// sequence, which has no opening delimiter.
+    pub open: Span,
     pub eoi: Span,
 }
 
@@ -796,6 +801,16 @@ impl Declarator {
         }
     }
 
+    /// Span of the declared identifier (the variable name itself), for anchoring
+    /// at the name rather than the start of the declarator. None if error inside.
+    pub fn identifier_span(&self) -> Option<Span> {
+        match self {
+            Declarator::Direct(direct) => direct.identifier_span(),
+            Declarator::Pointer { declarator, .. } => declarator.identifier_span(),
+            Declarator::Error => None,
+        }
+    }
+
     /// Get the parameter type list from the declarator. None if not a function
     /// declarator.
     pub fn parameters(&self) -> Option<&ParameterTypeList> {
@@ -831,6 +846,9 @@ impl Declarator {
 pub enum DirectDeclarator {
     Identifier {
         identifier: Identifier,
+        /// Span of just the identifier token (its start offset locates the
+        /// variable name, e.g. for hover anchoring).
+        identifier_span: Span,
         attributes: Vec<AttributeSpecifier>,
     },
     Parenthesized(Box<Declarator>),
@@ -854,6 +872,17 @@ impl DirectDeclarator {
             DirectDeclarator::Parenthesized(declarator) => declarator.identifier(),
             DirectDeclarator::Array { declarator, .. } => declarator.identifier(),
             DirectDeclarator::Function { declarator, .. } => declarator.identifier(),
+        }
+    }
+
+    /// Span of the declared identifier (the variable name itself). None if error
+    /// inside.
+    pub fn identifier_span(&self) -> Option<Span> {
+        match self {
+            DirectDeclarator::Identifier { identifier_span, .. } => Some(*identifier_span),
+            DirectDeclarator::Parenthesized(declarator) => declarator.identifier_span(),
+            DirectDeclarator::Array { declarator, .. } => declarator.identifier_span(),
+            DirectDeclarator::Function { declarator, .. } => declarator.identifier_span(),
         }
     }
 
@@ -1187,6 +1216,10 @@ pub struct LabeledStatement {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
+    /// Span of the opening `{` (carries the `#line` context at the brace).
+    pub lbrace: Span,
+    /// Span of the closing `}` (carries the `#line` context at the brace).
+    pub rbrace: Span,
 }
 
 /// Block items (6.8.2)
@@ -1287,6 +1320,10 @@ pub struct FunctionDefinition {
     pub specifiers: DeclarationSpecifiers,
     pub declarator: Declarator,
     pub body: CompoundStatement,
+    /// Span of the signature (specifiers through the declarator), used to locate
+    /// the function start. Single `#line` region, unlike a whole-definition span
+    /// that would cross preprocessor line directives into the body.
+    pub signature_span: Span,
 }
 
 #[cfg(feature = "quasi-quote")]

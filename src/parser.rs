@@ -974,8 +974,13 @@ pub fn declarator<'a>() -> impl Parser<'a, Tokens<'a>, Declarator, Extra<'a>> + 
 #[apply(cached)]
 pub fn direct_declarator<'a>() -> impl Parser<'a, Tokens<'a>, DirectDeclarator, Extra<'a>> + Clone {
     let identifier_decl = identifier()
+        .map_with(|identifier, e| (identifier, e.span()))
         .then(attribute_specifier_sequence())
-        .map(|(identifier, attributes)| DirectDeclarator::Identifier { identifier, attributes });
+        .map(|((identifier, identifier_span), attributes)| DirectDeclarator::Identifier {
+            identifier,
+            identifier_span,
+            attributes,
+        });
 
     let parenthesized = declarator()
         .parenthesized()
@@ -1423,11 +1428,14 @@ pub fn compound_statement<'a>() -> impl Parser<'a, Tokens<'a>, CompoundStatement
     choice((
         #[cfg(feature = "quasi-quote")]
         interpolation(),
-        block_item()
-            .repeated()
-            .collect::<Vec<BlockItem>>()
-            .braced()
-            .map(|items| CompoundStatement { items }),
+        // Peek the `{ ... }` token (without consuming) to grab the opening and
+        // closing brace spans, each carrying its own `#line` context, then parse
+        // the contents. A single span over `{`..`}` would carry only the closing
+        // context, mislocating the opening brace across preprocessor directives.
+        select_ref! { Token::Braced(seq) => (seq.open, seq.eoi) }
+            .rewind()
+            .then(block_item().repeated().collect::<Vec<BlockItem>>().braced())
+            .map(|((lbrace, rbrace), items)| CompoundStatement { items, lbrace, rbrace }),
     ))
     .labelled("compound statement")
     .as_context()
@@ -1743,15 +1751,23 @@ pub fn function_definition<'a>() -> impl Parser<'a, Tokens<'a>, FunctionDefiniti
         #[cfg(feature = "quasi-quote")]
         interpolation(),
         attribute_specifier_sequence()
+            // Anchor the signature at the first token's own span (a single
+            // token, so chumsky returns that token's lexer span with the correct
+            // `#line` context — a combined span over the specifiers/declarator
+            // would carry the far end's context across preprocessor directives).
+            .then(any_ref().map_with(|_, e| e.span()).rewind())
             .then(declaration_specifiers())
             .then(declarator())
             .then(compound_statement())
-            .map(|(((attributes, specifiers), declarator), body)| FunctionDefinition {
-                attributes,
-                specifiers,
-                declarator,
-                body,
-            }),
+            .map(
+                |((((attributes, signature_span), specifiers), declarator), body)| FunctionDefinition {
+                    attributes,
+                    specifiers,
+                    declarator,
+                    body,
+                    signature_span,
+                },
+            ),
     ))
     .labelled("function definition")
     .as_context()

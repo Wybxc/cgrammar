@@ -80,6 +80,7 @@ mod lexer_core {
                     ctx_map.insert_context(SourceContext {
                         filename: filename.into(),
                         line_offset: 0,
+                        start_offset: 0,
                     })
                 }),
                 ctx_map,
@@ -651,6 +652,7 @@ impl<'a> Lexer<'a> {
                 self.set_context(SourceContext {
                     filename: file.trim_matches('"').to_string(),
                     line_offset: self.lineno() - line_num,
+                    start_offset: self.cursor(),
                 });
             }
         }
@@ -695,10 +697,14 @@ impl<'a> Lexer<'a> {
     {
         let start = self.cursor();
         if self.eat_if(open).is_some() {
+            // The opening-delimiter span, carrying the `#line` context active
+            // here — before the inner sequence advances it past line directives.
+            let open_span = self.make_span(start);
             let mut inner = self.balanced_token_sequence();
             if self.eat_if(close).is_none() {
                 inner.closed = false;
             }
+            inner.open = open_span;
             let span = self.make_span(start);
             return Some(Spanned::new(make_token(inner), span));
         }
@@ -796,6 +802,13 @@ impl<'a> Lexer<'a> {
         self.skip_whitespace();
         let eoi = Span::new_eoi(self.cursor(), self.ctx_id());
 
-        BalancedTokenSequence { tokens, closed: true, eoi }
+        // `open` is filled in by `parse_bracketed` for delimited sequences; the
+        // top-level sequence has no opening delimiter.
+        BalancedTokenSequence {
+            tokens,
+            closed: true,
+            open: Span::default(),
+            eoi,
+        }
     }
 }
