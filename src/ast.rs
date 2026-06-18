@@ -796,16 +796,6 @@ impl Declarator {
         }
     }
 
-    /// Span of the declared identifier (the variable name itself), for anchoring
-    /// at the name rather than the start of the declarator. None if error inside.
-    pub fn identifier_span(&self) -> Option<Span> {
-        match self {
-            Declarator::Direct(direct) => direct.identifier_span(),
-            Declarator::Pointer { declarator, .. } => declarator.identifier_span(),
-            Declarator::Error => None,
-        }
-    }
-
     /// Get the parameter type list from the declarator. None if not a function
     /// declarator.
     pub fn parameters(&self) -> Option<&ParameterTypeList> {
@@ -840,7 +830,7 @@ impl Declarator {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub enum DirectDeclarator {
     Identifier {
-        identifier: Ident,
+        identifier: Identifier,
         attributes: Vec<AttributeSpecifier>,
     },
     Parenthesized(Box<Declarator>),
@@ -860,21 +850,10 @@ impl DirectDeclarator {
     /// Get the identifier from the direct declarator. None if error inside.
     pub fn identifier(&self) -> Option<&Identifier> {
         match self {
-            DirectDeclarator::Identifier { identifier, .. } => Some(&identifier.value),
+            DirectDeclarator::Identifier { identifier, .. } => Some(identifier),
             DirectDeclarator::Parenthesized(declarator) => declarator.identifier(),
             DirectDeclarator::Array { declarator, .. } => declarator.identifier(),
             DirectDeclarator::Function { declarator, .. } => declarator.identifier(),
-        }
-    }
-
-    /// Span of the declared identifier (the variable name itself). None if error
-    /// inside.
-    pub fn identifier_span(&self) -> Option<Span> {
-        match self {
-            DirectDeclarator::Identifier { identifier, .. } => Some(identifier.span),
-            DirectDeclarator::Parenthesized(declarator) => declarator.identifier_span(),
-            DirectDeclarator::Array { declarator, .. } => declarator.identifier_span(),
-            DirectDeclarator::Function { declarator, .. } => declarator.identifier_span(),
         }
     }
 

@@ -979,7 +979,6 @@ pub fn declarator<'a>() -> impl Parser<'a, Tokens<'a>, Declarator, Extra<'a>> + 
 #[apply(cached)]
 pub fn direct_declarator<'a>() -> impl Parser<'a, Tokens<'a>, DirectDeclarator, Extra<'a>> + Clone {
     let identifier_decl = identifier()
-        .map_with(|identifier, e| Ident::new(identifier, e.span()))
         .then(attribute_specifier_sequence())
         .map(|(identifier, attributes)| DirectDeclarator::Identifier { identifier, attributes });
 

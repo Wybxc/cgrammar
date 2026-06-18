@@ -451,7 +451,7 @@ fn extract_declarator_name(d: &Declarator) -> Option<String> {
 
 fn extract_direct_declarator_name(dd: &DirectDeclarator) -> Option<String> {
     match dd {
-        DirectDeclarator::Identifier { identifier, .. } => Some(identifier.value.0.to_string()),
+        DirectDeclarator::Identifier { identifier, .. } => Some(identifier.0.to_string()),
         DirectDeclarator::Parenthesized(d) => extract_declarator_name(d),
         DirectDeclarator::Array { declarator, .. } => extract_direct_declarator_name(declarator),
         DirectDeclarator::Function { declarator, .. } => extract_direct_declarator_name(declarator),

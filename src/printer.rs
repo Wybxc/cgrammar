@@ -700,8 +700,8 @@ impl<'a, R: Render> Visitor<'a> for Printer<'a, R> {
 
     fn visit_direct_declarator(&mut self, d: &'a DirectDeclarator) -> Self::Result {
         match d {
-            DirectDeclarator::Identifier { identifier, attributes, .. } => {
-                self.visit_variable_name(&identifier.value)?;
+            DirectDeclarator::Identifier { identifier, attributes } => {
+                self.visit_variable_name(identifier)?;
                 for a in attributes {
                     self.space()?;
                     self.visit_attribute_specifier(a)?;

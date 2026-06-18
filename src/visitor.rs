@@ -1176,8 +1176,8 @@ pub fn walk_pointer<'a, V: Visitor<'a> + ?Sized>(v: &mut V, p: &'a Pointer) -> V
 /// Walk a direct declarator.
 pub fn walk_direct_declarator<'a, V: Visitor<'a> + ?Sized>(v: &mut V, d: &'a DirectDeclarator) -> V::Result {
     match d {
-        DirectDeclarator::Identifier { identifier, attributes, .. } => {
-            tr!(v.visit_variable_name(&identifier.value));
+        DirectDeclarator::Identifier { identifier, attributes } => {
+            tr!(v.visit_variable_name(identifier));
             for attr in attributes {
                 tr!(v.visit_attribute_specifier(attr));
             }
@@ -2447,8 +2447,8 @@ pub fn walk_pointer_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, p: &'a mut Po
 /// Walk a direct declarator with mutable access.
 pub fn walk_direct_declarator_mut<'a, V: VisitorMut<'a> + ?Sized>(v: &mut V, d: &'a mut DirectDeclarator) -> V::Result {
     match d {
-        DirectDeclarator::Identifier { identifier, attributes, .. } => {
-            tr!(v.visit_variable_name_mut(&mut identifier.value));
+        DirectDeclarator::Identifier { identifier, attributes } => {
+            tr!(v.visit_variable_name_mut(identifier));
             for attr in attributes {
                 tr!(v.visit_attribute_specifier_mut(attr));
             }
