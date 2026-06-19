@@ -5,8 +5,8 @@ use std::{io::Write, path::PathBuf};
 use cgrammar::{
     printer::Context,
     visitor::{
-        Visitor, VisitorMut, walk_declaration_mut, walk_declarator_mut, walk_direct_declarator_mut,
-        walk_expression_mut, walk_statement_mut,
+        Visitor, VisitorMut, walk_compound_statement_mut, walk_declaration_mut,
+        walk_declarator_mut, walk_direct_declarator_mut, walk_expression_mut, walk_statement_mut,
     },
     *,
 };
@@ -66,6 +66,11 @@ impl VisitorMut<'_> for RemoveSpans {
     fn visit_declaration_mut(&mut self, d: &'_ mut Declaration) -> Self::Result {
         walk_declaration_mut(self, d);
         d.span = Default::default();
+    }
+
+    fn visit_compound_statement_mut(&mut self, c: &'_ mut CompoundStatement) -> Self::Result {
+        walk_compound_statement_mut(self, c);
+        c.lbrace = Default::default();
     }
 }
 

@@ -1432,7 +1432,12 @@ pub fn compound_statement<'a>() -> impl Parser<'a, Tokens<'a>, CompoundStatement
             .repeated()
             .collect::<Vec<BlockItem>>()
             .braced()
-            .map(|items| CompoundStatement { items }),
+            // `.braced()` consumes the single `Token::Braced` group, so `e.span()`
+            // is the whole `{ … }` span — its start offset is the opening brace.
+            .map_with(|items, e| CompoundStatement {
+                items,
+                lbrace: e.span(),
+            }),
     ))
     .labelled("compound statement")
     .as_context()

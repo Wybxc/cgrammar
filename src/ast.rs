@@ -1187,6 +1187,11 @@ pub struct LabeledStatement {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
+    /// Span of the block, anchored at the opening `{` (its start offset resolves
+    /// to the brace's line/`#line` context). Lets downstream tools locate a
+    /// `{ … }` statement — e.g. a `[[cst::proof]]` block — by its own line
+    /// rather than the enclosing function body. Default for synthesized blocks.
+    pub lbrace: Span,
 }
 
 /// Block items (6.8.2)
