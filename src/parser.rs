@@ -3,12 +3,7 @@
 use chumsky::prelude::*;
 use macro_rules_attribute::apply;
 
-use crate::{
-    ast::*,
-    context::State,
-    span::{Spanned, *},
-    utils::*,
-};
+use crate::{ast::*, context::State, span::*, utils::*};
 
 /// Utilities for the parser.
 pub mod parser_utils {
@@ -1432,12 +1427,7 @@ pub fn compound_statement<'a>() -> impl Parser<'a, Tokens<'a>, CompoundStatement
             .repeated()
             .collect::<Vec<BlockItem>>()
             .braced()
-            // `.braced()` consumes the single `Token::Braced` group, so `e.span()`
-            // is the whole `{ … }` span — its start offset is the opening brace.
-            .map_with(|items, e| CompoundStatement {
-                items,
-                lbrace: e.span(),
-            }),
+            .map_with(|items, e| CompoundStatement { items, span: e.span() }),
     ))
     .labelled("compound statement")
     .as_context()
@@ -1755,7 +1745,7 @@ pub fn function_definition<'a>() -> impl Parser<'a, Tokens<'a>, FunctionDefiniti
         attribute_specifier_sequence()
             .then(declaration_specifiers())
             .then(declarator().map_with(|declarator, e| Declr::new(declarator, e.span())))
-            .then(compound_statement().map_with(|body, e| Spanned::new(body, e.span())))
+            .then(compound_statement())
             .map(|(((attributes, specifiers), declarator), body)| FunctionDefinition {
                 attributes,
                 specifiers,
