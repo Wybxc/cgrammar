@@ -1427,7 +1427,7 @@ pub fn compound_statement<'a>() -> impl Parser<'a, Tokens<'a>, CompoundStatement
             .repeated()
             .collect::<Vec<BlockItem>>()
             .braced()
-            .map(|items| CompoundStatement { items }),
+            .map_with(|items, e| CompoundStatement { items, span: e.span() }),
     ))
     .labelled("compound statement")
     .as_context()
@@ -1744,7 +1744,7 @@ pub fn function_definition<'a>() -> impl Parser<'a, Tokens<'a>, FunctionDefiniti
         interpolation(),
         attribute_specifier_sequence()
             .then(declaration_specifiers())
-            .then(declarator())
+            .then(declarator().map_with(|declarator, e| Declr::new(declarator, e.span())))
             .then(compound_statement())
             .map(|(((attributes, specifiers), declarator), body)| FunctionDefinition {
                 attributes,

@@ -80,6 +80,7 @@ mod lexer_core {
                     ctx_map.insert_context(SourceContext {
                         filename: filename.into(),
                         line_offset: 0,
+                        start_offset: 0,
                     })
                 }),
                 ctx_map,
@@ -651,6 +652,7 @@ impl<'a> Lexer<'a> {
                 self.set_context(SourceContext {
                     filename: file.trim_matches('"').to_string(),
                     line_offset: self.lineno() - line_num,
+                    start_offset: self.cursor(),
                 });
             }
         }

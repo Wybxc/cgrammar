@@ -624,7 +624,7 @@ pub fn walk_function_definition<'a, V: Visitor<'a> + ?Sized>(v: &mut V, f: &'a F
         tr!(v.visit_attribute_specifier(attr));
     }
     tr!(v.visit_declaration_specifiers(&f.specifiers));
-    tr!(v.visit_declarator(&f.declarator));
+    tr!(v.visit_declarator(&f.declarator.value));
     v.visit_compound_statement(&f.body)
 }
 
@@ -1842,7 +1842,7 @@ pub fn walk_function_definition_mut<'a, V: VisitorMut<'a> + ?Sized>(
         tr!(v.visit_attribute_specifier_mut(attr));
     }
     tr!(v.visit_declaration_specifiers_mut(&mut f.specifiers));
-    tr!(v.visit_declarator_mut(&mut f.declarator));
+    tr!(v.visit_declarator_mut(&mut f.declarator.value));
     v.visit_compound_statement_mut(&mut f.body)
 }
 

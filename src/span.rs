@@ -21,6 +21,11 @@ pub struct SourceContext {
     /// The offset from the line numbers in the input code to the original
     /// source file.
     pub line_offset: i32,
+    /// Byte offset in the (preprocessed) source where this context begins —
+    /// i.e. just after the `#line` directive that introduced it. Lets a caller
+    /// resolve the correct context for an arbitrary offset, independent of the
+    /// `ctx_id` a span happens to carry.
+    pub start_offset: usize,
 }
 
 /// An identifier for a source context.
@@ -70,6 +75,17 @@ impl<'a> ContextMapping<'a> {
     /// Inserts a new source context and returns its ID.
     pub fn insert_context(&mut self, context: SourceContext) -> ContextId {
         self.contexts.insert(context).into()
+    }
+
+    /// The source context active at `offset` — the one with the greatest
+    /// `start_offset` not exceeding `offset`. Use this to resolve a location
+    /// from a byte offset robustly, rather than trusting a span's `ctx_id`
+    /// (which, for spans built by the parser, reflects the input's end context).
+    pub fn context_at_offset(&self, offset: usize) -> Option<&SourceContext> {
+        self.contexts
+            .iter()
+            .filter(|c| c.start_offset <= offset)
+            .max_by_key(|c| c.start_offset)
     }
 }
 
@@ -121,6 +137,31 @@ impl Span {
     /// Create a new end-of-input span at the given position and context ID.
     pub fn new_eoi(pos: usize, ctx_id: ContextId) -> Self {
         Self { start: pos, len: 0, ctx_id }
+    }
+
+    /// A zero-length span pinned at this span's start, keeping this span's
+    /// `ctx_id`. Note the inherited `ctx_id` reflects *this* span's context, not
+    /// necessarily the one active at the start offset — if the span crosses a
+    /// `#line` directive, resolve the start offset with
+    /// [`ContextMapping::context_at_offset`] instead.
+    pub fn start_point(self) -> Self {
+        Self {
+            start: self.start,
+            len: 0,
+            ctx_id: self.ctx_id,
+        }
+    }
+
+    /// A zero-length span pinned at this span's end, keeping this span's
+    /// `ctx_id`. As with [`Span::start_point`], the inherited `ctx_id` may not
+    /// match the context active at the end offset across a `#line` directive;
+    /// use [`ContextMapping::context_at_offset`] when that matters.
+    pub fn end_point(self) -> Self {
+        Self {
+            start: self.start + self.len as usize,
+            len: 0,
+            ctx_id: self.ctx_id,
+        }
     }
 
     /// Get the context and range of this span.

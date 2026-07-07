@@ -1187,6 +1187,7 @@ pub struct LabeledStatement {
 #[cfg_attr(feature = "dbg-pls", derive(DebugPls))]
 pub struct CompoundStatement {
     pub items: Vec<BlockItem>,
+    pub span: Span,
 }
 
 /// Block items (6.8.2)
@@ -1285,7 +1286,7 @@ pub enum ExternalDeclaration {
 pub struct FunctionDefinition {
     pub attributes: Vec<AttributeSpecifier>,
     pub specifiers: DeclarationSpecifiers,
-    pub declarator: Declarator,
+    pub declarator: Declr,
     pub body: CompoundStatement,
 }
 
